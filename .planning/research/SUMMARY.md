@@ -1,251 +1,175 @@
 # Project Research Summary
 
-**Project:** Noetree v1.0 Monetisation and Paiements
-**Domain:** Freemium SaaS subscription billing + AI credits metering (Stripe + Convex + Clerk)
-**Researched:** 2026-07-07
+**Project:** Noetree — v1.1 Marketplace de notes
+**Domain:** Peer-to-peer digital-goods marketplace (notes/knowledge artifacts) with Stripe Connect payouts, bolted onto an existing Next.js 15 + Convex + Clerk + Stripe SaaS
+**Researched:** 2026-07-12
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Noetree v1.0 adds a Free/Pro subscription model and an AI credits top-up system on top of an already-functional Next.js 15 / Convex / Clerk stack. The integration follows a well-established pattern: Stripe handles money and lifecycle events, Convex is the real-time source of truth for subscription state, and Clerk userId is the link between the two systems. The critical non-obvious requirement is that the Clerk userId must be embedded in Stripe metadata at checkout time because webhooks arrive without a Clerk session. All subscription enforcement must live server-side in Convex mutations, never in UI alone.
+This milestone adds a peer-to-peer notes marketplace to Noetree: any user (Free or Pro) can list a note or note+subtree for sale at a self-set price, choose whether buyers get an editable copy or read-only access, and receive automatic payouts minus a flat 15% platform commission via Stripe Connect. The closest reference marketplaces (Gumroad, Etsy digital, Notion Marketplace, PromptBase) converge on the same table-stakes shape - a browsable/searchable catalog, partial preview before purchase, instant delivery, a buyer purchase history, and a seller earnings view - all of which map cleanly onto this milestone's confirmed scope. The one genuine differentiator, and the single highest-complexity piece of the whole milestone, is the "read-only live access" delivery mode: no reference marketplace offers in-place, non-downloadable access to someone else's content, and this requires extending, not rebuilding, the app's existing single-owner permission model.
 
-The recommended build approach is schema-first: add new Convex tables before writing any feature code, then wire the webhook handler, then build checkout, and only then build UI that reads from subscription state. This order is dictated by hard dependencies: the webhook populates state that all UI reads, and Convex schema changes require redeployment before any code referencing new tables can compile.
+The recommended approach requires no new production dependencies: Stripe Connect (Express accounts, Account Links hosted onboarding, destination charges via a single Checkout Session with application_fee_amount + transfer_data.destination) rides entirely on the stripe package already installed. Architecturally, the research is emphatic that this milestone should be built by extending existing, proven subsystems rather than inventing parallel ones: the "read-only" grant mode should insert into the existing shares table (reusing the already-tested ancestor-aware getUserPermission resolution), and the "editable copy" grant mode should reuse (via a shared extracted helper) the existing recursive subtree-duplication logic in notes.ts. Convex native searchIndex covers marketplace search without a new search service.
 
-The highest-risk pitfalls are infrastructure failures that cause silent billing breakage in production: raw body destruction before Stripe signature verification, mismatched webhook secrets across environments, Vercel Deployment Protection blocking webhook POSTs, and missing idempotency on webhook event processing. All four must be handled in the first two phases. Credits deduction atomicity (TOCTOU) and the Clerk-Stripe metadata linkage are the two other places where a small error causes a hard-to-diagnose production bug.
-
----
+The dominant risk cluster is Stripe Connect integration correctness, not product design: (1) treating a completed onboarding redirect as proof a seller can actually receive payouts, when only charges_enabled/payouts_enabled from the account object (kept in sync via a separate, distinctly-signed Connect webhook stream) are authoritative; (2) the existing checkout.session.completed handler currently treats every mode:payment session as an AI-credits top-up with no metadata.type discriminator, so without a fix a marketplace purchase could silently grant the wrong thing; (3) idempotency-key collisions when one purchase event must trigger multiple independent side effects (order record, access grant, payout record), an exact bug class that already bit this codebase once (Phase 06.1) and must be designed against explicitly with per-operation composite keys; (4) reusing the existing duplicateNote recursion verbatim for purchased copies would inherit two real gaps (no Free-tier quota enforcement, no idempotency guard against webhook retries) that are currently invisible because that code only runs in a same-owner, synchronous context. All four are well-documented, mechanically fixable pitfalls with concrete prevention/verification strategies below, not open research questions.
 
 ## Key Findings
 
-### Stack Additions
+### Recommended Stack
 
-Two npm packages needed. The existing stack (Next.js 15, Convex 1.19.5, Clerk 6.x, Shadcn) is not re-evaluated.
+No new npm packages are required for the MVP checkout/onboarding flow - Stripe Connect (Express accounts, Account Links, destination charges) is part of the API surface of the stripe Node SDK already installed (22.3.0, optional patch bump to 22.3.1). Convex native searchIndex (installed ^1.40.0, optional minor bump to ^1.41.0 per project guideline baseline) handles marketplace browse/search without a second search system. The one architecturally significant stack decision is Express connected accounts plus destination charges via a single Checkout Session, chosen over Standard/Custom accounts and over separate-charges-and-transfers - this is Stripe's own default recommendation for a single-seller-per-order marketplace of casual individual sellers.
 
-- `stripe` (^17.x, latest ~22.x on npm) — server-side Stripe API calls in Route Handlers; only viable option
-- `@stripe/stripe-js` (^4.x) — client-side loadStripe() for Checkout redirect; loaded lazily, tiny footprint
+**Core technologies:**
 
-Rejected: `@convex-dev/stripe` (v0.1.3) requires Convex Components migration (convex.config.ts does not exist), conflicts with existing users/roles tables, and has a known bug where customer.subscription.updated does not update priceId (GitHub issue #7). Manual implementation is ~150 lines and gives full schema control.
+- stripe Node SDK (existing, ^22.3.1) - Connect Accounts v1 (accounts.create type express), Account Links hosted onboarding, destination charges (application_fee_amount + transfer_data.destination) - already installed, no new dependency, verified against SDK source (Context7) and official Stripe docs.
+- Convex searchIndex (existing) - full-text search over listing title/description with filterFields for tags/status - native, no external search service needed at this scale.
+- Stripe Connect Express account type - Stripe-hosted KYC/onboarding, lowest integration effort, explicitly Stripe's recommended default for marketplaces where sellers are casual individuals with no existing Stripe account.
+- Destination charges (not separate charges/transfers, not direct charges) - one Checkout Session atomically splits payment and computes commission server-side; correct pattern specifically because current scope is always exactly one seller per order.
 
-New infrastructure files (no additional packages):
+One flagged gap: Stripe GA'd a newer "Accounts v2" configuration model in Q2 2026; existing v1 integrations (including this project's existing Customer/Subscription usage) do not need to migrate, and mature Checkout-Session-with-v2-config guidance wasn't confirmed during research - build on v1 Express for this milestone, don't mix v1 and v2 in the same feature.
 
-- `app/api/webhooks/stripe/route.ts` — Stripe webhook receiver, Node.js runtime forced with `export const runtime = "nodejs"`
-- `app/api/checkout/route.ts` — creates Stripe Checkout Session
-- `convex/subscriptions.ts` — subscription queries + internalMutations
-- `convex/aiCredits.ts` — credits balance queries + deduction mutations
+### Expected Features
 
-Env var discipline: STRIPE*SECRET_KEY, STRIPE_WEBHOOK_SECRET, and Price IDs are server-only and must never have the NEXT_PUBLIC* prefix. Only NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is safe to expose to the client.
+Table-stakes features are well-established across 4+ reference marketplaces (Gumroad, Etsy, Notion Marketplace, PromptBase) and map directly onto this milestone's already-confirmed decisions in PROJECT.md. The genuine differentiator - read-only live access - has no reference precedent and is the highest-risk/highest-value feature.
 
----
+**Must have (table stakes):**
 
-### Table Stakes vs Differentiators
+- Marketplace browse page with search, tag filter, sort (newest/price/popularity), filter state preserved via URL params
+- Listing detail page with partial preview (title + description + excerpt; subtree note-count shown but not contents)
+- Buy to Stripe Checkout to instant delivery (copy or read-only access)
+- "My Purchases" buyer library page; already-purchased indicator; self-purchase prevention
+- Seller: create/edit/unpublish listing flow; deferred Connect onboarding (triggered at first listing creation, not signup); basic earnings view (gross/commission/net, running balance)
+- Pre-checkout Free-tier quota check for copy-mode listings (must happen before payment, since sales are final)
 
-**Must have (table stakes — missing = product feels untrustworthy):**
+**Should have (differentiators, not required for launch):**
 
-- Pricing page showing Free vs Pro plans
-- Hard note limit enforcement at 20 for Free tier, enforced in Convex createNote mutation (never client-side only)
-- Upgrade prompt when hitting the limit (industry standard: Notion, Evernote pattern)
-- In-app subscription confirmation after payment (PAY-02) — critical trust signal
-- Cancel subscription from within the app (PAY-04, SET-04) — users who cannot cancel dispute charges
-- Settings page with plan and renewal date — reduces unexpected charge support tickets
-- Webhook idempotency — Stripe retries 72h; double credit grants are a real financial bug
-- Real-time plan reflection after webhook fires — Convex reactive queries eliminate page reload
+- Read-only "live" access mode - unique among reference marketplaces, but architecturally the most novel piece (new cross-user access-grant concept)
+- Note+subtree bundle sales - leverages the app's hierarchical structure vs. flat-file competitors
+- Seller public profile/storefront - defer until enough sellers exist to make it meaningful
 
-**Should have (differentiators for Noetree):**
+**Defer (v2+):**
 
-- AI credits balance visible near the AI feature entry point, not only in Settings
-- Credits top-up via Stripe Checkout (PAY-05) — secondary revenue stream on top of subscription
-- Monthly credits auto-reset tied to invoice.paid billing cycle, not calendar cron
-- Top-up purchase history (SET-05) — trust signal, reduces support tickets
-- Low-credits nudge before reaching zero — prevents frustration mid-session
-
-**Defer to v2+:**
-
-- Stripe Customer Portal — explicitly out of scope per PROJECT.md; custom Settings UI chosen for UX cohesion
-- Credit expiry with short windows — creates resentment and support burden
-- Pause subscription, prorated downgrade enforcement, teams/seats, marketplace
-
----
+- Multi-seller cart checkout - conflicts with Stripe's single-destination-per-session limitation; would require a full separate-charges-and-transfers rework
+- Ratings/reviews and content moderation - explicitly paired together, both deferred (unmoderated reviews = abuse surface)
+- Discount codes/coupons, wishlist/favorites, curated/Discover-style ranking (no supply yet to rank), refunds/disputes handling (explicitly out of scope - final sales)
 
 ### Architecture Approach
 
-Three subsystems: (1) a Next.js Route Handler creates Checkout Sessions and receives webhooks, (2) Convex internalMutations are the single writer of subscription state called from the webhook via ConvexHttpClient, (3) Convex reactive queries provide real-time plan enforcement and UI state. The Clerk userId is embedded in both session.metadata and subscription_data.metadata at checkout time, allowing all subsequent webhook events including monthly renewal to recover the user identity.
+The recommended architecture is additive and deliberately reuses proven subsystems rather than building parallel ones: three new Convex tables (connectAccounts, listings, purchases) plus a purchaseId extension to the existing shares table, a new (marketplace) route group (public, no-auth browse distinct from the authenticated (app) shell), and modifications to the existing stripeWebhooks.ts dispatcher and notes.ts (extracting the private recursive-copy logic into a shared, owner-parameterized helper). The single most important structural decision is: "access" grants are shares rows, and "copy" grants reuse (via extraction) the existing subtree-duplication algorithm - avoiding a second, divergent permission/copy system.
 
 **Major components:**
 
-1. `app/api/webhooks/stripe/route.ts` — event ingestion; validates signature with request.text() before any parsing; `export const runtime = "nodejs"` required; route excluded from Clerk middleware protection
-2. `convex/subscriptions.ts` — internalMutation upsertSubscription; handles all 5 lifecycle events with upsert pattern for out-of-order delivery safety
-3. `convex/aiCredits.ts` — mutation consumeCredits (atomic check+deduct in one OCC-protected handler); internalMutation resetCredits; query getBalance
-4. `convex/schema.ts` additions — 4 new tables
+1. connectAccounts (Convex, new) - tracks each seller's Stripe Express account + onboarding/capability state (charges_enabled/payouts_enabled), kept in sync via the Connect webhook stream, gates both listing creation and checkout creation server-side.
+2. listings (Convex, new) - a note or note+subtree offered for sale (price in cents, scope, grant mode, status); owner-only creation, browsed/searched via Convex searchIndex.
+3. purchases (Convex, new) - one row per completed sale, created idempotently from the webhook-driven fulfillment mutation; drives buyer's "My Purchases" and seller's earnings view.
+4. shares (existing, extended) - reused verbatim for read-only access grants, with a new optional purchaseId field that guards against a seller revoking access a buyer already paid for.
+5. Shared copyNoteSubtree helper (new, extracted from notes.ts) - recursive duplication with an explicit newOwnerId parameter, callable from both same-owner duplication and cross-owner marketplace copy-grants, with pre-flight Free-tier quota checks and purchase-scoped idempotency.
+6. stripeWebhooks.ts (existing, modified) - adds an account.updated case and a session.metadata.type discriminator inside the existing checkout.session.completed branch (critical fix, see pitfalls).
 
-**New tables:**
+### Critical Pitfalls
 
-- `subscriptions`: userId, clerkUserId, stripeCustomerId, stripeSubscriptionId, planType, status, currentPeriodStart, currentPeriodEnd, createdAt, updatedAt — indexes: by_userId, by_clerkUserId, by_stripeCustomerId, by_stripeSubscriptionId
-- `aiCredits`: userId, clerkUserId, balance, monthlyQuota, billingPeriodStart, billingPeriodEnd, updatedAt — indexes: by_userId, by_clerkUserId
-- `creditTransactions`: userId, type (monthly_grant|topup_purchase|ai_consumption), amount, stripePaymentIntentId, description, createdAt — indexes: by_userId, by_userId_and_type
-- `processedStripeEvents`: stripeEventId, processedAt — unique index by_stripe_event_id (idempotency guard)
-
-**Modified files:** convex/schema.ts (4 new tables), convex/notes.ts (20-note guard in createNote treating null subscription as Free), middleware.ts (exclude /api/webhooks/\*\* from Clerk protection).
-
-**Stripe events handled:** checkout.session.completed, customer.subscription.updated, customer.subscription.deleted, invoice.paid, invoice.payment_failed
-
----
-
-### Top 5 Critical Pitfalls
-
-1. **Raw body destroyed before signature verification** — Use `request.text()` as the very first line of the webhook handler before any other body access. Any call to `request.json()` or middleware body parsing before `stripe.webhooks.constructEvent()` invalidates the signature and silently drops all webhooks. Also declare `export const runtime = "nodejs"` to prevent Edge runtime.
-
-2. **Wrong webhook secret per environment** — The stripe listen CLI secret, the Stripe Dashboard test-endpoint secret, and the live-endpoint secret are three different values. Copying the CLI secret into Vercel production means all production webhooks return 400 silently for 72 hours then stop retrying. Maintain three separate env vars, verify against Stripe Dashboard Webhook Attempts logs at each environment.
-
-3. **Vercel Deployment Protection blocks Stripe webhook POSTs** — Stripe POSTs have no auth header. Vercel Deployment Protection (enabled by default on preview deployments) returns 401. Stripe logs show "delivered" but the app never processes anything. Fix: add VERCEL_AUTOMATION_BYPASS_SECRET to the webhook URL query string, or disable protection for the webhook path.
-
-4. **No idempotency guard on webhook processing** — Stripe retries for 72 hours on any non-200 response. Without a processedStripeEvents deduplication table, a transient Convex error causes double credit grants on retry. Check-and-insert must wrap every event handler. Add a unique index on stripeEventId as a hard safety net.
-
-5. **Credits deduction TOCTOU across separate Convex calls** — Reading balance in one query then writing in a separate mutation allows two concurrent requests to both pass the balance check. Convex OCC only protects a single mutation transaction. The balance check AND the deduction must be in the same mutation handler — never split across query + mutation.
-
-**Additional high-severity pitfalls to prevent:**
-
-- Set clerkUserId in BOTH session.metadata AND subscription_data.metadata — renewal events carry only subscription metadata, not session metadata
-- Treat null subscription row as Free tier (not error) — all pre-existing users have no subscriptions row
-- Drive credits reset from invoice.paid with billing_reason === "subscription_cycle", not calendar cron
-- Never use NEXT*PUBLIC* prefix for secret key or webhook secret
-
----
+1. **Sellers allowed to list/sell before Connect onboarding is truly complete** - the hosted-onboarding return redirect is not proof of verification; gate "can list"/"can receive payouts" on live charges_enabled and payouts_enabled state synced via the Connect webhook stream, re-checked server-side at both listing-creation and checkout-creation time, and able to regress (re-block) later.
+2. **Connect webhook events silently never arrive** - connected-account events (account.updated, etc.) are a separate event stream requiring a distinct, connect-scoped webhook endpoint with its own signing secret; wiring new case branches into the existing single-secret handler without this registration means events are silently dropped (0 retries, 0 errors).
+3. **Idempotency-key collisions across multi-effect purchase events** - this exact bug class already required a dedicated gap-closure phase (06.1) for grantInitialCredits vs upsertSubscription. A marketplace purchase must independently create an order record, an access/copy grant, and a payout record from one webhook event; each needs its own composite idempotency key (event.id plus operation suffix), never the bare event id.
+4. **Reusing the existing checkout.session.completed handler unmodified** - it currently treats every mode:payment session as an AI-credits top-up with no metadata.type check; without adding that discriminator, a marketplace purchase could error or silently grant the wrong thing (AI credits instead of a note).
+5. **Reusing duplicateNote's recursion verbatim for purchased copies** - inherits two live gaps: no Free-tier quota enforcement at all, and no idempotency guard against webhook retries duplicating the purchase. Requires a dedicated purchase-copy path with pre-flight quota checks and a purchase-scoped idempotency key.
 
 ## Implications for Roadmap
 
-Strict 6-phase dependency chain. Each phase must complete before the next is testable.
+Based on combined research, the dependency chain is unusually linear and well-constrained: Connect onboarding must exist before listings can be legitimately created; listings must exist before checkout; checkout (and its webhook-handler fix) must exist before purchase fulfillment; fulfillment must exist before any purchase-history UI. The architecture research's own "Build Order Implications" section already lays out this exact sequence, and it should be adopted directly as phase structure.
 
-### Phase 1: Schema + Infrastructure Foundation
+### Phase 1: Connect Onboarding and Seller Enablement
 
-**Rationale:** Convex schema changes require redeployment before any referencing code compiles. This phase has no UI — it is the foundation everything else builds on.
-**Delivers:** 4 new Convex tables deployed; stripe and @stripe/stripe-js installed; all env vars in place across all environments; middleware.ts updated to exclude webhook path; stub Convex modules that compile.
-**Addresses:** Pre-requisite for all 19 REQUIREMENTS.md items.
-**Avoids:** Schema-not-found deploy failures; NEXT*PUBLIC* secret exposure established correctly from day one.
-**Research flag:** Standard — Convex schema and env var patterns are well-documented.
+**Rationale:** Nothing else can be tested end-to-end without a charges_enabled true test seller account existing first; this is also where the highest-severity Connect pitfalls (Pitfall 1, 2) must be closed.
+**Delivers:** connectAccounts table, stripe.accounts.create/accountLinks.create server action, a second Connect-scoped webhook endpoint + distinct signing secret, account.updated webhook case syncing charges_enabled/payouts_enabled, SettingsSellerCard UI.
+**Addresses:** "Seller: Stripe Connect (Express) onboarding, deferred until first listing creation" (FEATURES.md P1).
+**Avoids:** Pitfall 1 (onboarding-redirect treated as proof of capability) and Pitfall 2 (Connect webhook misrouting) - both flagged as needing live verification via stripe listen --forward-connect-to, not just code review.
 
-### Phase 2: Webhook Handler + Convex Internal Mutations
+### Phase 2: Listings CRUD and Marketplace Browse/Search
 
-**Rationale:** Webhook is the single writer of subscription state. Without a working webhook, checkout and settings UI cannot be tested — everything shows Free regardless of payment. Must be verified end-to-end with stripe listen before Phase 3 begins.
-**Delivers:** Working webhook at app/api/webhooks/stripe/route.ts; all 5 event types handled; idempotency via processedStripeEvents; upsert pattern for out-of-order event safety; credits reset from invoice.paid with billing_reason check.
-**Addresses:** PAY-03, CRED-01 (foundational for PAY-01, PAY-02, PAY-04, PAY-05).
-**Avoids:** Pitfalls 1, 2, 4 (raw body, wrong env secret, idempotency); Pitfalls 9, 10, 14 (out-of-order events, billing-cycle reset, subscription.deleted handled).
-**Research flag:** Needs careful implementation — verify raw body, idempotency table, and upsert with `stripe listen` before merging.
+**Rationale:** Can be built and demoed against manually-flagged test charges_enabled accounts before Checkout is wired up; keeps payment risk isolated from discovery-UI risk.
+**Delivers:** listings table with by_status index, createListing/listListings/getListing Convex functions, (marketplace) public route group (browse + detail pages), ListingFormDialog, "List for sale" note-tree action, partial-preview rendering (title/description/excerpt only, never full content server-side).
+**Uses:** Convex searchIndex (STACK.md); owner-only listing gate + attestation checkbox (PITFALLS.md Pitfall 7).
+**Implements:** listings.ts to connectAccounts.ts boundary (re-verify chargesEnabled at listing-creation time, not just checkout time).
 
-### Phase 3: Checkout Flow + Pricing Page
+### Phase 3: Marketplace Checkout and Webhook Metadata Fix
 
-**Rationale:** Can only be built after webhook is working because checkout triggers the webhook. Testing: start stripe listen, click upgrade, verify webhook fires, verify Convex subscriptions row created.
-**Delivers:** /pricing page (PLAN-01); app/api/checkout/route.ts with clerkUserId in BOTH metadata locations; post-checkout success page that polls Convex read-only until webhook confirms activation (PAY-02); Stripe customer dedup by email.
-**Addresses:** PLAN-01, PAY-01, PAY-02.
-**Avoids:** Pitfall 3 (success URL polls only, never writes subscription state); Pitfall 8 (orphaned customers); Pitfall 15 (metadata on both session and subscription_data).
-**Research flag:** Standard — double-check metadata placement on both objects is the one detail requiring care.
+**Rationale:** Necessarily touches the existing checkout.session.completed handler (Anti-Pattern 3 / Pitfall 4), so this phase must budget regression time for the existing AI-credits-topup path, not just build the new branch in isolation - the architecture research explicitly calls this out as the single most important integration risk in the milestone.
+**Delivers:** createMarketplaceCheckoutSession server action (destination charge: application_fee_amount computed server-side in integer cents from the stored listing price + transfer_data.destination), session.metadata.type discriminator added to the existing webhook switch, self-purchase prevention.
+**Avoids:** Pitfall 4 (commission rounding/client-controlled fee - needs a unit test asserting sellerNet + platformFee equals grossCharge), Pitfall 8 (charge-type consistency - destination charges only, documented explicitly).
 
-### Phase 4: Plan Enforcement
+### Phase 4: Purchase Fulfillment (Copy and Access Grants)
 
-**Rationale:** Enforcement reads the subscriptions table which Phases 1-3 establish. Pre-existing users have no subscriptions row — guard must handle null as Free tier.
-**Delivers:** 20-note hard limit in convex/notes.ts createNote mutation (PLAN-02); upgrade prompt component on limit hit (PLAN-04); plan badge in dashboard (PLAN-03).
-**Addresses:** PLAN-02, PLAN-03, PLAN-04.
-**Avoids:** Pitfall 7 (client-side-only enforcement bypass — Convex mutation is the authority).
-**Research flag:** Standard — straightforward Convex mutation guard pattern.
+**Rationale:** Depends on Phase 3 existing so there's a real webhook event to fulfill against; deliberately scoped separately from raw checkout wiring because it touches the existing note-tree and quota systems, not just Stripe.
+**Delivers:** purchases table, copyNoteSubtree helper extracted from notes.ts's private duplicateRecursive (parameterized by newOwnerId, pre-flight Free-tier quota check across the whole subtree, purchase-scoped idempotency key), shares.purchaseId schema extension + revoke-guard in removeShare/updateShareRole.
+**Addresses:** "Instant delivery: copy mode" and "Instant delivery: read-only mode" (FEATURES.md P1); "Pre-purchase Free-tier quota check" (FEATURES.md P1).
+**Avoids:** Pitfall 3 (per-operation idempotency keys, verified via a replay-the-webhook-twice test), Pitfall 5 (unbounded recursion / quota bypass / no idempotency in copy grants), Pitfall 6 (IDOR - access must route through the existing shares/getUserPermission path, never a parallel mechanism).
 
-### Phase 5: AI Credits System
+### Phase 5: Buyer and Seller History UI
 
-**Rationale:** Credits exist only for Pro users who went through checkout (Phase 3). The aiCredits row is created by the Phase 2 webhook handler. This phase adds the deduction layer and top-up flow.
-**Delivers:** Atomic consumeCredits mutation in single handler (CRED-04); getBalance query; credits display near AI features (CRED-02); credits top-up checkout reusing Phase 3 pattern with mode: payment (PAY-05, CRED-03); top-up history from creditTransactions (SET-05 partial).
-**Addresses:** CRED-02, CRED-03, CRED-04, PAY-05 (CRED-01 was handled in Phase 2 webhook).
-**Avoids:** Pitfall 6 (TOCTOU — single atomic mutation); Pitfall 18 (use checkout.session.completed with payment_status: paid for top-up, not pre-payment events).
-**Research flag:** Standard — Convex OCC mutation pattern is well-documented.
-
-### Phase 6: Settings Page
-
-**Rationale:** Read-only aggregation of state all previous phases have established. Building last avoids building settings UI for features not yet stable.
-**Delivers:** /dashboard/settings showing plan (SET-01), renewal date (SET-02), upgrade CTA (SET-03), cancel with confirmation dialog + Stripe API + Convex sync (SET-04), credits balance and top-up history (SET-05, PAY-04).
-**Addresses:** SET-01, SET-02, SET-03, SET-04, SET-05, PAY-04.
-**Avoids:** Cancel flow must display cancel_at_period_end state — actual downgrade fires only on customer.subscription.deleted (handled in Phase 2).
-**Research flag:** Standard — UI assembly of Convex reactive queries.
+**Rationale:** Purely additive read-only views once Phase 4 is producing purchases rows; lowest risk, can slip to the end without blocking other phases.
+**Delivers:** "My Purchases" buyer page, seller earnings/sales view (gross/commission/net per sale, running balance, payout status), already-purchased indicator.
+**Addresses:** Remaining P1 features from FEATURES.md (buyer library, seller earnings view, manage/unpublish listings).
 
 ### Phase Ordering Rationale
 
-- Schema first: Convex deploy order is strict; tables must exist before referencing code compiles
-- Webhook second: sole writer of subscription state; cannot test anything without it
-- Checkout third: triggers the webhook; both must be running to test end-to-end
-- Enforcement fourth: reads subscription state that only exists after Phases 2-3
-- Credits fifth: Pro-user aiCredits rows created by Phase 2 webhook; deduction layer builds on top
-- Settings last: aggregates all state from all prior phases; no new data shapes
+- Connect onboarding is a hard prerequisite for anything sale-related - it must exist and be live-verified (not just code-complete) before listing creation can be meaningfully tested.
+- Listings/browse is deliberately sequenced before checkout so discovery-UI work isn't blocked on payment-integration risk, and can be demoed with manually-flagged test accounts.
+- The webhook-handler fix (metadata-type discriminator) is bundled into the checkout phase, not deferred, because it modifies existing production code path (AI-credits top-up) that must be regression-tested alongside the new branch, not treated as an independent add.
+- Purchase fulfillment is split from checkout wiring specifically because it touches two existing, sensitive subsystems (note-tree quota, permission model) that deserve dedicated pitfall-focused testing (replay/idempotency, quota-boundary, IDOR) rather than being folded into payment plumbing.
+- History/dashboard UI is last because it is purely derivative of data produced by earlier phases and carries no architectural risk of its own.
 
 ### Research Flags
 
-Phases needing careful implementation attention:
+Needs deeper research during planning:
 
-- **Phase 2 (Webhook):** Three specific checks before merge — request.text() raw body, processedStripeEvents idempotency table present, upsert not insert. Verify all 5 event types with stripe listen.
-- **Phase 3 (Checkout):** Verify clerkUserId is set on BOTH session.metadata AND subscription_data.metadata.
-- **Phase 5 (Credits deduction):** Verify consumeCredits is one mutation with read+write in same handler.
+- **Phase 1 (Connect onboarding):** Confirm current Stripe Dashboard/CLI configuration steps for registering a second, connect-scoped webhook endpoint in this specific Stripe account (test mode) - the "how" is well-documented, but this project has never done it before and should live-verify with stripe listen --forward-connect-to plus stripe trigger --stripe-account before considering the phase done.
+- **Phase 3 (Checkout and webhook fix):** Confirm the exact shape of the existing checkout.session.completed switch in convex/stripeWebhooks.ts at implementation time (line numbers cited in research may drift) and write the replay-idempotency test per Pitfall 3's precedent (Phase 06.1) before considering this phase done.
+- **Phase 4 (Purchase fulfillment):** The Free-tier quota pre-flight check for subtree-sized copies is new logic not present anywhere in the codebase today (existing createNote only checks one note at a time) - treat the "count subtree size before starting the copy" logic as needing its own design pass during phase planning, not a copy-paste of FREE_NOTE_LIMIT.
 
-Phases with standard well-documented patterns:
+Phases with standard, well-documented patterns (research-phase can likely be skipped):
 
-- **Phase 1:** Convex schema addition, env var setup
-- **Phase 4:** Mutation guard with note count check
-- **Phase 6:** Settings page UI assembly
-
----
-
-## Open Questions Requiring Product Decisions Before Coding
-
-| Question                                                         | Blocks                                                   | Owner         |
-| ---------------------------------------------------------------- | -------------------------------------------------------- | ------------- |
-| What is the Pro plan monthly price?                              | Phase 3: Stripe Price creation, pricing page copy        | Product owner |
-| What is the monthly AI credits quota for Pro (e.g. 100 credits)? | Phase 2: monthlyQuota value in webhook handler           | Product owner |
-| What does 1 AI credit correspond to in usage?                    | Phase 5: cost parameter per AI action in consumeCredits  | Product owner |
-| What is the top-up pack size and price?                          | Phase 3: Stripe one-time Price; Phase 5: top-up checkout | Product owner |
-| What is the upgrade prompt copy framing?                         | Phase 4: upgrade prompt component text and CTA           | Product owner |
-
----
+- **Phase 2 (Listings CRUD and browse):** Convex searchIndex, table CRUD, and route-group structuring all follow patterns already established elsewhere in this codebase and Convex's own docs.
+- **Phase 5 (History UI):** Purely reactive Convex query/UI work mirroring the existing SettingsPlanCard/SettingsCreditsCard pattern already in the codebase.
 
 ## Confidence Assessment
 
-| Area         | Confidence | Notes                                                                                                                                                                             |
-| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stack        | HIGH       | Verified via Context7 stripe-node, official Convex blog, npm. @convex-dev/stripe rejection is MEDIUM due to schema mismatch and GitHub issue #7.                                  |
-| Features     | HIGH       | Corroborated across Stripe docs, Stigg/Appcues/Lago SaaS research, competitor analysis.                                                                                           |
-| Architecture | HIGH       | Verified against official Convex docs, Stripe subscription webhook docs, and Clerk blog on Stripe metadata pattern. Webhook-in-Next.js is the project constraint from PROJECT.md. |
-| Pitfalls     | HIGH       | Multiple production post-mortems plus official Stripe/Convex/Vercel docs. Detection methods documented for each.                                                                  |
+| Area         | Confidence  | Notes                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stack        | HIGH        | Stripe Connect core mechanics (Express accounts, Account Links, destination charges) verified directly against stripe-node SDK source via Context7 and official Stripe docs; no new dependency required. One flagged LOW-MEDIUM sub-area: Stripe's newer "Accounts v2" path is intentionally not adopted this milestone and should be spot-checked again before any future migration. |
+| Features     | MEDIUM-HIGH | Cross-verified across 4+ real reference marketplaces (Gumroad, Etsy, Notion Marketplace, PromptBase); the one genuine differentiator (read-only live access) has no reference precedent by definition, so its UX patterns are inferred/designed rather than benchmarked.                                                                                                              |
+| Architecture | HIGH        | Grounded directly in this repo's existing code (convex/schema.ts, notes.ts, stripeWebhooks.ts, subscriptions.ts, actual route/component files read directly), not generic assumptions; Stripe Connect specifics verified against current official docs but not yet tested against this repo's live Stripe account.                                                                    |
+| Pitfalls     | MEDIUM-HIGH | Stripe Connect mechanics verified against official docs; codebase-integration findings (idempotency-key collision precedent, existing webhook branch behavior, existing duplicateNote gaps) verified by directly reading the actual source files, not inferred.                                                                                                                       |
 
 **Overall confidence:** HIGH
 
-### Gaps to Address During Planning
+### Gaps to Address
 
-- **Stripe Price IDs**: Must be created in Stripe Dashboard (test mode first, then live mode) before Phase 3 coding begins. Blocked on product pricing decisions above.
-- **Existing user migration**: No data migration needed. A ensure-subscription-row-exists function on first login is advisable so Settings page shows meaningful state for existing Free users. Address during Phase 4.
-- **Vercel environment setup**: Three webhook secrets (CLI, staging, production) must be documented and kept separate. Staging needs its own Stripe test-mode endpoint registered in the Stripe Dashboard. Ops task for Phase 1.
-- **invoice.paid field validation**: Verify billing_reason === "subscription_cycle" is the correct current field name at implementation time — Stripe has renamed event fields before.
-
----
+- **Stripe Accounts v2 migration timing:** Explicitly deferred - build v1 Express this milestone; re-evaluate v2 in a later milestone once Checkout/Connect documentation for it matures. Flag for future research, not this roadmap.
+- **Dispute/chargeback liability policy:** PITFALLS.md flags that the platform (not individual sellers) bears default chargeback liability under destination charges, and this milestone has no moderation or refund system. Needs an explicit, documented (even if manual/informal) policy decision during Phase 3 planning - not a code gap, but a product/ops decision gap.
+- **Subtree size cap for copy-mode purchases:** No existing precedent in the codebase for capping recursive duplication size/depth; needs a concrete numeric bound decided during Phase 4 planning to avoid Convex per-mutation execution/size limits on very large trees.
+- **Exact current line/shape of checkout.session.completed handler:** Architecture and Pitfalls research cite approximate line numbers in convex/stripeWebhooks.ts - re-read the file fresh at Phase 3 implementation time rather than trusting cited line numbers, since the file may have changed since research was conducted.
 
 ## Sources
 
 ### Primary (HIGH confidence)
 
-- Stripe Node.js SDK (Context7 / stripe-node) — checkout session creation, webhook signature verification, subscription lifecycle
-- Stripe Subscription Webhooks official docs — event types, delivery guarantees, 72h retry behavior
-- Stripe Billing Cycle Anchor docs — rationale for invoice.paid-driven credits reset
-- Convex OCC and Atomicity docs — credits deduction safety pattern
-- Convex + Stripe official blog (stack.convex.dev) — end-to-end integration pattern
-- Clerk + Stripe metadata blog (clerk.com) — clerkUserId embedding in Stripe metadata pattern
-- Vercel Deployment Protection docs — bypass for automation webhook paths
+- Context7 /stripe/stripe-node - SDK source for application_fee_amount, accountLinks.create, accounts.create capabilities
+- Context7 convex_dev_llms-full_txt plus this project's own convex/\_generated/ai/guidelines.md - searchIndex API
+- Stripe official docs: design-an-integration, integration-recommendations, destination-charges, marketplace/tasks/app-fees, end-to-end-marketplace, direct-charges-fee-payer-behavior, express-accounts, hosted-onboarding, marketplace/tasks/onboard, webhooks, connect/webhooks, charges, direct-charges, separate-charges-and-transfers, disputes, risk-management, account-capabilities
+- Direct repo inspection: convex/schema.ts, convex/notes.ts, convex/stripeWebhooks.ts, convex/subscriptions.ts, convex/aiCredits.ts, app/api/webhooks/stripe/route.ts, settings pages, pricing actions, PROJECT.md, package.json
 
 ### Secondary (MEDIUM confidence)
 
-- @convex-dev/stripe component README + GitHub issue #7 — basis for component rejection decision
-- Next.js App Router webhook raw body pattern (community articles, verified against Next.js docs)
-- Production post-mortem: The Race Condition You Are Probably Shipping With Stripe Webhooks — two-writer race pitfall
-- Stigg AI credits implementation blog — credits expiry anti-patterns, top-up UX research
-- Appcues freemium upgrade prompt research — upgrade prompt framing best practices
-- Note-taking app pricing comparison (stackscored.com) — competitive context
+- Stripe docs on Accounts v2 (GA'd 2026, "existing platforms don't need to change"); full Checkout-Session-with-v2-config integration details not confirmed - flagged open gap
+- WebSearch aggregator sources on Standard vs. Express marketplace recommendations, Connect webhook secret separation - consistent across multiple independent sources but not single official-doc citations
+- Gumroad/Etsy/Notion Marketplace/PromptBase help-center and third-party articles - feature-landscape benchmarking (table stakes, differentiators, anti-features)
 
-### Tertiary (LOW confidence — validate at implementation)
+### Tertiary (LOW confidence)
 
-- invoice.paid billing_reason field name — verify against current Stripe API event catalog at implementation time
+- None flagged as requiring validation beyond the Accounts v2 gap noted above.
 
 ---
 
-_Research completed: 2026-07-07_
+_Research completed: 2026-07-12_
 _Ready for roadmap: yes_

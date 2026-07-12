@@ -1,148 +1,203 @@
-# Feature Landscape: Noetree Monetisation v1.0
+# Feature Research
 
-**Domain:** Freemium SaaS note-taking app with AI credits
-**Researched:** 2026-07-07
-**Confidence:** HIGH (corroborated across Stripe docs, competitor analysis, SaaS UX research)
+**Domain:** Peer-to-peer digital content marketplace (notes/knowledge-artifact marketplace, closest analogues: Gumroad, Etsy digital downloads, Notion template marketplace, PromptBase)
+**Researched:** 2026-07-12
+**Confidence:** MEDIUM-HIGH (patterns cross-verified across 4+ marketplaces; Stripe Connect mechanics confirmed via official docs)
 
----
+## Feature Landscape
 
-## Table Stakes
+### Table Stakes (Users Expect These)
 
-Features users expect in any Free/Pro note-taking SaaS. Missing = product feels unfinished or untrustworthy.
+Features users assume exist. Missing these = marketplace feels broken or untrustworthy.
 
-| Feature                                           | Why Expected                                                                               | Complexity | Depends On                             |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------- | -------------------------------------- |
-| Pricing page (Free vs Pro)                        | Users won't subscribe without understanding what they get                                  | Low        | None                                   |
-| Hard note limit enforcement on Free               | Without enforcement, the free tier has no upgrade pressure                                 | Medium     | Convex note count query + Clerk userId |
-| Upgrade prompt at limit                           | Industry standard (Evernote, Notion): warn before hard block                               | Low        | Note limit enforcement                 |
-| In-app subscription confirmation                  | Users expect instant feedback after payment; no confirmation = distrust                    | Low        | Stripe webhook → Convex                |
-| Cancel subscription from app                      | Stripe Portal or custom UI — users refuse apps where cancellation requires email           | Medium     | Stripe API + Convex status update      |
-| Settings/Billing page showing plan + renewal date | Standard: every SaaS shows current plan, next billing date, status                         | Medium     | Convex subscription record             |
-| Webhook idempotency                               | Stripe retries webhooks; double-processing a credit grant or plan upgrade causes real bugs | High       | Convex mutation deduplication          |
-| Real-time plan enforcement                        | After webhook fires, the app must reflect the new plan without page reload                 | Medium     | Convex reactive queries                |
+| Feature                                                                  | Why Expected                                                                                                                                                           | Complexity  | Notes                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Marketplace browse page (grid/list of published listings)                | Every reference marketplace (Gumroad Discover, Etsy, Notion Marketplace, PromptBase) leads with a browsable catalog                                                    | LOW         | Convex query with pagination; reuse existing UI shell/Shadcn components                                                                                                                                                                                                                            |
+| Keyword search across title/description                                  | Table stakes on virtually all consumer marketplaces in 2026; search-intent buyers convert 2-3x higher than pure browsers                                               | LOW-MEDIUM  | Convex supports search indexes on `listings` table (title + description + tags)                                                                                                                                                                                                                    |
+| Category/tag filters                                                     | All four reference marketplaces (Gumroad categories, Etsy attributes, Notion Marketplace categories, PromptBase model/category filters) filter by taxonomy             | LOW-MEDIUM  | Start with seller-defined free-form tags rather than a fixed taxonomy — avoids needing a moderated category system this milestone                                                                                                                                                                  |
+| Sort (newest, price asc/desc, most purchased)                            | Standard on Gumroad, Etsy, PromptBase                                                                                                                                  | LOW         | Simple Convex index-based sort; no personalization needed for MVP                                                                                                                                                                                                                                  |
+| Preserve filter/search state on back-navigation                          | Documented UX failure mode: users who filter, click a listing, then hit "back" and lose their filters abandon                                                          | LOW         | Use URL query params for filter state (Next.js searchParams), not client-only state                                                                                                                                                                                                                |
+| Listing detail page with partial preview (title + description + excerpt) | **Already confirmed in milestone scope.** Matches PromptBase's "preview before purchase" and Etsy's listing photos/description pattern                                 | LOW-MEDIUM  | Excerpt extraction from rich text note content — truncate to N characters/blocks, strip formatting that would leak full content                                                                                                                                                                    |
+| Subtree scope indicator on preview                                       | When scope = note+subtree, buyers need to know they're buying a bundle, not a single note                                                                              | LOW         | Show "Includes N sub-notes" count; do NOT reveal subtree titles/content pre-purchase (stays consistent with partial-preview decision)                                                                                                                                                              |
+| Buy button → Stripe Checkout → instant delivery                          | Universal pattern: Etsy ("instant download ready after payment confirms"), Gumroad, PromptBase ("one-click purchase, instant delivery")                                | MEDIUM      | Depends on existing Stripe Checkout integration (Phase 3/5), extended with `application_fee_amount` + connected account destination for the 15% commission split                                                                                                                                   |
+| "My Purchases" / buyer library page                                      | Etsy ("Purchases and Reviews" section), Gumroad customer dashboard, PromptBase — buyers need a permanent place to find what they bought, independent of email receipts | LOW-MEDIUM  | For copy-mode: list of purchased note copies (also visible in normal tree). For read-only-mode: dedicated list since the note lives in the seller's tree, not the buyer's                                                                                                                          |
+| Already-purchased / already-owned indicator                              | Prevents duplicate purchase confusion; standard on all reference marketplaces                                                                                          | LOW         | Query buyer's purchase records before rendering Buy button; show "Open" / "View" instead                                                                                                                                                                                                           |
+| Prevent self-purchase                                                    | Basic abuse prevention (seller buying own listing to inflate stats or bypass commission)                                                                               | LOW         | Simple check: listing.sellerId !== buyerId at Checkout session creation                                                                                                                                                                                                                            |
+| Seller: create listing flow                                              | Core seller action across all marketplaces                                                                                                                             | MEDIUM      | Select note/subtree from existing tree UI, set price, scope, access mode — **already scoped/confirmed decisions**                                                                                                                                                                                  |
+| Seller: manage/edit/unpublish listings                                   | Etsy ("Manage Your Digital Listings"), Gumroad product management — sellers need to change price, pause, or remove listings without deleting sales history             | LOW-MEDIUM  | Unpublishing must NOT revoke already-delivered purchases (copies already made, or active read-only grants) — matches Etsy's model where existing buyers keep access after a listing is removed                                                                                                     |
+| Seller: Stripe Connect onboarding                                        | Required before any payout; every Connect-based marketplace guide treats this as non-negotiable table stakes                                                           | MEDIUM-HIGH | Use Stripe **Express** accounts (Stripe-hosted KYC, simplified seller dashboard) per Stripe's own recommendation for marketplaces. **Defer onboarding**: trigger only when a user first creates a listing, not at account creation — reduces drop-off since most users haven't earned anything yet |
+| Seller: basic sales/earnings view                                        | Every marketplace vendor dashboard reference treats gross/commission/net visibility as baseline — reduces support tickets                                              | LOW-MEDIUM  | Per-sale row: gross amount, 15% commission, net payout; plus running balance. Convex table mirroring Stripe transfer/charge events, similar to existing `creditTransactions` pattern                                                                                                               |
+| Purchased copy lands somewhere sensible in buyer's tree                  | Notion Marketplace duplication asks "where to duplicate"; buyer needs the copy to appear predictably                                                                   | LOW         | Simplest MVP: place at root level of buyer's tree; buyer can then drag-and-drop using **existing DnD feature** — avoids building a location picker                                                                                                                                                 |
+| Pre-purchase Free-tier quota check (copy mode only)                      | Purchased copies count toward the existing 20-note quota (confirmed decision) — a paid purchase must not silently fail to deliver                                      | MEDIUM      | Must check quota **before** initiating Stripe Checkout for copy-mode listings, since sales are final/non-refundable — a purchase that can't be delivered due to quota is a support/trust disaster. Read-only-mode purchases should bypass this check entirely (no new note created)                |
 
----
+### Differentiators (Competitive Advantage)
 
-## Differentiators
+Features that set the product apart. Not required for launch, but valuable — and some map directly to the confirmed unique mechanics of this milestone (subtree sales, read-only access).
 
-Features not universally expected but meaningfully valued for Noetree's specific model.
+| Feature                                                             | Value Proposition                                                                                                                                                                                  | Complexity  | Notes                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read-only "live" access mode (view seller's note in place, no copy) | Unique to a real-time hierarchical note app — no reference marketplace (Gumroad/Etsy/Notion Marketplace/PromptBase) offers this; it's a genuine differentiator vs. flat file/download marketplaces | HIGH        | Requires a **new cross-user access-grant concept** in Convex (buyer gets read permission on a note tree they don't own) — this doesn't exist in the current schema (today all access is single-owner). This is the most architecturally novel piece of the milestone                                                                      |
+| Note+subtree bundle sales                                           | Differentiates from flat "one file" marketplaces (Gumroad/Etsy sell single files or zips); leverages the app's core hierarchical-tree value proposition                                            | MEDIUM-HIGH | Copy-mode delivery must recursively duplicate the subtree preserving parent/child structure — extends existing note CRUD, not a rewrite                                                                                                                                                                                                   |
+| Seller public profile / storefront                                  | PromptBase gives each seller a profile showing total sales, ratings, and a portfolio — helps buyers trust unfamiliar sellers                                                                       | LOW-MEDIUM  | Straightforward to add once there are enough sellers/listings to justify it; low risk to defer                                                                                                                                                                                                                                            |
+| Curated/featured listings (Discover-style ranking)                  | Gumroad Discover placement drives meaningful sales for eligible creators                                                                                                                           | MEDIUM      | Explicitly a **cold-start** feature — with a brand-new marketplace and few listings, curation/personalization has nothing to rank; not worth building before there's supply                                                                                                                                                               |
+| Ratings & reviews                                                   | Builds buyer trust (all four reference marketplaces have some review mechanism)                                                                                                                    | MEDIUM      | **Deliberately paired with content moderation in the reference ecosystem** — PromptBase reviews every submitted prompt before listing. Since this milestone explicitly defers moderation, shipping reviews without moderation risks unmoderated review abuse/brigading. Recommend deferring together with moderation to a later milestone |
 
-| Feature                              | Value Proposition                                                                                              | Complexity | Notes                                                                  |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------- |
-| AI credits balance visible in-app    | Transparency reduces support tickets and increases trust in metered usage                                      | Low        | Convex `credits` field on user/subscription record                     |
-| Credits top-up via Stripe Checkout   | Lets Pro users extend AI usage without upgrading plan tier — unlocks usage monetization on top of subscription | Medium     | Separate Stripe Price (one-time), `checkout.session.completed` webhook |
-| Monthly credits auto-reset           | Predictability: users know what to expect each billing cycle                                                   | Medium     | Convex scheduled function or webhook on `invoice.payment_succeeded`    |
-| Top-up purchase history              | Builds trust, helps users track spend, reduces "where did my credits go" support                               | Low        | Log `credits_transactions` table in Convex                             |
-| Low-credits nudge                    | Proactively surface top-up before user hits zero mid-session — reduces frustration                             | Low        | Convex reactive query with threshold check                             |
-| Upgrade prompt framed as opportunity | "You've unlocked a Pro feature" > "You've hit the free limit" — measurably better conversion                   | Low        | Copy/UX decision only, no extra code                                   |
+### Anti-Features (Commonly Requested, Often Problematic)
 
----
+Features that seem good but create disproportionate problems for this milestone's scope.
 
-## Anti-Features
-
-Features to explicitly NOT build in v1.0, with rationale.
-
-| Anti-Feature                                              | Why Avoid                                                                                        | What to Do Instead                                                        |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| Stripe Customer Portal (native)                           | Decided out of scope (PROJECT.md): poor UX cohesion, harder to style to match dark mode / Shadcn | Build custom Settings/Billing page                                        |
-| Credit expiry with short windows                          | Stigg research: short expiry creates resentment, support burden, bad reviews                     | Either no expiry on top-up credits or 12+ month window                    |
-| Aggressive mid-session interruption when credits hit zero | Users in flow should not be blocked with a full-screen modal mid-edit                            | Show a dismissable banner; block only on next AI action attempt           |
-| Manual refund UI                                          | Stripe handles this; building custom refund logic is high complexity, low value                  | Direct users to support email or Stripe's automated flow                  |
-| Unlimited credit rollover on Free plan                    | Free has no AI credits — no rollover logic needed                                                | Only Pro credits roll over (or reset)                                     |
-| Teams/seats management                                    | Out of scope (PROJECT.md)                                                                        | Deferred to v2                                                            |
-| Dunning / failed payment retry UI                         | Stripe handles dunning natively with email; building in-app dunning is overkill for v1           | Let Stripe manage failed payments                                         |
-| Plan downgrade enforcement (notes over limit)             | Deciding what happens to 25 notes when user downgrades from Pro adds complexity                  | On downgrade: keep existing notes readable, block creation until under 20 |
-
----
+| Feature                                                | Why Requested                                                                                  | Why Problematic                                                                                                                                                                                                                                                                                                                                                                                                        | Alternative                                                                                                                                                                              |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Multi-item / multi-seller cart checkout                | Standard e-commerce expectation (Etsy, Amazon-style carts)                                     | Stripe Checkout's destination-charge model supports **only one connected account per session** (confirmed via official Stripe Connect docs — destination charges "don't support paying 2+ people for one purchase"). A multi-seller cart requires the separate-charges-and-transfers architecture instead, which is materially more complex (decoupled charge + N transfers, reconciliation, partial-failure handling) | Ship single-listing purchase only (one listing = one Checkout session = one seller = one commission split), consistent with the confirmed "sales are final" simplicity of this milestone |
+| DRM / watermarking / piracy-prevention tech            | Sellers worry about resale/leaks of paid content (a real concern in generic file marketplaces) | Heavy engineering for a problem partially solved by this milestone's own model: content isn't a downloadable file, it's served in-app (either a database copy the buyer legitimately owns, or a permissioned read-only view). Traditional file-piracy vectors (torrenting a PDF, reselling a download link) don't directly apply the same way. Also explicitly out of scope alongside moderation this milestone        | Rely on read-only access being view-only in-app (no export path) for that mode; revisit content-protection only if abuse is observed post-launch                                         |
+| Ratings/reviews shipped without moderation             | Feels like an obvious trust signal                                                             | Without moderation, review content itself becomes an unmoderated surface (fake reviews, harassment, spam) — the same reason PromptBase gates it behind quality review                                                                                                                                                                                                                                                  | Defer until moderation ships (already deferred per milestone decisions)                                                                                                                  |
+| Wishlist / favorites                                   | Common in mature marketplaces (Etsy favorites)                                                 | Adds a whole secondary data model and UI surface with no bearing on the core purchase loop; low value before there's meaningful listing volume to save-for-later                                                                                                                                                                                                                                                       | Defer to a post-validation milestone                                                                                                                                                     |
+| Discount codes / coupons                               | Sellers often ask for promotional tools early                                                  | Interacts awkwardly with the 15% commission-at-source model and Stripe Checkout's connected-account split; adds seller-side pricing complexity before basic sales flow is validated                                                                                                                                                                                                                                    | Defer; seller can always just set a lower price for a limited-time listing manually                                                                                                      |
+| Full custom category taxonomy (curated, admin-managed) | Feels more "professional" than free-form tags                                                  | Requires ongoing admin curation/moderation decisions (which category does a "prompt template vs research note" belong to?) that conflict with the explicit "no moderation this milestone" decision                                                                                                                                                                                                                     | Seller-defined free-form tags, searchable; introduce curated categories later if supply volume warrants it                                                                               |
 
 ## Feature Dependencies
 
 ```
-Clerk userId
-  └─→ Stripe Customer (createCustomer on first checkout)
-        ├─→ Stripe Subscription (PAY-01)
-        │     └─→ Convex `subscriptions` record (PAY-03 webhook)
-        │           ├─→ Plan enforcement: note limit (PLAN-02/03)
-        │           ├─→ Settings page: plan + renewal (SET-01/02)
-        │           ├─→ Cancel flow (PAY-04, SET-04)
-        │           └─→ Monthly credits reset (CRED-01)
-        └─→ Stripe one-time credits checkout (PAY-05)
-              └─→ Convex credits += amount (CRED-03)
-                    ├─→ Credits display (CRED-02, SET-05)
-                    ├─→ Credits deduction on AI use (CRED-04)
-                    └─→ Top-up history log (SET-05)
+Marketplace browse/search
+    └──requires──> Listing creation (seller side)
+                       └──requires──> Existing note tree (select note or note+subtree)
+                       └──requires──> Existing Free/Pro tier model (who can sell — confirmed: both)
 
-Upgrade prompt (PLAN-04) depends on:
-  - Note count query (already exists in Convex)
-  - Plan enforcement check (PLAN-02)
+Listing creation (price + scope + access mode)
+    └──requires──> Stripe Connect seller onboarding (before first payout, can defer account creation but not payout)
+
+Purchase flow (Checkout)
+    └──requires──> Listing creation
+    └──requires──> Stripe Connect onboarding (application_fee_amount + destination account)
+    └──requires──> Existing Stripe webhook handler pattern (Phase 2) — extended for Connect events
+
+Copy-mode delivery
+    └──requires──> Purchase flow
+    └──requires──> Existing note CRUD (create/duplicate)
+    └──requires──> Free-tier 20-note quota enforcement (existing, Phase 4) ──must run BEFORE checkout, not after
+
+Read-only-mode delivery
+    └──requires──> Purchase flow
+    └──requires──> NEW: cross-user access-grant model (does not exist today — all note access is single-owner)
+
+Seller earnings dashboard
+    └──requires──> Purchase flow
+    └──requires──> Stripe Connect onboarding (to know payout status/account readiness)
+
+Already-purchased indicator ──enhances──> Marketplace browse/search and Listing detail page
+
+Ratings/reviews ──conflicts──> "No moderation this milestone" decision (unmoderated reviews = abuse surface)
+
+Multi-seller cart checkout ──conflicts──> Stripe Checkout single-destination-charge limitation
 ```
 
----
+### Dependency Notes
 
-## MVP Recommendation
+- **Copy-mode delivery requires Free-tier quota enforcement, ordered before Checkout, not after:** because sales are final/non-refundable, a Free-tier buyer whose quota is already full must be blocked _before_ payment is taken, not discovered as a delivery failure after a completed (non-refundable) charge.
+- **Read-only-mode delivery requires a new cross-user access-grant model:** the existing note ownership model is single-owner. Granting a buyer read access to a seller-owned note/subtree is new schema and permission-check surface, not an extension of an existing pattern — this is the highest-complexity net-new piece of the milestone.
+- **Seller Stripe Connect onboarding should be deferred to first-listing-creation, not signup:** per Stripe's own guidance, forcing a 5-10 minute KYC flow before a user has any reason to sell is a proven drop-off point. Trigger onboarding the moment a user attempts to create their first listing.
+- **Ratings/reviews conflicts with "no moderation this milestone":** shipping one without the other creates an abuse surface; both should land together in a later milestone.
+- **Multi-seller cart conflicts with Stripe Checkout's destination-charge model:** confirmed via official Stripe docs. Single-listing purchase avoids this entirely and matches the milestone's existing simplicity decisions (no refunds, no partial-failure handling needed).
+- **Unpublishing a listing must not revoke already-granted access:** for read-only mode specifically, if a seller unpublishes or later deletes the underlying note, existing buyers' read-only grants would break — this is a real edge case to flag for architecture/pitfalls research, since it doesn't have a clean answer purely at the feature level (deletion of a note with active read-only grants outstanding).
 
-Prioritize in this order, matching required complexity gates:
+## MVP Definition
 
-1. **Pricing page (PLAN-01)** — Zero backend, establishes value prop, unblocks user testing
-2. **Note limit enforcement + upgrade prompt (PLAN-02, PLAN-04)** — Creates upgrade pressure; can ship before Stripe is wired up using a stub `isPro` flag
-3. **Stripe Checkout subscription (PAY-01)** — Core monetization path; everything downstream depends on this
-4. **Webhook → Convex subscription record (PAY-03)** — Must ship with PAY-01; no deferral
-5. **Settings page: plan + renewal + cancel (SET-01, SET-02, SET-04, PAY-04)** — Needed for trust and legal compliance (ability to cancel)
-6. **Monthly AI credits display + reset (PLAN-05, CRED-01, CRED-02)** — Pro value delivery
-7. **AI credit deduction on use (CRED-04)** — Required for credits to mean anything
-8. **Credits top-up checkout + history (PAY-05, CRED-03, SET-05)** — Secondary revenue stream; can ship after core subscription is stable
+### Launch With (v1.1 — this milestone)
 
-Defer (not in v1.0): pause subscription, prorated downgrade enforcement, low-credits email notifications.
+Minimum viable product — what's needed to validate the concept, matching confirmed milestone decisions.
 
----
+- [ ] Marketplace browse page: search + tag filter + sort (newest/price/popularity) — core discovery loop
+- [ ] Listing detail page with partial preview (title + description + excerpt, subtree note-count if applicable) — confirmed decision
+- [ ] Seller: create listing (select note/subtree, price, scope, access mode) — confirmed decision
+- [ ] Seller: view/edit/unpublish own listings
+- [ ] Seller: Stripe Connect (Express) onboarding, deferred until first listing creation
+- [ ] Purchase flow: single-listing Stripe Checkout with 15% application fee to platform — confirmed decision
+- [ ] Instant delivery: copy mode (duplicate note/subtree into buyer's tree, root-level placement) with pre-checkout quota check
+- [ ] Instant delivery: read-only mode (new access-grant record, buyer sees note in a "shared with me" or "purchased" view)
+- [ ] Buyer: "My Purchases" page listing everything bought (both modes)
+- [ ] Seller: basic earnings view (gross/commission/net per sale, running balance, payout status)
+- [ ] Already-purchased indicator + self-purchase prevention
 
-## Expected User Behaviors
+### Add After Validation (v1.x)
 
-Based on freemium SaaS research (Stigg, Appcues, Lago):
+Features to add once the core marketplace loop is working and has real listings/sales.
 
-**Free tier users:**
+- [ ] Seller public profile/storefront page — once there are enough sellers to make discovery-by-seller meaningful
+- [ ] Ratings & reviews — bundle with content moderation when that milestone ships
+- [ ] Content moderation / reporting flow — explicitly deferred per PROJECT.md
+- [ ] Curated/featured listings ("Discover"-style) — needs supply volume to be worth ranking
+- [ ] Seller analytics beyond sales count (views, conversion rate)
 
-- Will hit 20-note limit within the first 1-2 sessions if they're genuinely engaged
-- Expect a clear, non-punitive explanation of the limit (not a red error)
-- Convert best when the upgrade prompt shows the specific feature/action they were trying to take
+### Future Consideration (v2+)
 
-**Pro subscribers:**
+Features to defer until product-market fit is established for the marketplace itself.
 
-- Will check the Settings page once after subscribing, then almost never unless something breaks
-- Expect the renewal date to be clearly visible (reduces "unexpected charge" support tickets)
-- Will use cancel as a button to test ease-of-exit — if cancellation is hard, they'll dispute the charge instead
+- [ ] Multi-item/multi-seller cart — requires separate-charges-and-transfers rework of the payment architecture
+- [ ] Refunds/disputes handling — explicitly out of scope this milestone (final sales)
+- [ ] Discount codes/coupons — interacts with commission-at-source model, needs its own design
+- [ ] Wishlist/favorites
+- [ ] Affiliate/referral program
+- [ ] Business/team marketplace listings — explicitly out of scope (no Business/Teams plan)
 
-**Credits users:**
+## Feature Prioritization Matrix
 
-- AI credit balance must be visible near the AI feature entry point (not buried in settings)
-- Will not notice credits running low unless the app tells them — passive depletion without warning kills trust
-- Top-up intent is impulsive: the flow from "I want more credits" to Stripe checkout should be under 3 clicks
+| Feature                                           | User Value                  | Implementation Cost | Priority                   |
+| ------------------------------------------------- | --------------------------- | ------------------- | -------------------------- |
+| Browse/search/filter marketplace                  | HIGH                        | LOW-MEDIUM          | P1                         |
+| Listing detail + partial preview                  | HIGH                        | LOW-MEDIUM          | P1                         |
+| Create listing flow                               | HIGH                        | MEDIUM              | P1                         |
+| Stripe Connect onboarding (deferred)              | HIGH                        | MEDIUM-HIGH         | P1                         |
+| Purchase flow (single-item Checkout + commission) | HIGH                        | MEDIUM              | P1                         |
+| Copy-mode delivery + quota check                  | HIGH                        | MEDIUM              | P1                         |
+| Read-only-mode delivery (new access model)        | HIGH                        | HIGH                | P1                         |
+| My Purchases page                                 | HIGH                        | LOW-MEDIUM          | P1                         |
+| Seller earnings view                              | MEDIUM-HIGH                 | LOW-MEDIUM          | P1                         |
+| Manage/unpublish listings                         | MEDIUM                      | LOW-MEDIUM          | P1                         |
+| Seller storefront/profile                         | MEDIUM                      | LOW-MEDIUM          | P2                         |
+| Ratings/reviews                                   | MEDIUM                      | MEDIUM              | P3 (blocked on moderation) |
+| Curated/Discover-style ranking                    | LOW (at launch, no supply)  | MEDIUM              | P3                         |
+| Multi-seller cart                                 | LOW (adds friction for MVP) | HIGH                | P3                         |
 
----
+**Priority key:**
 
-## Phase-Specific Complexity Notes
+- P1: Must have for launch
+- P2: Should have, add when possible
+- P3: Nice to have, future consideration
 
-| Requirement Group                       | Complexity | Key Reason                                                                              |
-| --------------------------------------- | ---------- | --------------------------------------------------------------------------------------- |
-| PLAN-01: Pricing page                   | Low        | Static or near-static UI                                                                |
-| PLAN-02/03/04: Note limits + prompts    | Low-Medium | Convex query exists; enforcement is a count check                                       |
-| PAY-01/02/03: Stripe Checkout + webhook | High       | Webhook idempotency, Clerk↔Stripe customer ID linking, signature verification          |
-| PAY-04/SET-04: Cancel                   | Medium     | Stripe subscription update API + Convex sync                                            |
-| PAY-05/CRED-03: Top-up checkout         | Medium     | Reuses Checkout pattern but needs separate Price ID; credits arithmetic must be atomic  |
-| CRED-01: Monthly reset                  | Medium     | Requires Convex scheduled action or reliable `invoice.payment_succeeded` event handling |
-| CRED-04: Deduction on AI use            | Medium     | Server-side only (never trust client); must be atomic with the AI action                |
-| SET-01/02/03/05: Settings page          | Low-Medium | UI assembly of Convex data; upgrade path reuses PAY-01 flow                             |
+## Competitor Feature Analysis
 
----
+| Feature            | Gumroad                                                                  | Etsy (digital)                                                                          | Notion Marketplace                                  | PromptBase                                     | Our Approach                                                                                      |
+| ------------------ | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Discovery          | Homepage + category browse + "Discover" curated placement (30% fee tier) | Category pages + attribute filters, search-as-you-type                                  | Template categories, search                         | Search filtered by model/category/rating/price | Search + tag filter + sort; no curation until supply exists                                       |
+| Preview            | Description + mockup images                                              | Photos + description                                                                    | Live template preview link                          | Hover preview + example outputs                | Partial preview: title + description + excerpt (confirmed)                                        |
+| Delivery mechanism | File download link (instant)                                             | File download link (instant), permanent re-download                                     | "Duplicate" into buyer's workspace                  | Instant text delivery, lifetime access         | Copy (duplicate into buyer's tree) OR read-only in-app access grant — no downloadable file at all |
+| Commission         | 10% new sellers down to 2.9% at scale, +30% via Discover                 | Etsy standard listing/transaction fees (not marketplace-specific to digital)            | N/A (Notion's own marketplace, different fee model) | 20% marketplace commission                     | Flat 15% at source, confirmed                                                                     |
+| Seller payout      | Gumroad's own payout system                                              | Etsy Payments                                                                           | Notion payout                                       | Stripe-based                                   | Stripe Connect Express, deferred onboarding                                                       |
+| Reviews            | Limited                                                                  | Full review system                                                                      | N/A                                                 | Seller profile with ratings/sales history      | Deferred — pairs with moderation, not this milestone                                              |
+| Cart               | Single/multi product, single-seller checkout per creator's own store     | Standard multi-item cart (single marketplace operator, not per-seller commission split) | N/A                                                 | Single prompt purchase                         | Single-listing purchase only this milestone (Stripe destination-charge limitation)                |
 
 ## Sources
 
-- Stripe credits model guide: https://stripe.com/resources/more/what-is-a-credits-based-subscription-model-and-how-does-it-work
-- Stripe SaaS integration: https://docs.stripe.com/saas
-- Stigg AI credits implementation: https://www.stigg.io/blog-posts/weve-built-ai-credits-and-it-was-harder-than-we-expected
-- Convex + Stripe pattern: https://stack.convex.dev/stripe-with-convex
-- Freemium upgrade prompt UX: https://www.appcues.com/blog/best-freemium-upgrade-prompts
-- SaaS subscription management best practices: https://getlago.com/blog/subscription-management-best-practices-and-strategies
-- Note-taking app pricing comparison: https://www.stackscored.com/pricing/note-taking/
-- Credit-based pricing for AI SaaS: https://getlago.com/blog/6-proven-pricing-models-for-ai-saas
-- Chargebee prepaid credits guide: https://www.chargebee.com/pricing-labs/prepaid-credit-pricing-guide/
+- [Gumroad Discover - Gumroad Help Center](https://gumroad.com/help/article/79-gumroad-discover)
+- [The sales dashboard - Gumroad Help Center](https://help.gumroad.com/article/268-customer-dashboard)
+- [The sales analytics dashboard - Gumroad Help Center](https://gumroad.com/help/article/74-the-analytics-dashboard)
+- [How to Sell Notion Templates: Build A $1k/mo Creator Side Hustle](https://bloggingwizard.com/sell-notion-templates/)
+- [Finding templates on Marketplace – Notion Help Center](https://www.notion.com/help/finding-templates-on-marketplace)
+- [Selling templates on Marketplace – Notion Help Center](https://www.notion.com/help/selling-on-marketplace)
+- [How to Duplicate Notion Templates to Your Workspace - Gridfiti](https://support.gridfiti.com/article/13-duplicate-notion-templates)
+- [PromptBase Deep Dive - Skywork](https://skywork.ai/skypage/en/PromptBase-Deep-Dive-Mastering-the-AI-Prompt-Marketplace-for-Future-Growth-and-SEO-Dominance/1972861300479422464)
+- [How to Download a Digital Item – Etsy Help](https://help.etsy.com/hc/en-us/articles/115013328108-How-to-Download-a-Digital-Item)
+- [How to Manage Your Digital Listings – Etsy Help](https://help.etsy.com/hc/en-us/articles/115015628347-How-to-Manage-Your-Digital-Listings)
+- [10 features of the best online marketplaces | Algolia](https://www.algolia.com/blog/ecommerce/10-features-of-the-best-online-marketplaces)
+- [Marketplace Search Strategy for Filtering & Categorizing Products](https://www.clarity-ventures.com/marketplace-ecommerce/search-filtering-of-marketplace-products)
+- [Top Vendor Dashboard Features in Marketplace Apps](https://www.lowcode.agency/blog/vendor-dashboard-features-in-marketplace-apps)
+- [Using Express connected accounts | Stripe Documentation](https://docs.stripe.com/connect/express-accounts)
+- [Create destination charges | Stripe Documentation](https://docs.stripe.com/connect/destination-charges)
+- [Create separate charges and transfers | Stripe Documentation](https://docs.stripe.com/connect/separate-charges-and-transfers)
+- [How to Build a Marketplace with Stripe Connect (2026 Guide)](https://viprasol.com/blog/stripe-connect-marketplace/)
+- [3 ways to prevent digital product piracy and theft — Podia](https://www.podia.com/articles/protect-digital-downloads-piracy-theft)
+
+---
+
+_Feature research for: Peer-to-peer notes marketplace (Noetree v1.1)_
+_Researched: 2026-07-12_
