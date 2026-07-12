@@ -79,39 +79,39 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase | Status  |
-| ----------- | ----- | ------- |
-| CONNECT-01  | TBD   | Pending |
-| CONNECT-02  | TBD   | Pending |
-| CONNECT-03  | TBD   | Pending |
-| LIST-01     | TBD   | Pending |
-| LIST-02     | TBD   | Pending |
-| LIST-03     | TBD   | Pending |
-| LIST-04     | TBD   | Pending |
-| BROWSE-01   | TBD   | Pending |
-| BROWSE-02   | TBD   | Pending |
-| BROWSE-03   | TBD   | Pending |
-| BROWSE-04   | TBD   | Pending |
-| BROWSE-05   | TBD   | Pending |
-| BROWSE-06   | TBD   | Pending |
-| BUY-01      | TBD   | Pending |
-| BUY-02      | TBD   | Pending |
-| BUY-03      | TBD   | Pending |
-| BUY-04      | TBD   | Pending |
-| BUY-05      | TBD   | Pending |
-| DELIVER-01  | TBD   | Pending |
-| DELIVER-02  | TBD   | Pending |
-| DELIVER-03  | TBD   | Pending |
-| HIST-01     | TBD   | Pending |
-| HIST-02     | TBD   | Pending |
+| Requirement | Phase    | Status  |
+| ----------- | -------- | ------- |
+| CONNECT-01  | Phase 7  | Pending |
+| CONNECT-02  | Phase 7  | Pending |
+| CONNECT-03  | Phase 7  | Pending |
+| LIST-01     | Phase 8  | Pending |
+| LIST-02     | Phase 8  | Pending |
+| LIST-03     | Phase 8  | Pending |
+| LIST-04     | Phase 8  | Pending |
+| BROWSE-01   | Phase 8  | Pending |
+| BROWSE-02   | Phase 8  | Pending |
+| BROWSE-03   | Phase 8  | Pending |
+| BROWSE-04   | Phase 8  | Pending |
+| BROWSE-05   | Phase 8  | Pending |
+| BROWSE-06   | Phase 8  | Pending |
+| BUY-01      | Phase 9  | Pending |
+| BUY-02      | Phase 9  | Pending |
+| BUY-03      | Phase 9  | Pending |
+| BUY-04      | Phase 9  | Pending |
+| BUY-05      | Phase 9  | Pending |
+| DELIVER-01  | Phase 10 | Pending |
+| DELIVER-02  | Phase 10 | Pending |
+| DELIVER-03  | Phase 10 | Pending |
+| HIST-01     | Phase 11 | Pending |
+| HIST-02     | Phase 11 | Pending |
 
 **Coverage:**
 
-- v1 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22 ⚠️ (roadmap not yet created)
+- v1 requirements: 23 total (corrected from initial count of 22 — CONNECT×3 + LIST×4 + BROWSE×6 + BUY×5 + DELIVER×3 + HIST×2 = 23)
+- Mapped to phases: 23
+- Unmapped: 0 ✓
 
 ---
 
 _Requirements defined: 2026-07-12_
-_Last updated: 2026-07-12 after initial definition_
+_Last updated: 2026-07-12 after ROADMAP.md creation (v1.1, Phases 7-11)_
