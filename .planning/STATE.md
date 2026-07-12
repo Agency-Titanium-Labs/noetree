@@ -1,25 +1,24 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Awaiting next milestone
-stopped_at: v1.0 milestone archived and complete
-last_updated: "2026-07-12T07:30:31.767Z"
-last_activity: 2026-07-12 — Milestone v1.0 completed and archived
+milestone: v1.1
+milestone_name: Marketplace de notes
+status: planning
+last_updated: "2026-07-12T09:09:16.421Z"
+last_activity: 2026-07-12
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 32
-  completed_plans: 32
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-12 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-12 — Milestone v1.1 started
 
 ## Project Reference
 

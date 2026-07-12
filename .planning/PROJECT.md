@@ -8,19 +8,23 @@ Noetree est une application web de prise de notes hiérarchique (style Notion/Ob
 
 Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
 
-## Current Milestone: v1.0 Monétisation & Paiements
+## Current Milestone: v1.1 Marketplace de notes
 
-**Statut :** ✅ Shipped 2026-07-12 — voir `.planning/MILESTONES.md` pour le détail complet
-
-**Goal :** Intégrer Stripe pour monétiser Noetree via un modèle Free/Pro avec quota de crédits IA rechargeables.
+**Goal :** Permettre aux utilisateurs de vendre et acheter des notes entre eux via Stripe Connect, avec commission Noetree.
 
 **Target features :**
 
-- Plans Free (notes limitées + features basiques) et Pro (illimité + features avancées)
-- Abonnement mensuel via Stripe Checkout
-- Quota mensuel de crédits IA inclus dans Pro, rechargeable par top-up
-- Webhooks Stripe → mise à jour statut abonnement dans Convex
-- Page Settings in-app : gérer abonnement, voir crédits, top-up
+- Page marketplace publique (browse + recherche)
+- Mise en vente d'une note : prix libre, choix note seule ou note+sous-arbre, choix copie éditable ou accès lecture seule pour l'acheteur
+- Aperçu partiel (titre + description + extrait) avant achat
+- Achat via Stripe Checkout, payout automatique vendeur via Stripe Connect (onboarding KYC géré par Stripe)
+- Commission Noetree fixe : 15% prélevée à la source sur chaque vente
+- Vente ouverte à tous (Free + Pro)
+- Notes achetées en mode copie comptent dans le quota 20 notes Free existant
+- Ventes finales, pas de remboursement (contenu numérique)
+- Pas de modération de contenu ce milestone (déféré à plus tard)
+
+**Previous milestone:** v1.0 Monétisation & Paiements — Shipped 2026-07-12, voir `.planning/MILESTONES.md` pour le détail complet
 
 ## Requirements
 
@@ -51,16 +55,22 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 ### Active
 
-<!-- Scope actuel — prochain milestone (à définir via /gsd:new-milestone). -->
+<!-- Scope actuel — milestone v1.1. -->
 
-(none yet — v1.0 shipped in full; run `/gsd:new-milestone` to define the next milestone's scope)
+- [ ] Page marketplace publique (browse + recherche de notes en vente)
+- [ ] Mise en vente d'une note (prix, portée note/sous-arbre, mode copie/lecture seule)
+- [ ] Aperçu partiel avant achat
+- [ ] Achat via Stripe Checkout + payout vendeur via Stripe Connect
+- [ ] Onboarding Stripe Connect pour vendeurs
+- [ ] Commission Noetree (15%) prélevée à la source
 
 ### Out of Scope
 
-- Plan Business/Teams — complexité équipe hors scope pour v1.0
-- Marketplace de vente de notes — futur milestone, nécessite plus de maturité produit
+- Plan Business/Teams — complexité équipe hors scope
 - Portail Stripe natif — UI custom dans l'app choisie à la place
 - Remboursements / prorations manuels — Stripe gère automatiquement
+- Modération de contenu marketplace — déféré à un futur milestone (v1.1 ships sans modération)
+- Remboursement acheteur — ventes finales pour ce milestone
 
 ## Context
 
@@ -107,4 +117,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-07-12 — v1.0 milestone shipped (all 19 requirements Validated)_
+_Last updated: 2026-07-12 — v1.1 milestone started (Marketplace de notes)_
