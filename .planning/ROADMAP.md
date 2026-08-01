@@ -50,8 +50,17 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 2. Seller can view their onboarding/payout status (pending, active, restricted) on the Settings page, kept in sync with Stripe via a distinct Connect-scoped webhook stream
 3. Server rejects listing-creation and checkout attempts for sellers without `charges_enabled`/`payouts_enabled` both true, even if the client is bypassed
 
-**Plans**: TBD
+**Plans**: 6 plans
 **UI hint**: yes
+
+Plans:
+
+- [ ] 07-01-PLAN.md — connectAccounts schema + getMyConnectStatus / isSellerActive (D-06 gate)
+- [ ] 07-02-PLAN.md — recordPendingAccount + webhook-driven upsertFromStripeAccount
+- [ ] 07-03-PLAN.md — Connect-scoped webhook route + dispatcher action + STRIPE_CONNECT_WEBHOOK_SECRET
+- [ ] 07-04-PLAN.md — createConnectOnboardingLink server action (Express account + fresh Account Link)
+- [ ] 07-05-PLAN.md — SettingsSellerCard (4 states), i18n copy, Settings page wiring
+- [ ] 07-06-PLAN.md — Stripe Dashboard configuration + live Connect webhook verification (checkpoints)
 
 ### Phase 8: Listings & Marketplace Browse/Search
 
@@ -123,7 +132,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 5. AI Credits System                            | v1.0      | 5/5            | Complete    | 2026-07-10 |
 | 6. Settings Page                                | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant      | v1.0      | 1/1            | Complete    | 2026-07-12 |
-| 7. Connect Onboarding & Seller Enablement       | v1.1      | 0/TBD          | Not started | -          |
+| 7. Connect Onboarding & Seller Enablement       | v1.1      | 0/6            | Planned     | -          |
 | 8. Listings & Marketplace Browse/Search         | v1.1      | 0/TBD          | Not started | -          |
 | 9. Marketplace Checkout & Webhook Fix           | v1.1      | 0/TBD          | Not started | -          |
 | 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 0/TBD          | Not started | -          |
