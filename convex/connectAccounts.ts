@@ -1,5 +1,10 @@
-import { query, internalQuery } from "./_generated/server";
-import { v } from "convex/values";
+import {
+  query,
+  internalQuery,
+  mutation,
+  internalMutation,
+} from "./_generated/server";
+import { v, ConvexError } from "convex/values";
 
 // Security: clerkUserId is derived exclusively from the caller's
 // authenticated Convex identity (never a client-supplied argument) so a
@@ -44,5 +49,167 @@ export const isSellerActive = internalQuery({
       .unique();
 
     return account?.chargesEnabled === true && account?.payoutsEnabled === true;
+  },
+});
+
+// Security: clerkUserId is derived exclusively from ctx.auth.getUserIdentity()
+// (never a client-supplied argument), so a caller can only ever create/read
+// their OWN row. Two account-takeover primitives are explicitly closed here:
+//   1. A caller with an existing row can never re-point it at a different
+//      stripeAccountId (would let a client silently swap in a different
+//      Stripe account after the fact) — existing callers get
+//      { alreadyExists: true } and nothing is patched.
+//   2. A caller cannot claim a stripeAccountId already linked to a different
+//      user — throws ConvexError("CONNECT_ACCOUNT_ALREADY_LINKED").
+//
+// This mutation stores an INERT account id only — status "pending" and all
+// three capability booleans false. It must NEVER write a capability flag as
+// true; all capability state originates exclusively from
+// upsertFromStripeAccount, the webhook-driven internal mutation below
+// (07-RESEARCH.md Pitfall 1 / ARCHITECTURE.md Anti-Pattern 2). The row is
+// written here (rather than waiting for the first account.updated webhook)
+// so a second "Become a seller" click can detect the existing pending
+// account and skip calling stripe.accounts.create again — without it, every
+// repeat click would orphan a duplicate Express account.
+export const recordPendingAccount = mutation({
+  args: { stripeAccountId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("UNAUTHENTICATED");
+    }
+
+    const existingForCaller = await ctx.db
+      .query("connectAccounts")
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
+      .unique();
+    if (existingForCaller) {
+      return { alreadyExists: true };
+    }
+
+    const existingForAccountId = await ctx.db
+      .query("connectAccounts")
+      .withIndex("by_stripeAccountId", q =>
+        q.eq("stripeAccountId", args.stripeAccountId),
+      )
+      .unique();
+    if (existingForAccountId) {
+      throw new ConvexError("CONNECT_ACCOUNT_ALREADY_LINKED");
+    }
+
+    await ctx.db.insert("connectAccounts", {
+      clerkUserId: identity.subject,
+      stripeAccountId: args.stripeAccountId,
+      status: "pending",
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      detailsSubmitted: false,
+    });
+
+    return { created: true };
+  },
+});
+
+// Webhook-driven. This is the ONLY code path in the whole app allowed to set
+// chargesEnabled/payoutsEnabled — every future gate (isSellerActive above,
+// and Phase 8/9's sell-side checks) trusts that invariant absolutely
+// (07-RESEARCH.md Pitfall 1 / ARCHITECTURE.md Anti-Pattern 2).
+export const upsertFromStripeAccount = internalMutation({
+  args: {
+    stripeEventId: v.string(),
+    eventType: v.string(),
+    stripeAccountId: v.string(),
+    // From event.data.object.metadata.clerkUserId — fallback only, used to
+    // insert a brand-new row on the first-ever event for an account
+    // (Pitfall 4: this event can beat the server action's own
+    // recordPendingAccount write) and to cross-check ownership on patch.
+    clerkUserId: v.optional(v.string()),
+    chargesEnabled: v.boolean(),
+    payoutsEnabled: v.boolean(),
+    detailsSubmitted: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    // Idempotency bookend (mirrors subscriptions.upsertSubscription).
+    // Security note (07-RESEARCH.md Pitfall 3): a bare stripeEventId key is
+    // safe here ONLY because account.updated has exactly one consumer in
+    // this phase. A future second consumer of the same event must use a
+    // suffixed key such as `${event.id}:<operation>` — precedent: Phase
+    // 06.1's grantInitialCredits vs upsertSubscription bug.
+    const alreadyProcessed = await ctx.db
+      .query("processedStripeEvents")
+      .withIndex("by_stripeEventId", q =>
+        q.eq("stripeEventId", args.stripeEventId),
+      )
+      .unique();
+    if (alreadyProcessed) {
+      return { alreadyProcessed: true };
+    }
+
+    // Single definition of the three-way status (D-03's badge), derived from
+    // the raw capability booleans — never store a status the booleans
+    // themselves don't support.
+    const status =
+      args.chargesEnabled && args.payoutsEnabled
+        ? ("active" as const)
+        : args.detailsSubmitted
+          ? ("restricted" as const)
+          : ("pending" as const);
+
+    // Resolve by stripeAccountId (NOT by_clerkUserId) — account.updated
+    // identifies the Stripe account, not the app user.
+    const existing = await ctx.db
+      .query("connectAccounts")
+      .withIndex("by_stripeAccountId", q =>
+        q.eq("stripeAccountId", args.stripeAccountId),
+      )
+      .unique();
+
+    if (existing) {
+      if (args.clerkUserId && args.clerkUserId !== existing.clerkUserId) {
+        // Elevation-of-privilege guard (T-07-05): a squatted
+        // recordPendingAccount row (or a Stripe account that legitimately
+        // changed hands) must never let a mismatched event's capability
+        // flags flow onto someone else's row. Log and no-op — never throw
+        // (see anomaly rationale below).
+        console.error(
+          `upsertFromStripeAccount anomaly: stripeAccountId owner mismatch for ${args.stripeAccountId} (row owner ${existing.clerkUserId}, event metadata clerkUserId ${args.clerkUserId})`,
+        );
+        return { anomaly: "stripeAccountId owner mismatch" };
+      }
+      // Never patch clerkUserId or stripeAccountId — only capability state.
+      await ctx.db.patch(existing._id, {
+        chargesEnabled: args.chargesEnabled,
+        payoutsEnabled: args.payoutsEnabled,
+        detailsSubmitted: args.detailsSubmitted,
+        status,
+      });
+    } else if (args.clerkUserId) {
+      // Pitfall 4: the very first account.updated event can beat the server
+      // action's own recordPendingAccount write.
+      await ctx.db.insert("connectAccounts", {
+        clerkUserId: args.clerkUserId,
+        stripeAccountId: args.stripeAccountId,
+        chargesEnabled: args.chargesEnabled,
+        payoutsEnabled: args.payoutsEnabled,
+        detailsSubmitted: args.detailsSubmitted,
+        status,
+      });
+    } else {
+      // Never throw here: a thrown error becomes a 500 to Stripe and
+      // triggers pointless retries of a request that can never succeed
+      // (no row to patch and nothing to insert against).
+      console.error(
+        `upsertFromStripeAccount anomaly: no matching connectAccounts row and no clerkUserId metadata for stripeAccountId ${args.stripeAccountId}`,
+      );
+      return { anomaly: "no matching account and no clerkUserId metadata" };
+    }
+
+    await ctx.db.insert("processedStripeEvents", {
+      stripeEventId: args.stripeEventId,
+      eventType: args.eventType,
+      processedAt: Date.now(),
+    });
+
+    return { success: true };
   },
 });
