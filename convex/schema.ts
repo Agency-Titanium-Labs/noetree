@@ -52,6 +52,29 @@ export default defineSchema({
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_stripeSubscriptionId", ["stripeSubscriptionId"]),
 
+  // Idempotency note (07-RESEARCH.md Pitfall 3): the Connect event stream
+  // (account.updated) reuses the existing processedStripeEvents table below
+  // with a bare stripeEventId key. That is safe only because this phase's
+  // handler is the sole consumer of account.updated events. If a future
+  // phase adds a second consumer of the same event, it must suffix its own
+  // idempotency key (e.g. `${event.id}:<operation>`, per the
+  // grantInitialCredits/upsertSubscription precedent in aiCredits.ts) rather
+  // than sharing this bare key.
+  connectAccounts: defineTable({
+    clerkUserId: v.string(),
+    stripeAccountId: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("restricted"),
+    ),
+    chargesEnabled: v.boolean(),
+    payoutsEnabled: v.boolean(),
+    detailsSubmitted: v.boolean(),
+  })
+    .index("by_clerkUserId", ["clerkUserId"])
+    .index("by_stripeAccountId", ["stripeAccountId"]),
+
   aiCredits: defineTable({
     clerkUserId: v.string(),
     balance: v.number(),
