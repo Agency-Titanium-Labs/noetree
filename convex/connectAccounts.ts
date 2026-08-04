@@ -1,5 +1,5 @@
-import { query, internalQuery } from "./_generated/server";
-import { v } from "convex/values";
+import { query, internalQuery, mutation } from "./_generated/server";
+import { v, ConvexError } from "convex/values";
 
 // Security: clerkUserId is derived exclusively from the caller's
 // authenticated Convex identity (never a client-supplied argument) so a
@@ -44,5 +44,63 @@ export const isSellerActive = internalQuery({
       .unique();
 
     return account?.chargesEnabled === true && account?.payoutsEnabled === true;
+  },
+});
+
+// Security: clerkUserId is derived exclusively from ctx.auth.getUserIdentity()
+// (never a client-supplied argument), so a caller can only ever create/read
+// their OWN row. Two account-takeover primitives are explicitly closed here:
+//   1. A caller with an existing row can never re-point it at a different
+//      stripeAccountId (would let a client silently swap in a different
+//      Stripe account after the fact) — existing callers get
+//      { alreadyExists: true } and nothing is patched.
+//   2. A caller cannot claim a stripeAccountId already linked to a different
+//      user — throws ConvexError("CONNECT_ACCOUNT_ALREADY_LINKED").
+//
+// This mutation stores an INERT account id only — status "pending" and all
+// three capability booleans false. It must NEVER write a capability flag as
+// true; all capability state originates exclusively from
+// upsertFromStripeAccount, the webhook-driven internal mutation below
+// (07-RESEARCH.md Pitfall 1 / ARCHITECTURE.md Anti-Pattern 2). The row is
+// written here (rather than waiting for the first account.updated webhook)
+// so a second "Become a seller" click can detect the existing pending
+// account and skip calling stripe.accounts.create again — without it, every
+// repeat click would orphan a duplicate Express account.
+export const recordPendingAccount = mutation({
+  args: { stripeAccountId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("UNAUTHENTICATED");
+    }
+
+    const existingForCaller = await ctx.db
+      .query("connectAccounts")
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
+      .unique();
+    if (existingForCaller) {
+      return { alreadyExists: true };
+    }
+
+    const existingForAccountId = await ctx.db
+      .query("connectAccounts")
+      .withIndex("by_stripeAccountId", q =>
+        q.eq("stripeAccountId", args.stripeAccountId),
+      )
+      .unique();
+    if (existingForAccountId) {
+      throw new ConvexError("CONNECT_ACCOUNT_ALREADY_LINKED");
+    }
+
+    await ctx.db.insert("connectAccounts", {
+      clerkUserId: identity.subject,
+      stripeAccountId: args.stripeAccountId,
+      status: "pending",
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      detailsSubmitted: false,
+    });
+
+    return { created: true };
   },
 });
