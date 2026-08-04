@@ -591,4 +591,166 @@ describe("connectAccounts", () => {
       expect(row?.status).toBe("pending");
     });
   });
+
+  describe("processConnectWebhookEvent", () => {
+    const TEST_SECRET = "test-internal-secret";
+
+    test("throws an Unauthorized-prefixed ConvexError when the secret does not match, and writes no row", async () => {
+      const t = convexTest(schema, modules);
+      process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+
+      let caught: unknown;
+      try {
+        await t.action(api.connectAccounts.processConnectWebhookEvent, {
+          secret: "wrong-secret",
+          event: {
+            id: "evt_bad",
+            type: "account.updated",
+            account: "acct_bad",
+            data: { object: {} },
+          },
+        });
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(ConvexError);
+      expect((caught as ConvexError<string>).data).toMatch(/^Unauthorized/);
+
+      const rowCount = await t.run(async ctx => {
+        const rows = await ctx.db.query("connectAccounts").collect();
+        return rows.length;
+      });
+      expect(rowCount).toBe(0);
+    });
+
+    test("correct secret, account.updated with capability flags true, dispatches to upsertFromStripeAccount and creates an active row", async () => {
+      const t = convexTest(schema, modules);
+      process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+
+      const result = await t.action(
+        api.connectAccounts.processConnectWebhookEvent,
+        {
+          secret: TEST_SECRET,
+          event: {
+            id: "evt_dispatch_1",
+            type: "account.updated",
+            account: "acct_1",
+            data: {
+              object: {
+                metadata: { clerkUserId: "user_1" },
+                charges_enabled: true,
+                payouts_enabled: true,
+                details_submitted: true,
+              },
+            },
+          },
+        },
+      );
+
+      expect(result).toEqual({ success: true });
+
+      const row = await t.run(async ctx => {
+        return await ctx.db
+          .query("connectAccounts")
+          .withIndex("by_stripeAccountId", q =>
+            q.eq("stripeAccountId", "acct_1"),
+          )
+          .unique();
+      });
+      expect(row).not.toBeNull();
+      expect(row?.clerkUserId).toBe("user_1");
+      expect(row?.status).toBe("active");
+    });
+
+    test("correct secret, an unhandled event type returns { skipped: true } and writes nothing", async () => {
+      const t = convexTest(schema, modules);
+      process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+
+      const result = await t.action(
+        api.connectAccounts.processConnectWebhookEvent,
+        {
+          secret: TEST_SECRET,
+          event: {
+            id: "evt_deauth",
+            type: "account.application.deauthorized",
+            account: "acct_deauth",
+            data: { object: {} },
+          },
+        },
+      );
+
+      expect(result).toEqual({ skipped: true });
+
+      const rowCount = await t.run(async ctx => {
+        const rows = await ctx.db.query("connectAccounts").collect();
+        return rows.length;
+      });
+      expect(rowCount).toBe(0);
+    });
+
+    test("correct secret, account.updated with missing event.data.object.metadata entirely does not throw and returns the anomaly sentinel", async () => {
+      const t = convexTest(schema, modules);
+      process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+
+      const result = await t.action(
+        api.connectAccounts.processConnectWebhookEvent,
+        {
+          secret: TEST_SECRET,
+          event: {
+            id: "evt_no_metadata",
+            type: "account.updated",
+            account: "acct_no_metadata",
+            data: {
+              object: {
+                charges_enabled: true,
+                payouts_enabled: true,
+                details_submitted: true,
+              },
+            },
+          },
+        },
+      );
+
+      expect(result).toHaveProperty("anomaly");
+
+      const rowCount = await t.run(async ctx => {
+        const rows = await ctx.db.query("connectAccounts").collect();
+        return rows.length;
+      });
+      expect(rowCount).toBe(0);
+    });
+
+    test("correct secret, account.updated with missing event.account returns an anomaly sentinel without throwing or calling the mutation", async () => {
+      const t = convexTest(schema, modules);
+      process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+
+      const result = await t.action(
+        api.connectAccounts.processConnectWebhookEvent,
+        {
+          secret: TEST_SECRET,
+          event: {
+            id: "evt_no_account",
+            type: "account.updated",
+            data: {
+              object: {
+                metadata: { clerkUserId: "user_no_account" },
+                charges_enabled: true,
+                payouts_enabled: true,
+                details_submitted: true,
+              },
+            },
+          },
+        },
+      );
+
+      expect(result).toEqual({ anomaly: "missing event.account" });
+
+      const rowCount = await t.run(async ctx => {
+        const rows = await ctx.db.query("connectAccounts").collect();
+        return rows.length;
+      });
+      expect(rowCount).toBe(0);
+    });
+  });
 });
