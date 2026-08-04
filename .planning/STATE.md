@@ -2,31 +2,31 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Marketplace de notes
-status: planning
+status: executing
 stopped_at: Phase 07 UI-SPEC approved
-last_updated: "2026-08-01T10:14:17.962Z"
-last_activity: 2026-07-12 — ROADMAP.md written for v1.1 (5 phases, 23/23 requirements mapped)
+last_updated: "2026-08-04T08:54:38.434Z"
+last_activity: 2026-08-04 -- Phase 07 execution started
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 6
   completed_plans: 0
   percent: 0
 ---
 
 ## Current Position
 
-Phase: Phase 7 — Connect Onboarding & Seller Enablement (not started)
-Plan: —
-Status: Roadmap created, ready for phase planning
-Last activity: 2026-07-12 — ROADMAP.md written for v1.1 (5 phases, 23/23 requirements mapped)
+Phase: 07 (connect-onboarding-seller-enablement) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 07
+Last activity: 2026-08-04 -- Phase 07 execution started
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente.
-**Current focus:** v1.1 Marketplace de notes — Phase 7 (Connect Onboarding & Seller Enablement) next up for `/gsd:plan-phase 7`
+**Current focus:** Phase 07 — connect-onboarding-seller-enablement
 
 ## Performance Metrics
 
