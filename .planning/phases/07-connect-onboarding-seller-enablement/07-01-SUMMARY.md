@@ -117,5 +117,19 @@ None - no external service configuration required. (This plan is the pure Convex
 
 ---
 
+## Self-Check: PASSED
+
+- FOUND: convex/connectAccounts.ts
+- FOUND: convex/connectAccounts.test.ts
+- FOUND: convex/schema.ts
+- FOUND: convex/\_generated/api.d.ts
+- FOUND: .planning/phases/07-connect-onboarding-seller-enablement/07-01-SUMMARY.md
+- FOUND commit: bbcd8f4 (feat: connectAccounts schema)
+- FOUND commit: 339599b (test: RED phase)
+- FOUND commit: e2aa5d4 (feat: GREEN phase)
+- FOUND commit: 76e53e7 (docs: this summary)
+
+---
+
 _Phase: 07-connect-onboarding-seller-enablement_
 _Completed: 2026-08-04_
