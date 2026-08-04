@@ -3,7 +3,9 @@ import {
   internalQuery,
   mutation,
   internalMutation,
+  action,
 } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v, ConvexError } from "convex/values";
 
 // Security: clerkUserId is derived exclusively from the caller's
@@ -211,5 +213,71 @@ export const upsertFromStripeAccount = internalMutation({
     });
 
     return { success: true };
+  },
+});
+
+// Connect-scoped webhook dispatcher (07-RESEARCH.md Pattern 3 / Pitfall 2).
+// Invoked ONLY from app/api/webhooks/stripe-connect/route.ts, which verifies
+// the inbound Stripe signature against its own distinct Connect-scoped
+// signing secret — a DIFFERENT secret than the platform route uses. This
+// dispatcher never reads that Stripe signing secret itself; it authenticates
+// the Next.js-route-to-Convex-action hop with INTERNAL_WEBHOOK_SECRET, the
+// SAME shared secret stripeWebhooks.processWebhookEvent already uses (that
+// secret's purpose is unrelated to which Stripe secret verified the inbound
+// signature). Mirrors stripeWebhooks.processWebhookEvent's shape exactly;
+// deliberately kept in a separate dispatcher/route pair rather than a unified
+// `if (event.account)` branch, so the secret-per-endpoint boundary can never
+// be blurred.
+export const processConnectWebhookEvent = action({
+  args: { event: v.any(), secret: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args): Promise<any> => {
+    if (args.secret !== process.env.INTERNAL_WEBHOOK_SECRET) {
+      // ConvexError (not a plain Error) is required here: Convex's documented
+      // production behavior only preserves thrown data across the action
+      // boundary for ConvexError — a plain Error's message gets redacted, which
+      // would silently break route.ts's 400-vs-500 auth-failure mapping (CR-01).
+      throw new ConvexError("Unauthorized: invalid INTERNAL_WEBHOOK_SECRET");
+    }
+
+    switch (args.event.type) {
+      case "account.updated": {
+        // event.account is a top-level field present ONLY on connected-account
+        // events (never on platform events) — this is a routing signal only,
+        // never an authenticity signal (authenticity comes exclusively from
+        // signature verification in the route, before this action is called).
+        const stripeAccountId = args.event.account;
+        if (!stripeAccountId) {
+          console.error(
+            `processConnectWebhookEvent anomaly: missing event.account for stripeEventId ${args.event.id}`,
+          );
+          return { anomaly: "missing event.account" };
+        }
+
+        const account = args.event.data.object;
+        const clerkUserId = account?.metadata?.clerkUserId;
+        // Coerce with === true so a missing/undefined field becomes `false`
+        // rather than failing the internalMutation's v.boolean() validator.
+        const chargesEnabled = account?.charges_enabled === true;
+        const payoutsEnabled = account?.payouts_enabled === true;
+        const detailsSubmitted = account?.details_submitted === true;
+
+        return await ctx.runMutation(
+          internal.connectAccounts.upsertFromStripeAccount,
+          {
+            stripeEventId: args.event.id,
+            eventType: args.event.type,
+            stripeAccountId,
+            clerkUserId,
+            chargesEnabled,
+            payoutsEnabled,
+            detailsSubmitted,
+          },
+        );
+      }
+
+      default:
+        return { skipped: true };
+    }
   },
 });
