@@ -223,6 +223,18 @@
     "topupHistoryTitle": "Historique des recharges",
     "topupHistoryEmptyTitle": "Aucune recharge pour le moment",
     "topupHistoryEmptyBody": "Vos achats de crédits IA apparaîtront ici une fois que vous aurez effectué une recharge.",
-    "actionError": "Une erreur est survenue lors de la mise à jour de votre abonnement. Veuillez réessayer, ou contacter le support si le problème persiste."
+    "actionError": "Une erreur est survenue lors de la mise à jour de votre abonnement. Veuillez réessayer, ou contacter le support si le problème persiste.",
+    "sellerCardTitle": "Vente",
+    "sellerNotStartedBody": "Vendez vos notes et gagnez de l'argent.",
+    "becomeSellerCta": "Devenir vendeur",
+    "sellerStatusPending": "En attente",
+    "sellerPendingBody": "Terminez votre inscription avec Stripe pour commencer à vendre.",
+    "resumeOnboardingCta": "Reprendre l'inscription",
+    "sellerStatusActive": "Actif",
+    "sellerActiveBody": "Vous êtes prêt à vendre vos notes.",
+    "sellerStatusRestricted": "Restreint",
+    "sellerRestrictedBody": "Stripe a besoin d'informations supplémentaires avant que vous puissiez continuer à vendre.",
+    "updateDetailsCta": "Mettre à jour vos informations",
+    "sellerActionError": "Une erreur est survenue lors du démarrage de l'inscription. Veuillez réessayer, ou contacter le support si le problème persiste."
   }
 }
