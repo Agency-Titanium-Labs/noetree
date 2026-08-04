@@ -223,6 +223,18 @@
     "topupHistoryTitle": "Top-up history",
     "topupHistoryEmptyTitle": "No top-ups yet",
     "topupHistoryEmptyBody": "Your AI credit purchases will appear here once you buy a top-up.",
-    "actionError": "Something went wrong updating your subscription. Please try again, or contact support if this keeps happening."
+    "actionError": "Something went wrong updating your subscription. Please try again, or contact support if this keeps happening.",
+    "sellerCardTitle": "Selling",
+    "sellerNotStartedBody": "Sell your notes and earn money from buyers.",
+    "becomeSellerCta": "Become a seller",
+    "sellerStatusPending": "Pending",
+    "sellerPendingBody": "Finish onboarding with Stripe to start selling.",
+    "resumeOnboardingCta": "Resume onboarding",
+    "sellerStatusActive": "Active",
+    "sellerActiveBody": "You're ready to sell notes.",
+    "sellerStatusRestricted": "Restricted",
+    "sellerRestrictedBody": "Stripe needs more information before you can continue selling.",
+    "updateDetailsCta": "Update details",
+    "sellerActionError": "Something went wrong starting onboarding. Please try again, or contact support if this keeps happening."
   }
 }
