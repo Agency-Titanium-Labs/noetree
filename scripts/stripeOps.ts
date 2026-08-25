@@ -189,3 +189,58 @@ export async function migrateProToPremium(
 
   return { migrated, skipped, failed, dryRun: dryRun === true };
 }
+
+export interface ArchiveResult {
+  archived: boolean;
+  activeCount: number;
+  reason?: string;
+}
+
+export interface ArchiveOldPriceIfUnusedParams {
+  oldPriceId: string;
+}
+
+/**
+ * Archives the old Pro price only once Stripe itself reports zero active
+ * subscriptions still referencing it. Archiving (`active: false`) only
+ * prevents NEW Checkout Sessions from using the price — it never affects
+ * subscriptions already on it — so this guard exists to ensure archiving
+ * can never be mistaken for, or used as a substitute for, the migration
+ * itself (see migrateProToPremium). This is the only place in this module
+ * permitted to mutate a Price object's `active` flag, and it may only
+ * ever pass `{ active: false }` — the recurring amount is immutable and
+ * must never appear in this call.
+ */
+export async function archiveOldPriceIfUnused(
+  stripe: Stripe,
+  params: ArchiveOldPriceIfUnusedParams,
+): Promise<ArchiveResult> {
+  const { oldPriceId } = params;
+
+  if (!oldPriceId) {
+    throw new Error(
+      "archiveOldPriceIfUnused: oldPriceId must be a non-empty string",
+    );
+  }
+
+  let activeCount = 0;
+  for await (const _subscription of stripe.subscriptions.list({
+    price: oldPriceId,
+    status: "active",
+    limit: 100,
+  })) {
+    activeCount++;
+  }
+
+  if (activeCount > 0) {
+    return {
+      archived: false,
+      activeCount,
+      reason: "active-subscriptions-remain",
+    };
+  }
+
+  await stripe.prices.update(oldPriceId, { active: false });
+
+  return { archived: true, activeCount: 0 };
+}

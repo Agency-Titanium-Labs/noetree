@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Stripe from "stripe";
-import { setupPremiumPrices, migrateProToPremium } from "./stripeOps";
+import {
+  setupPremiumPrices,
+  migrateProToPremium,
+  archiveOldPriceIfUnused,
+} from "./stripeOps";
 
 function makePricesListResult(prices: Partial<Stripe.Price>[]) {
   return {
@@ -408,5 +412,58 @@ describe("migrateProToPremium", () => {
     ).rejects.toThrow();
 
     expect(fake.subscriptions.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("archiveOldPriceIfUnused", () => {
+  let fake: ReturnType<typeof makeFakeStripe>;
+
+  beforeEach(() => {
+    fake = makeFakeStripe();
+  });
+
+  it("Test 1: with one or more active subscriptions still on the old price, prices.update is never called and archived is false with reason", async () => {
+    fake.subscriptions.list.mockReturnValue(
+      makeSubscriptionsListResult([
+        { id: "sub_1" } as Partial<Stripe.Subscription>,
+        { id: "sub_2" } as Partial<Stripe.Subscription>,
+      ]),
+    );
+
+    const result = await archiveOldPriceIfUnused(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+    });
+
+    expect(fake.prices.update).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      archived: false,
+      activeCount: 2,
+      reason: "active-subscriptions-remain",
+    });
+  });
+
+  it("Test 2: with zero active subscriptions on the old price, calls prices.update exactly once and reports archived true", async () => {
+    fake.subscriptions.list.mockReturnValue(makeSubscriptionsListResult([]));
+
+    const result = await archiveOldPriceIfUnused(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+    });
+
+    expect(fake.prices.update).toHaveBeenCalledTimes(1);
+    expect(fake.prices.update).toHaveBeenCalledWith("price_old", {
+      active: false,
+    });
+    expect(result).toEqual({ archived: true, activeCount: 0 });
+  });
+
+  it("Test 3: an empty oldPriceId throws before any Stripe call", async () => {
+    await expect(
+      archiveOldPriceIfUnused(fake as unknown as Stripe, {
+        oldPriceId: "",
+      }),
+    ).rejects.toThrow();
+
+    expect(fake.subscriptions.list).not.toHaveBeenCalled();
+    expect(fake.prices.update).not.toHaveBeenCalled();
   });
 });
