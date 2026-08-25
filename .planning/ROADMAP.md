@@ -51,8 +51,17 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 2. Pricing page, Settings page, Stripe Checkout, and any webhook-derived plan label all display "Premium" — no remaining "Pro" label anywhere in the app
 3. User can subscribe to Premium at 6.99€/month, or choose a 59€/year annual option at checkout
 4. Every subscriber who was on the old Pro plan continues to be billed correctly on the new Premium price, with no billing gap and no duplicate subscription created
-   **Plans**: TBD
+   **Plans**: 6 plans (4 waves)
    **UI hint**: yes
+
+Plans:
+
+- [ ] 12-01-PLAN.md — Remove the Free-tier 20-note cap and every UpgradeModal/PlanEnforcement remnant (wave 1)
+- [ ] 12-02-PLAN.md — Scripts toolchain + Stripe Premium Product rename and 6.99€/59€ Price creation (wave 1)
+- [ ] 12-03-PLAN.md — getUserTier centralization + Settings/AiCredits Premium copy (wave 2)
+- [ ] 12-04-PLAN.md — Subscriber migration + guarded old-price archive ops, unit-tested (wave 2)
+- [ ] 12-05-PLAN.md — Premium pricing page with Monthly/Annual toggle + server-resolved Checkout interval (wave 3)
+- [ ] 12-06-PLAN.md — Operator-gated Stripe cutover: test-mode verification then live migration and archive (wave 4)
 
 ### Phase 13: Sharing — Links & Public Notes
 
@@ -131,7 +140,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 5. AI Credits System                           | v1.0      | 5/5            | Complete    | 2026-07-10 |
 | 6. Settings Page                               | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
-| 12. Plan Restructure & Tier Foundation         | v1.2      | 0/TBD          | Not started | -          |
+| 12. Plan Restructure & Tier Foundation         | v1.2      | 0/6            | Planned     | -          |
 | 13. Sharing — Links & Public Notes             | v1.2      | 0/TBD          | Not started | -          |
 | 14. Comments & Notifications                   | v1.2      | 0/TBD          | Not started | -          |
 | 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |
@@ -139,4 +148,4 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 
 ---
 
-Next: `/gsd:plan-phase 12`
+Next: `/gsd:execute-phase 12`
