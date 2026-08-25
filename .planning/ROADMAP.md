@@ -56,11 +56,22 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 
 Plans:
 
+**Wave 1**
+
 - [ ] 12-01-PLAN.md — Remove the Free-tier 20-note cap and every UpgradeModal/PlanEnforcement remnant (wave 1)
 - [ ] 12-02-PLAN.md — Scripts toolchain + Stripe Premium Product rename and 6.99€/59€ Price creation (wave 1)
+
+**Wave 2** _(blocked on Wave 1 completion)_
+
 - [ ] 12-03-PLAN.md — getUserTier centralization + Settings/AiCredits Premium copy (wave 2)
 - [ ] 12-04-PLAN.md — Subscriber migration + guarded old-price archive ops, unit-tested (wave 2)
+
+**Wave 3** _(blocked on Wave 2 completion)_
+
 - [ ] 12-05-PLAN.md — Premium pricing page with Monthly/Annual toggle + server-resolved Checkout interval (wave 3)
+
+**Wave 4** _(blocked on Wave 3 completion)_
+
 - [ ] 12-06-PLAN.md — Operator-gated Stripe cutover: test-mode verification then live migration and archive (wave 4)
 
 ### Phase 13: Sharing — Links & Public Notes
