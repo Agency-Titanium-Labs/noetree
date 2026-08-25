@@ -98,3 +98,94 @@ export async function setupPremiumPrices(
     createdAnnual,
   };
 }
+
+export interface MigrationResult {
+  migrated: string[];
+  skipped: string[];
+  failed: string[];
+  dryRun: boolean;
+}
+
+export interface MigrateProToPremiumParams {
+  oldPriceId: string;
+  newPriceId: string;
+  dryRun?: boolean;
+}
+
+/**
+ * One-time migration of every active subscriber on `oldPriceId` onto
+ * `newPriceId`. Stripe itself is the authoritative enumeration source —
+ * Convex's `subscriptions` table has no `priceId` field and must never be
+ * consulted here. Each subscription's existing item is replaced in place
+ * (never duplicated) with no proration applied, so the current billing
+ * cycle completes untouched at the old price and the new price first
+ * applies at the subscriber's next natural renewal (D-01). A
+ * per-subscriber try/catch means one failure never aborts the run for the
+ * rest; re-running after Stripe's 24h idempotency-key window is safe
+ * because subscriptions already on `newPriceId` are skipped by an
+ * application-level check, not just the idempotency key.
+ */
+export async function migrateProToPremium(
+  stripe: Stripe,
+  params: MigrateProToPremiumParams,
+): Promise<MigrationResult> {
+  const { oldPriceId, newPriceId, dryRun } = params;
+
+  if (!oldPriceId || !newPriceId || oldPriceId === newPriceId) {
+    throw new Error(
+      "migrateProToPremium: oldPriceId and newPriceId must both be non-empty and different",
+    );
+  }
+
+  const migrated: string[] = [];
+  const skipped: string[] = [];
+  const failed: string[] = [];
+
+  for await (const subscription of stripe.subscriptions.list({
+    price: oldPriceId,
+    status: "active",
+    limit: 100,
+  })) {
+    const currentItem = subscription.items.data[0];
+
+    if (!currentItem) {
+      console.error(
+        "migrateProToPremium: subscription has no items",
+        subscription.id,
+      );
+      failed.push(subscription.id);
+      continue;
+    }
+
+    if (currentItem.price.id === newPriceId) {
+      skipped.push(subscription.id);
+      continue;
+    }
+
+    if (dryRun) {
+      migrated.push(subscription.id);
+      continue;
+    }
+
+    try {
+      await stripe.subscriptions.update(
+        subscription.id,
+        {
+          items: [{ id: currentItem.id, price: newPriceId }],
+          proration_behavior: "none",
+        },
+        { idempotencyKey: `premium-migration-${subscription.id}` },
+      );
+      migrated.push(subscription.id);
+    } catch (err) {
+      console.error(
+        "migrateProToPremium: subscription update failed",
+        subscription.id,
+        err,
+      );
+      failed.push(subscription.id);
+    }
+  }
+
+  return { migrated, skipped, failed, dryRun: dryRun === true };
+}
