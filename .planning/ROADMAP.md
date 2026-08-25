@@ -68,7 +68,7 @@ Plans:
 
 **Wave 3** _(blocked on Wave 2 completion)_
 
-- [ ] 12-05-PLAN.md — Premium pricing page with Monthly/Annual toggle + server-resolved Checkout interval (wave 3)
+- [x] 12-05-PLAN.md — Premium pricing page with Monthly/Annual toggle + server-resolved Checkout interval (wave 3)
 
 **Wave 4** _(blocked on Wave 3 completion)_
 
@@ -151,7 +151,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 5. AI Credits System                           | v1.0      | 5/5            | Complete    | 2026-07-10 |
 | 6. Settings Page                               | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
-| 12. Plan Restructure & Tier Foundation         | v1.2      | 4/6            | In Progress |            |
+| 12. Plan Restructure & Tier Foundation         | v1.2      | 5/6            | In Progress |            |
 | 13. Sharing — Links & Public Notes             | v1.2      | 0/TBD          | Not started | -          |
 | 14. Comments & Notifications                   | v1.2      | 0/TBD          | Not started | -          |
 | 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |
