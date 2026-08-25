@@ -20,16 +20,19 @@ export const getUser = async (ctx: GenericQueryCtx<DataModel>) => {
   return user;
 };
 
-// Pro is resolved strictly from an active subscription (D-03); no subscription
-// row (or any non-"active" status) resolves to Free (D-04). clerkUserId is
-// derived exclusively from identity.subject — never a client-supplied
-// argument (D-05, mirrors the IDOR fix in subscriptions.ts getSubscription).
-export const isProUser = async (
+export type UserTier = "free" | "premium";
+
+// Tier is resolved strictly from an active subscription (D-03); no
+// subscription row (or any non-"active" status) resolves to Free (D-04).
+// clerkUserId is derived exclusively from identity.subject — never a
+// client-supplied argument (D-05, mirrors the IDOR fix in subscriptions.ts
+// getSubscription).
+export const getUserTier = async (
   ctx: GenericQueryCtx<DataModel>,
-): Promise<boolean> => {
+): Promise<UserTier> => {
   const identity = await ctx.auth.getUserIdentity();
   if (identity === null) {
-    return false;
+    return "free";
   }
 
   const subscription = await ctx.db
@@ -37,5 +40,5 @@ export const isProUser = async (
     .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
     .unique();
 
-  return subscription?.status === "active";
+  return subscription?.status === "active" ? "premium" : "free";
 };

@@ -1,5 +1,6 @@
 import { query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { getUserTier } from "./helpers/helper";
 
 export const getSubscription = query({
   args: {},
@@ -16,6 +17,11 @@ export const getSubscription = query({
       .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
       .unique();
   },
+});
+
+export const getSubscriptionTier = query({
+  args: {},
+  handler: async ctx => await getUserTier(ctx),
 });
 
 export const upsertSubscription = internalMutation({

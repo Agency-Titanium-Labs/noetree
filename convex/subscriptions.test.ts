@@ -318,3 +318,111 @@ describe("subscriptions", () => {
     expect(sub?.status).toBe("past_due");
   });
 });
+
+describe("subscriptions.getSubscriptionTier (D-03 tier derivation)", () => {
+  test("no authenticated identity resolves to free", async () => {
+    const t = convexTest(schema, modules);
+
+    const tier = await t.query(api.subscriptions.getSubscriptionTier, {});
+
+    expect(tier).toBe("free");
+  });
+
+  test("authenticated identity with no subscriptions row resolves to free", async () => {
+    const t = convexTest(schema, modules);
+
+    const tier = await t
+      .withIdentity({ subject: "user_nonexistent" })
+      .query(api.subscriptions.getSubscriptionTier, {});
+
+    expect(tier).toBe("free");
+  });
+
+  test("authenticated identity with an active subscription resolves to premium", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async ctx => {
+      await ctx.db.insert("subscriptions", {
+        clerkUserId: "user_active",
+        stripeCustomerId: "cus_active",
+        stripeSubscriptionId: "sub_active",
+        status: "active",
+        currentPeriodEnd: 1234567890,
+        cancelAtPeriodEnd: false,
+      });
+    });
+
+    const tier = await t
+      .withIdentity({ subject: "user_active" })
+      .query(api.subscriptions.getSubscriptionTier, {});
+
+    expect(tier).toBe("premium");
+  });
+
+  test("authenticated identity with a past_due subscription resolves to free", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async ctx => {
+      await ctx.db.insert("subscriptions", {
+        clerkUserId: "user_past_due",
+        stripeCustomerId: "cus_past_due",
+        stripeSubscriptionId: "sub_past_due",
+        status: "past_due",
+        currentPeriodEnd: 1234567890,
+        cancelAtPeriodEnd: false,
+      });
+    });
+
+    const tier = await t
+      .withIdentity({ subject: "user_past_due" })
+      .query(api.subscriptions.getSubscriptionTier, {});
+
+    expect(tier).toBe("free");
+  });
+
+  test("authenticated identity with a canceled subscription resolves to free", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async ctx => {
+      await ctx.db.insert("subscriptions", {
+        clerkUserId: "user_canceled",
+        stripeCustomerId: "cus_canceled",
+        stripeSubscriptionId: "sub_canceled",
+        status: "canceled",
+        currentPeriodEnd: 1234567890,
+        cancelAtPeriodEnd: false,
+      });
+    });
+
+    const tier = await t
+      .withIdentity({ subject: "user_canceled" })
+      .query(api.subscriptions.getSubscriptionTier, {});
+
+    expect(tier).toBe("free");
+  });
+
+  test("IDOR: tier follows the caller's own identity, never a supplied argument", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async ctx => {
+      await ctx.db.insert("subscriptions", {
+        clerkUserId: "user_a",
+        stripeCustomerId: "cus_a",
+        stripeSubscriptionId: "sub_a",
+        status: "active",
+        currentPeriodEnd: 1234567890,
+        cancelAtPeriodEnd: false,
+      });
+    });
+
+    const tierForUserB = await t
+      .withIdentity({ subject: "user_b" })
+      .query(api.subscriptions.getSubscriptionTier, {});
+    expect(tierForUserB).toBe("free");
+
+    const tierForUserA = await t
+      .withIdentity({ subject: "user_a" })
+      .query(api.subscriptions.getSubscriptionTier, {});
+    expect(tierForUserA).toBe("premium");
+  });
+});
