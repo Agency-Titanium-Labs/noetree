@@ -92,45 +92,43 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Populated during roadmap creation (`/gsd:plan-phase` / roadmapper).
-
-| Requirement | Phase | Status  |
-| ----------- | ----- | ------- |
-| PLAN-06     | TBD   | Pending |
-| PLAN-07     | TBD   | Pending |
-| PLAN-08     | TBD   | Pending |
-| PLAN-09     | TBD   | Pending |
-| SHARE-01    | TBD   | Pending |
-| SHARE-02    | TBD   | Pending |
-| SHARE-03    | TBD   | Pending |
-| SHARE-04    | TBD   | Pending |
-| SHARE-05    | TBD   | Pending |
-| SHARE-06    | TBD   | Pending |
-| COMMENT-01  | TBD   | Pending |
-| COMMENT-02  | TBD   | Pending |
-| COMMENT-03  | TBD   | Pending |
-| COMMENT-04  | TBD   | Pending |
-| NOTIF-01    | TBD   | Pending |
-| NOTIF-02    | TBD   | Pending |
-| HIST-01     | TBD   | Pending |
-| HIST-02     | TBD   | Pending |
-| HIST-03     | TBD   | Pending |
-| HIST-04     | TBD   | Pending |
-| HIST-05     | TBD   | Pending |
-| CRED-05     | TBD   | Pending |
-| CRED-06     | TBD   | Pending |
-| CRED-07     | TBD   | Pending |
-| CRED-08     | TBD   | Pending |
-| CRED-09     | TBD   | Pending |
-| CRED-10     | TBD   | Pending |
+| Requirement | Phase                                         | Status  |
+| ----------- | --------------------------------------------- | ------- |
+| PLAN-06     | Phase 12 — Plan Restructure & Tier Foundation | Pending |
+| PLAN-07     | Phase 12 — Plan Restructure & Tier Foundation | Pending |
+| PLAN-08     | Phase 12 — Plan Restructure & Tier Foundation | Pending |
+| PLAN-09     | Phase 12 — Plan Restructure & Tier Foundation | Pending |
+| SHARE-01    | Phase 13 — Sharing — Links & Public Notes     | Pending |
+| SHARE-02    | Phase 13 — Sharing — Links & Public Notes     | Pending |
+| SHARE-03    | Phase 13 — Sharing — Links & Public Notes     | Pending |
+| SHARE-04    | Phase 13 — Sharing — Links & Public Notes     | Pending |
+| SHARE-05    | Phase 13 — Sharing — Links & Public Notes     | Pending |
+| SHARE-06    | Phase 13 — Sharing — Links & Public Notes     | Pending |
+| COMMENT-01  | Phase 14 — Comments & Notifications           | Pending |
+| COMMENT-02  | Phase 14 — Comments & Notifications           | Pending |
+| COMMENT-03  | Phase 14 — Comments & Notifications           | Pending |
+| COMMENT-04  | Phase 14 — Comments & Notifications           | Pending |
+| NOTIF-01    | Phase 14 — Comments & Notifications           | Pending |
+| NOTIF-02    | Phase 14 — Comments & Notifications           | Pending |
+| HIST-01     | Phase 15 — Version History & Restoration      | Pending |
+| HIST-02     | Phase 15 — Version History & Restoration      | Pending |
+| HIST-03     | Phase 15 — Version History & Restoration      | Pending |
+| HIST-04     | Phase 15 — Version History & Restoration      | Pending |
+| HIST-05     | Phase 15 — Version History & Restoration      | Pending |
+| CRED-05     | Phase 16 — AI Credit System Revision          | Pending |
+| CRED-06     | Phase 16 — AI Credit System Revision          | Pending |
+| CRED-07     | Phase 16 — AI Credit System Revision          | Pending |
+| CRED-08     | Phase 16 — AI Credit System Revision          | Pending |
+| CRED-09     | Phase 16 — AI Credit System Revision          | Pending |
+| CRED-10     | Phase 16 — AI Credit System Revision          | Pending |
 
 **Coverage:**
 
 - v1 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27 ⚠️ (roadmap not yet created)
+- Mapped to phases: 27
+- Unmapped: 0 ✓
 
 ---
 
 _Requirements defined: 2026-08-25_
-_Last updated: 2026-08-25 after initial definition (research-informed, milestone v1.2)_
+_Last updated: 2026-08-25 after roadmap creation (5 phases, 12-16, 100% coverage)_

@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: planning
-last_updated: "2026-08-25T07:42:47.070Z"
+status: roadmapped
+last_updated: "2026-08-25T00:00:00.000Z"
 last_activity: 2026-08-25
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,35 +15,37 @@ progress:
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-25 — Milestone v1.2 started
+Phase: 12 of 16 (Plan Restructure & Tier Foundation) — first phase of v1.2, ready to plan
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-08-25 — ROADMAP.md created for v1.2, phases 12-16 defined, 27/27 requirements mapped
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-12)
+See: .planning/PROJECT.md (updated 2026-08-25)
 
-**Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente.
-**Current focus:** Planning next milestone
+**Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
+**Current focus:** Phase 12 — Plan Restructure & Tier Foundation
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 21
+- Total plans completed: 21 (from v1.0; v1.2 has not started execution)
 - Average duration: —
-- Total execution time: 0 hours
+- Total execution time: 0 hours (v1.2)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 | ----- | ----- | ----- | -------- |
-| 02    | 6     | -     | -        |
-| 04    | 4     | -     | -        |
-| 05    | 5     | -     | -        |
-| 06    | 5     | -     | -        |
-| 06.1  | 1     | -     | -        |
+| 12    | TBD   | -     | -        |
+| 13    | TBD   | -     | -        |
+| 14    | TBD   | -     | -        |
+| 15    | TBD   | -     | -        |
+| 16    | TBD   | -     | -        |
 
 **Recent Trend:**
 
@@ -51,21 +53,24 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 - Trend: —
 
 _Updated after each plan completion_
-| Phase 01 P01 | 15 | 2 tasks | 3 files |
-| Phase 01 P02 | 15 | 2 tasks | 3 files |
-| Phase 01 P03 | 8 | 3 tasks | 3 files |
-| Phase 01 P04 | 5 | 2 tasks | 1 files |
-| Phase 06 P05 | N/A | 2 tasks | 0 files |
 
 ## Accumulated Context
 
 ### Roadmap Evolution
 
-- Phase 06.1 inserted after Phase 6: Close gap: PLAN-05/CRED-01/CRED-04 — grant initial AI credits at Pro checkout (found by v1.0 milestone audit integration check) (URGENT)
+- v1.2 roadmap created 2026-08-25: 5 phases (12-16) derived from 27 v1 requirements, following research/SUMMARY.md build order — Plan Restructure first (connective tissue for tier-gated features), Sharing next (no dependency, unblocks Comments' access model), Comments after Sharing, Version History parallel-safe with Sharing/Comments but gated on Plan Restructure for retention tiering, AI Credits last (most self-contained).
+- Phase numbers intentionally start at 12 (not 7) to avoid collision with milestone v1.1 "Marketplace de notes" (phases 7-11), in progress in parallel on branch `milestone/v1.1-marketplace-de-notes`.
 
 ### Decisions
 
-v1.0 decisions are logged in PROJECT.md Key Decisions table and `.planning/RETROSPECTIVE.md` (v1.0 milestone section). Cleared here at milestone close — see those two files for full history.
+v1.0 decisions are logged in PROJECT.md Key Decisions table and `.planning/RETROSPECTIVE.md` (v1.0 milestone section).
+
+Decisions relevant to v1.2 planning (from research, to be confirmed during phase planning):
+
+- Public/link-shared notes: anonymous access is view-only; edit-permission links still require sign-in (no anonymous edits) — per SHARE-03.
+- Comments are note-level only (no text-selection anchoring) for this milestone — per COMMENT scope and REQUIREMENTS.md v2 deferral of COMMENT-05.
+- Notifications are in-app only, no email digest this milestone — per NOTIF scope and REQUIREMENTS.md v2 deferral of NOTIF-03.
+- Version restore never deletes/hides comments as a side effect — per COMMENT-04.
 
 ### Pending Todos
 
@@ -73,11 +78,12 @@ None yet.
 
 ### Blockers/Concerns
 
-None open. v1.0 blockers/concerns (Stripe setup sequencing, decision-coverage gate false-negatives on Phases 4/5/06.1) are resolved and summarized in `.planning/RETROSPECTIVE.md`.
+- Phase 12 (Stripe subscriber migration to new Premium price) touches live billing for real paying customers — research/SUMMARY.md flags this as needing a dedicated research pass during `/gsd:plan-phase 12` before execution (subscriptions.update vs Subscription Schedule, proration/timing, idempotency-key pattern).
+- Phase 13 (public/unauthenticated Convex query path) is the first genuinely anonymous read surface in this codebase and carries IDOR-class risk — research/SUMMARY.md recommends an explicit security-review/IDOR-checklist step before merge.
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close on 2026-07-12:
+Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 | Category | Item            | Status                                                        |
 | -------- | --------------- | ------------------------------------------------------------- |
@@ -85,10 +91,11 @@ Items acknowledged and deferred at milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-07-12T08:18:07+02:00
-Stopped at: v1.0 milestone archived and complete
-Resume file: none — start next milestone with /gsd:new-milestone
+Last session: 2026-08-25
+Stopped at: v1.2 ROADMAP.md and STATE.md created, REQUIREMENTS.md traceability updated — awaiting roadmap approval
+Resume file: none — next step is `/gsd:plan-phase 12`
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review and approve the v1.2 roadmap (.planning/ROADMAP.md)
+- Start phase planning with `/gsd:plan-phase 12`
