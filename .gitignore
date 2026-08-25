@@ -49,3 +49,6 @@ certificates
 cypress.env.json
 cypress/videos/
 cypress/screenshots/
+
+# git worktrees (isolated workspaces for parallel milestone/feature work)
+.worktrees/
