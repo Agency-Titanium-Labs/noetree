@@ -29,13 +29,14 @@ export default function CreditsExhaustedDialog({
 }: CreditsExhaustedDialogProps) {
   const t = useTranslations("AiCredits");
 
-  // D-11: same active-only Pro check established in Phase 4 enforcement —
-  // branches the dialog's CTA between "Upgrade to Pro" (Free) and
-  // "Buy 50 credits" (Pro-at-zero).
-  const { data: subscription } = useQuery(
-    convexQuery(api.subscriptions.getSubscription, {}),
+  // D-11: tier branches the dialog's CTA between "Upgrade to Premium" (Free)
+  // and "Buy 50 credits" (Premium-at-zero). Sourced from getSubscriptionTier
+  // (D-03) — the single server-derived source of truth, not a local
+  // subscription-status recomputation (RESEARCH.md Pitfall 4).
+  const { data: tier } = useQuery(
+    convexQuery(api.subscriptions.getSubscriptionTier, {}),
   );
-  const isPro = subscription?.status === "active";
+  const isPremium = tier === "premium";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -43,14 +44,14 @@ export default function CreditsExhaustedDialog({
         <DialogHeader>
           <DialogTitle>{t("dialogTitle")}</DialogTitle>
           <DialogDescription>
-            {isPro ? t("dialogBodyPro") : t("dialogBodyFree")}
+            {isPremium ? t("dialogBodyPremium") : t("dialogBodyFree")}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="secondary">{t("dismiss")}</Button>
           </DialogClose>
-          {isPro ? (
+          {isPremium ? (
             <form action={createTopupCheckoutSession}>
               <Button type="submit">{t("topupCta")}</Button>
             </form>

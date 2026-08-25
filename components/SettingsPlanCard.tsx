@@ -37,12 +37,23 @@ export default function SettingsPlanCard() {
   // Pattern 3 / Pitfall 5: "skip" sentinel, never `enabled: false`.
   // Security: no clerkUserId arg — the query derives the caller's identity
   // from Convex auth itself (IDOR fix, 03-REVIEW.md CR-01).
+  // getSubscription is still needed for currentPeriodEnd/cancelAtPeriodEnd —
+  // getSubscriptionTier does not carry those fields.
   const { data: subscription, isPending: isSubscriptionPending } = useQuery(
     convexQuery(api.subscriptions.getSubscription, isSignedIn ? {} : "skip"),
   );
 
-  const isPro = subscription?.status === "active";
-  const isCancelling = isPro && subscription?.cancelAtPeriodEnd === true;
+  // D-03: tier is the single server-derived source of truth — never
+  // recompute it from subscription.status here (RESEARCH.md Pitfall 4).
+  const { data: tier, isPending: isTierPending } = useQuery(
+    convexQuery(
+      api.subscriptions.getSubscriptionTier,
+      isSignedIn ? {} : "skip",
+    ),
+  );
+
+  const isPremium = tier === "premium";
+  const isCancelling = isPremium && subscription?.cancelAtPeriodEnd === true;
 
   // Pitfall 1 (MUST apply): currentPeriodEnd is stored in Unix SECONDS —
   // always construct the Date via * 1000, never render it raw.
@@ -82,7 +93,7 @@ export default function SettingsPlanCard() {
     }
   }
 
-  const showSkeleton = isSignedIn && isSubscriptionPending;
+  const showSkeleton = isSignedIn && (isSubscriptionPending || isTierPending);
 
   return (
     <Card>
@@ -97,16 +108,16 @@ export default function SettingsPlanCard() {
         ) : (
           <>
             <p className="text-base">
-              {isPro ? t("proPlanName") : t("freePlanName")}
+              {isPremium ? t("premiumPlanName") : t("freePlanName")}
             </p>
 
-            {!isPro && (
+            {!isPremium && (
               <Button asChild>
                 <Link href="/pricing">{t("upgradeCta")}</Link>
               </Button>
             )}
 
-            {isPro && !isCancelling && (
+            {isPremium && !isCancelling && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
                   {t("renewsOn", { date: formattedDate ?? "" })}
@@ -120,7 +131,7 @@ export default function SettingsPlanCard() {
               </div>
             )}
 
-            {isPro && isCancelling && (
+            {isPremium && isCancelling && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
                   {t("cancelsOn", { date: formattedDate ?? "" })}
