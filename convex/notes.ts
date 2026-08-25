@@ -1,9 +1,7 @@
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { v, ConvexError } from "convex/values";
-import { getUser, isProUser } from "./helpers/helper";
+import { v } from "convex/values";
+import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
-
-const FREE_NOTE_LIMIT = 20;
 
 type Notes = Doc<"notes">;
 
@@ -537,27 +535,6 @@ export const createNote = mutation({
 
     if (args.parentNote) {
       await requireEditAccess(ctx, args.parentNote, user._id);
-    }
-
-    // Free-tier 20-note cap (server-side, cannot be bypassed by the client —
-    // ROADMAP SC1). Counts notes at any depth by scanning by owner alone
-    // (D-01). Bounded with .take() rather than .collect().length so the
-    // check stays O(FREE_NOTE_LIMIT + 1) regardless of how many notes the
-    // user owns (guidelines rule). Pro users skip the check entirely.
-    const pro = await isProUser(ctx);
-    if (!pro) {
-      const ownedNotes = await ctx.db
-        .query("notes")
-        .withIndex("by_owner", q => q.eq("owner", user._id))
-        .take(FREE_NOTE_LIMIT + 1);
-      if (ownedNotes.length >= FREE_NOTE_LIMIT) {
-        // ConvexError (not a plain Error) is required here: a plain Error's
-        // message gets redacted before reaching the client, but
-        // ConvexError.data survives the client boundary (see
-        // convex/stripeWebhooks.ts and app/api/webhooks/stripe/route.ts for
-        // the same pattern already established in this codebase).
-        throw new ConvexError("NOTE_LIMIT_REACHED");
-      }
     }
 
     const note = await ctx.db.insert("notes", {

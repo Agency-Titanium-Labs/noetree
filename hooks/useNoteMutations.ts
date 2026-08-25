@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useConvexMutation, convexQuery } from "@convex-dev/react-query";
-import { ConvexError } from "convex/values";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -11,14 +10,12 @@ import {
   removeNoteFromTree,
   updateTitleInTree,
 } from "@/lib/treeUtils";
-import { useUpgradeModal } from "@/providers/UpgradeModalProvider";
 
 export function useNoteMutations(
   noteId: Id<"notes">,
   setSelectedNoteId?: (id: Id<"notes">) => void,
 ) {
   const queryClient = useQueryClient();
-  const upgradeModal = useUpgradeModal();
   const queryKey = convexQuery(api.notes.getTreeById, {
     id: noteId,
     deep: 10,
@@ -78,9 +75,6 @@ export function useNoteMutations(
     onError: (err, variables, context) => {
       if (context?.previousTree) {
         queryClient.setQueryData(queryKey, context.previousTree);
-      }
-      if (err instanceof ConvexError && err.data === "NOTE_LIMIT_REACHED") {
-        upgradeModal.open();
       }
     },
     onSuccess: (newNoteId: Id<"notes">) => {

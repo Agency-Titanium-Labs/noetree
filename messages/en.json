@@ -29,7 +29,7 @@
     "subheading": "Start free. Upgrade anytime for unlimited notes and AI credits.",
     "freeName": "Free",
     "freePrice": "Free",
-    "freeDetail": "Up to 20 notes",
+    "freeDetail": "Unlimited notes",
     "proName": "Pro",
     "proPrice": "9€ / month",
     "proDetail": "Unlimited notes · 100 AI credits/month",
@@ -147,12 +147,6 @@
     "deleteConfirmDesc": "This action cannot be undone. This will permanently delete this note and all of its child notes.",
     "cancel": "Cancel",
     "continue": "Continue"
-  },
-  "PlanEnforcement": {
-    "title": "You've reached the Free plan limit",
-    "body": "Free plans include up to 20 notes. Upgrade to Pro for unlimited notes and 100 AI credits a month.",
-    "upgradeCta": "Upgrade to Pro",
-    "dismiss": "Maybe later"
   },
   "AiCredits": {
     "dialogTitle": "You're out of AI credits",

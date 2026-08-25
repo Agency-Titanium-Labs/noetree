@@ -28,14 +28,12 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ConvexError } from "convex/values";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { useHeaderConfig } from "@/providers/HeaderProvider";
-import { useUpgradeModal } from "@/providers/UpgradeModalProvider";
 import {
   Form,
   FormControl,
@@ -449,7 +447,6 @@ export default function Notes() {
   const [noteToDelete, setNoteToDelete] = useState<Id<"notes"> | null>(null);
 
   const queryClient = useQueryClient();
-  const upgradeModal = useUpgradeModal();
   const queryKey = convexQuery(api.notes.getTreesByMe, { deep: 10 }).queryKey;
 
   const { data, isPending, error } = useQuery(
@@ -669,9 +666,6 @@ export default function Notes() {
     ) => {
       if (context?.previousTrees) {
         queryClient.setQueryData(queryKey, context.previousTrees);
-      }
-      if (err instanceof ConvexError && err.data === "NOTE_LIMIT_REACHED") {
-        upgradeModal.open();
       }
     },
   });

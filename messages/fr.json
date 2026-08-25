@@ -29,7 +29,7 @@
     "subheading": "Commencez gratuitement. Passez à Pro à tout moment pour des notes illimitées et des crédits IA.",
     "freeName": "Gratuit",
     "freePrice": "Gratuit",
-    "freeDetail": "Jusqu'à 20 notes",
+    "freeDetail": "Notes illimitées",
     "proName": "Pro",
     "proPrice": "9€ / mois",
     "proDetail": "Notes illimitées · 100 crédits IA/mois",
@@ -147,12 +147,6 @@
     "deleteConfirmDesc": "Cette action ne peut pas être annulée. Cela supprimera définitivement cette note et toutes ses notes enfants.",
     "cancel": "Annuler",
     "continue": "Continuer"
-  },
-  "PlanEnforcement": {
-    "title": "Vous avez atteint la limite du plan Gratuit",
-    "body": "Les plans Gratuits incluent jusqu'à 20 notes. Passez à Pro pour des notes illimitées et 100 crédits IA par mois.",
-    "upgradeCta": "Passer à Pro",
-    "dismiss": "Plus tard"
   },
   "AiCredits": {
     "dialogTitle": "Vous n'avez plus de crédits IA",
