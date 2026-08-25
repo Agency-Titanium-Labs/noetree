@@ -1,12 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Stripe from "stripe";
-import { setupPremiumPrices } from "./stripeOps";
+import {
+  setupPremiumPrices,
+  migrateProToPremium,
+  archiveOldPriceIfUnused,
+} from "./stripeOps";
 
 function makePricesListResult(prices: Partial<Stripe.Price>[]) {
   return {
     async *[Symbol.asyncIterator]() {
       for (const price of prices) {
         yield price as Stripe.Price;
+      }
+    },
+  };
+}
+
+function makeSubscriptionsListResult(
+  subscriptions: Partial<Stripe.Subscription>[],
+) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const subscription of subscriptions) {
+        yield subscription as Stripe.Subscription;
       }
     },
   };
@@ -21,6 +37,10 @@ function makeFakeStripe() {
       update: vi.fn(),
     },
     products: {
+      update: vi.fn(),
+    },
+    subscriptions: {
+      list: vi.fn(),
       update: vi.fn(),
     },
   };
@@ -196,6 +216,254 @@ describe("setupPremiumPrices", () => {
       oldProPriceId: "price_old_pro",
     });
 
+    expect(fake.prices.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("migrateProToPremium", () => {
+  let fake: ReturnType<typeof makeFakeStripe>;
+
+  beforeEach(() => {
+    fake = makeFakeStripe();
+  });
+
+  it("Test 1: enumerates with subscriptions.list called exactly once with { price: oldPriceId, status: active, limit: 100 }, never reading Convex", async () => {
+    fake.subscriptions.list.mockReturnValue(makeSubscriptionsListResult([]));
+
+    await migrateProToPremium(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+      newPriceId: "price_new",
+    });
+
+    expect(fake.subscriptions.list).toHaveBeenCalledTimes(1);
+    expect(fake.subscriptions.list).toHaveBeenCalledWith({
+      price: "price_old",
+      status: "active",
+      limit: 100,
+    });
+  });
+
+  it("Test 2: migrates a subscription whose item is still on the old price with the exact update args", async () => {
+    fake.subscriptions.list.mockReturnValue(
+      makeSubscriptionsListResult([
+        {
+          id: "sub_1",
+          items: {
+            data: [{ id: "si_1", price: { id: "price_old" } }],
+          },
+        } as Partial<Stripe.Subscription>,
+      ]),
+    );
+    fake.subscriptions.update.mockResolvedValue({});
+
+    const result = await migrateProToPremium(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+      newPriceId: "price_new",
+    });
+
+    expect(fake.subscriptions.update).toHaveBeenCalledTimes(1);
+    expect(fake.subscriptions.update).toHaveBeenCalledWith(
+      "sub_1",
+      {
+        items: [{ id: "si_1", price: "price_new" }],
+        proration_behavior: "none",
+      },
+      { idempotencyKey: "premium-migration-sub_1" },
+    );
+    expect(result.migrated).toEqual(["sub_1"]);
+  });
+
+  it("Test 3 (Pitfall 2 guard): items[0].id is always the existing subscription item's si_ id, asserted explicitly", async () => {
+    fake.subscriptions.list.mockReturnValue(
+      makeSubscriptionsListResult([
+        {
+          id: "sub_1",
+          items: {
+            data: [{ id: "si_1", price: { id: "price_old" } }],
+          },
+        } as Partial<Stripe.Subscription>,
+      ]),
+    );
+    fake.subscriptions.update.mockResolvedValue({});
+
+    await migrateProToPremium(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+      newPriceId: "price_new",
+    });
+
+    const callArgs = fake.subscriptions.update.mock.calls[0];
+    const updateParams = callArgs[1] as { items: { id?: string }[] };
+    expect(updateParams.items[0].id).toBeDefined();
+    expect(updateParams.items[0].id).toBe("si_1");
+  });
+
+  it("Test 4 (Pitfall 5): a subscription already on newPriceId is skipped with zero update calls", async () => {
+    fake.subscriptions.list.mockReturnValue(
+      makeSubscriptionsListResult([
+        {
+          id: "sub_1",
+          items: {
+            data: [{ id: "si_1", price: { id: "price_new" } }],
+          },
+        } as Partial<Stripe.Subscription>,
+      ]),
+    );
+
+    const result = await migrateProToPremium(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+      newPriceId: "price_new",
+    });
+
+    expect(fake.subscriptions.update).not.toHaveBeenCalled();
+    expect(result.skipped).toEqual(["sub_1"]);
+    expect(result.migrated).toEqual([]);
+  });
+
+  it("Test 5: isolates a mid-run failure — update still called three times, two migrated, failing id in failed, resolves rather than throws", async () => {
+    fake.subscriptions.list.mockReturnValue(
+      makeSubscriptionsListResult([
+        {
+          id: "sub_1",
+          items: { data: [{ id: "si_1", price: { id: "price_old" } }] },
+        } as Partial<Stripe.Subscription>,
+        {
+          id: "sub_2",
+          items: { data: [{ id: "si_2", price: { id: "price_old" } }] },
+        } as Partial<Stripe.Subscription>,
+        {
+          id: "sub_3",
+          items: { data: [{ id: "si_3", price: { id: "price_old" } }] },
+        } as Partial<Stripe.Subscription>,
+      ]),
+    );
+    fake.subscriptions.update
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error("stripe error"))
+      .mockResolvedValueOnce({});
+
+    const result = await migrateProToPremium(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+      newPriceId: "price_new",
+    });
+
+    expect(fake.subscriptions.update).toHaveBeenCalledTimes(3);
+    expect(result.migrated).toEqual(["sub_1", "sub_3"]);
+    expect(result.failed).toEqual(["sub_2"]);
+  });
+
+  it("Test 6: a subscription with an empty items.data array is recorded in failed with no update call", async () => {
+    fake.subscriptions.list.mockReturnValue(
+      makeSubscriptionsListResult([
+        {
+          id: "sub_empty",
+          items: { data: [] as Stripe.SubscriptionItem[] },
+        } as Partial<Stripe.Subscription>,
+      ]),
+    );
+
+    const result = await migrateProToPremium(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+      newPriceId: "price_new",
+    });
+
+    expect(fake.subscriptions.update).not.toHaveBeenCalled();
+    expect(result.failed).toEqual(["sub_empty"]);
+  });
+
+  it("Test 7: with dryRun true, update is never called while migrated lists the ids and dryRun is reported", async () => {
+    fake.subscriptions.list.mockReturnValue(
+      makeSubscriptionsListResult([
+        {
+          id: "sub_1",
+          items: { data: [{ id: "si_1", price: { id: "price_old" } }] },
+        } as Partial<Stripe.Subscription>,
+      ]),
+    );
+
+    const result = await migrateProToPremium(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+      newPriceId: "price_new",
+      dryRun: true,
+    });
+
+    expect(fake.subscriptions.update).not.toHaveBeenCalled();
+    expect(result.migrated).toEqual(["sub_1"]);
+    expect(result.dryRun).toBe(true);
+  });
+
+  it("throws before touching Stripe when oldPriceId or newPriceId is empty, or when they are equal", async () => {
+    await expect(
+      migrateProToPremium(fake as unknown as Stripe, {
+        oldPriceId: "",
+        newPriceId: "price_new",
+      }),
+    ).rejects.toThrow();
+    await expect(
+      migrateProToPremium(fake as unknown as Stripe, {
+        oldPriceId: "price_old",
+        newPriceId: "",
+      }),
+    ).rejects.toThrow();
+    await expect(
+      migrateProToPremium(fake as unknown as Stripe, {
+        oldPriceId: "price_same",
+        newPriceId: "price_same",
+      }),
+    ).rejects.toThrow();
+
+    expect(fake.subscriptions.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("archiveOldPriceIfUnused", () => {
+  let fake: ReturnType<typeof makeFakeStripe>;
+
+  beforeEach(() => {
+    fake = makeFakeStripe();
+  });
+
+  it("Test 1: with one or more active subscriptions still on the old price, prices.update is never called and archived is false with reason", async () => {
+    fake.subscriptions.list.mockReturnValue(
+      makeSubscriptionsListResult([
+        { id: "sub_1" } as Partial<Stripe.Subscription>,
+        { id: "sub_2" } as Partial<Stripe.Subscription>,
+      ]),
+    );
+
+    const result = await archiveOldPriceIfUnused(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+    });
+
+    expect(fake.prices.update).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      archived: false,
+      activeCount: 2,
+      reason: "active-subscriptions-remain",
+    });
+  });
+
+  it("Test 2: with zero active subscriptions on the old price, calls prices.update exactly once and reports archived true", async () => {
+    fake.subscriptions.list.mockReturnValue(makeSubscriptionsListResult([]));
+
+    const result = await archiveOldPriceIfUnused(fake as unknown as Stripe, {
+      oldPriceId: "price_old",
+    });
+
+    expect(fake.prices.update).toHaveBeenCalledTimes(1);
+    expect(fake.prices.update).toHaveBeenCalledWith("price_old", {
+      active: false,
+    });
+    expect(result).toEqual({ archived: true, activeCount: 0 });
+  });
+
+  it("Test 3: an empty oldPriceId throws before any Stripe call", async () => {
+    await expect(
+      archiveOldPriceIfUnused(fake as unknown as Stripe, {
+        oldPriceId: "",
+      }),
+    ).rejects.toThrow();
+
+    expect(fake.subscriptions.list).not.toHaveBeenCalled();
     expect(fake.prices.update).not.toHaveBeenCalled();
   });
 });
