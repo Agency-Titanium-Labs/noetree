@@ -30,6 +30,12 @@ created: 2026-08-25
 
 ---
 
+## Visual Hierarchy
+
+**Primary visual anchor:** the Premium card's CTA button ("Upgrade to Premium"), reinforced by the card's `border-primary` outline, is the primary visual anchor on this page — it is the only combination on the page pairing the purple `--primary` accent color with the largest interactive surface area, per the Color contract's closed accent list below. The Free card and the Monthly/Annual toggle are intentionally lower-contrast (neutral `--secondary`/`--accent` tones only) so they do not compete with this anchor.
+
+---
+
 ## Spacing Scale
 
 Declared values (must be multiples of 4) — matches existing usage on `pricing/page.tsx` and `SettingsPlanCard.tsx` exactly, no new scale introduced:
@@ -61,7 +67,16 @@ Matches the existing, already-shipped scale on this exact page (`pricing/page.ts
 
 Weights used: exactly 2 — regular (400, default body weight) and semibold (600, `font-semibold`, applied to `CardTitle`, the page `<h1>`, and the price line `text-base font-semibold`). Do not introduce `font-bold` (700) or `font-medium` (500) anywhere in this phase's changes.
 
-The Monthly/Annual `ToggleGroupItem` inherits its text size from `toggleVariants` (`text-sm`, 14px, `font-medium` — this is the one pre-existing exception baked into the shadcn `toggle.tsx` primitive itself, not a new weight introduced by this phase; do not override it).
+The Monthly/Annual `ToggleGroupItem` inherits `text-sm` (14px) from `toggleVariants`, matching the Label/detail row above — no new size introduced. However, `toggleVariants` (`components/ui/toggle.tsx`) also bakes in `font-medium` (500) by default, which would silently introduce a third font weight to the page and break the 2-weight cap declared above.
+
+**Required fix:** override the weight explicitly on each `ToggleGroupItem` with a `font-normal` className, e.g.:
+
+```tsx
+<ToggleGroupItem value="monthly" className="font-normal">Monthly</ToggleGroupItem>
+<ToggleGroupItem value="annual" className="font-normal">Annual</ToggleGroupItem>
+```
+
+This is confirmed safe: `ToggleGroupItem`'s internal `cn(toggleVariants({ variant, size }), "min-w-0 flex-1...", className)` call (`components/ui/toggle-group.tsx`) places the consumer-supplied `className` last, and `cn` resolves conflicting utility classes via `tailwind-merge` (`lib/utils.ts`) — the last-specified class for a given CSS property wins. `font-normal` therefore overrides the primitive's `font-medium` at render time. The rendered toggle label is 400 regular, matching every other 14px label on this page, and the page ships with exactly 2 font weights as declared.
 
 ---
 
@@ -127,6 +142,7 @@ No empty-state copy is needed for this phase — there is no list/collection UI 
 Not covered by the template's default sections but required for an executor to implement this phase's one new interactive element without ambiguity:
 
 - **Component:** `ToggleGroup type="single" variant="outline" size="lg"` wrapping two `ToggleGroupItem` (`monthly` | `annual`), placed inside `CardContent`, above the price line, below `CardHeader`.
+- **Weight override (required):** each `ToggleGroupItem` must carry `className="font-normal"` to override the shadcn primitive's default `font-medium` (500), keeping the page's font-weight count at exactly 2 (400/600) per the Typography contract above.
 - **Default value:** `"monthly"` on first render (uncontrolled default or controlled `useState("monthly")` — matches D-02's "single Premium card" framing where the card should not open on the annual/discounted price unprompted).
 - **`onValueChange`:** Radix `ToggleGroup` (single mode) can emit an empty string if the user clicks the already-selected item — guard against this (`if (value) setInterval(value)`) so the price line can never render blank.
 - **State → UI mapping:** selecting `monthly` shows `6.99€ / month` and no savings badge emphasis; selecting `annual` shows `59€ / year` with the `Save ~30%` `Badge` visible next to the Annual segment (the badge is not hidden/removed on toggle — it's a static label on the Annual option, not a conditional callout, so it should render regardless of which state is currently selected, always anchored to the Annual `ToggleGroupItem`).
