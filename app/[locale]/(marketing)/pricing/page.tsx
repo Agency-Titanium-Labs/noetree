@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createCheckoutSession } from "./actions";
 
 export default function PricingPage() {
@@ -23,21 +24,25 @@ export default function PricingPage() {
   const { isSignedIn } = useUser();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState(false);
+  const [interval, setInterval] = useState<"monthly" | "annual">("monthly");
 
   // Pattern 3 / Pitfall 5: "skip" sentinel, never `enabled: false`.
   // Security: no clerkUserId arg — the query derives the caller's identity
   // from Convex auth itself (IDOR fix, 03-REVIEW.md CR-01).
-  const { data } = useQuery(
-    convexQuery(api.subscriptions.getSubscription, isSignedIn ? {} : "skip"),
+  const { data: tier } = useQuery(
+    convexQuery(
+      api.subscriptions.getSubscriptionTier,
+      isSignedIn ? {} : "skip",
+    ),
   );
 
-  const isActive = data?.status === "active";
+  const isPremium = tier === "premium";
 
   async function handleUpgrade() {
     setError(false);
     setIsPending(true);
     try {
-      await createCheckoutSession(locale);
+      await createCheckoutSession(locale, interval);
     } catch (err) {
       // D-15/D-02: sign-in and Stripe redirects throw internally (Next's
       // redirect-throw); only a genuine Checkout Session creation failure
@@ -64,7 +69,7 @@ export default function PricingPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">{t("freeName")}</CardTitle>
-            {!isActive && isSignedIn && (
+            {!isPremium && isSignedIn && (
               <Badge variant="secondary">{t("currentPlanBadge")}</Badge>
             )}
           </CardHeader>
@@ -74,19 +79,42 @@ export default function PricingPage() {
           </CardContent>
         </Card>
 
-        {/* Pro plan card — accent border marks it as the recommended plan */}
+        {/* Premium plan card — accent border marks it as the recommended plan */}
         <Card className="border-primary">
           <CardHeader>
-            <CardTitle className="text-xl">{t("proName")}</CardTitle>
-            {isActive && (
+            <CardTitle className="text-xl">{t("premiumName")}</CardTitle>
+            {isPremium && (
               <Badge variant="default">{t("currentPlanBadge")}</Badge>
             )}
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-base font-semibold">{t("proPrice")}</p>
-            <p className="text-sm text-muted-foreground">{t("proDetail")}</p>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="lg"
+              value={interval}
+              onValueChange={value => {
+                if (value) setInterval(value as "monthly" | "annual");
+              }}
+            >
+              <ToggleGroupItem value="monthly" className="font-normal">
+                {t("intervalMonthly")}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="annual" className="font-normal">
+                {t("intervalAnnual")}
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Badge variant="secondary">{t("annualSaveBadge")}</Badge>
+            <p className="text-base font-semibold">
+              {interval === "annual"
+                ? t("premiumPriceAnnual")
+                : t("premiumPriceMonthly")}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t("premiumDetail")}
+            </p>
           </CardContent>
-          {!isActive && (
+          {!isPremium && (
             <CardFooter className="flex-col items-stretch gap-2">
               <Button
                 className="h-11"

@@ -1,7 +1,7 @@
 import { setupClerkTestingToken } from "@clerk/testing/cypress";
 
 describe("Checkout redirect", () => {
-  it("redirects to Stripe's hosted checkout domain when a signed-in user clicks Upgrade to Pro", () => {
+  it("redirects to Stripe's hosted checkout domain when a signed-in user clicks Upgrade to Premium", () => {
     setupClerkTestingToken();
 
     // setupClerkTestingToken() only bypasses bot protection — it does not
@@ -17,7 +17,7 @@ describe("Checkout redirect", () => {
     });
     cy.visit("/en/pricing");
 
-    cy.contains("Upgrade to Pro").click();
+    cy.contains("Upgrade to Premium").click();
 
     // Does NOT complete a real card payment — only asserts the redirect
     // reaches Stripe's hosted Checkout domain with the session created.
