@@ -125,3 +125,16 @@ None for this plan. This plan creates the reusable, unit-tested `setupPremiumPri
 
 _Phase: 12-plan-restructure-tier-foundation_
 _Completed: 2026-08-25_
+
+## Self-Check: PASSED
+
+- FOUND: scripts/tsconfig.json
+- FOUND: scripts/stripeOps.ts
+- FOUND: scripts/stripeOps.test.ts
+- FOUND: scripts/setup-premium-prices.ts
+- FOUND: .planning/phases/12-plan-restructure-tier-foundation/12-02-SUMMARY.md
+- FOUND commit: 1b7f144 (Task 1)
+- FOUND commit: 7903cdb (Task 2 RED)
+- FOUND commit: 4b178e9 (Task 2 GREEN)
+- FOUND commit: 55f8b37 (Task 3)
+- FOUND commit: d7d1ad4 (plan metadata)
