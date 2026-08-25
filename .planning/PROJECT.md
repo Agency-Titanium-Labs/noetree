@@ -8,19 +8,25 @@ Noetree est une application web de prise de notes hiérarchique (style Notion/Ob
 
 Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
 
-## Current Milestone: v1.0 Monétisation & Paiements
+## Current Milestone: v1.2 Pricing V2 & Fonctionnalités Sociales
 
-**Statut :** ✅ Shipped 2026-07-12 — voir `.planning/MILESTONES.md` pour le détail complet
-
-**Goal :** Intégrer Stripe pour monétiser Noetree via un modèle Free/Pro avec quota de crédits IA rechargeables.
+**Goal :** Passer à un modèle freemium sans limite de notes, avec de nouvelles fonctionnalités sociales (partage, commentaires, historique) et un système de crédits IA revu.
 
 **Target features :**
 
-- Plans Free (notes limitées + features basiques) et Pro (illimité + features avancées)
-- Abonnement mensuel via Stripe Checkout
-- Quota mensuel de crédits IA inclus dans Pro, rechargeable par top-up
-- Webhooks Stripe → mise à jour statut abonnement dans Convex
-- Page Settings in-app : gérer abonnement, voir crédits, top-up
+- Suppression du plafond de 20 notes gratuites (illimité pour tous les plans)
+- Renommage du plan Pro → Premium, repricing (9€/mois → 6,99€/mois ou 59€/an), migration des abonnés existants
+- Partage & droits d'accès (liens uniques, lecture seule/modification, notes publiques) — 100% gratuit et illimité
+- Commentaires & notifications
+- Historique & restauration de versions (Free limité ~24h, Premium historique complet + restauration)
+- Système de crédits IA revu (coûts différenciés par action : 1 crédit basique, 3-5 crédits complexe/sémantique ; nouveaux quotas mensuels Free/Premium ; 3 packs d'achat à la carte)
+
+**Explicitement hors scope de cette milestone :**
+
+- Collaboration temps réel (co-édition + chat) — reportée à une milestone future
+- Commission marketplace différenciée (20%/10%) — déjà intégrée dans la milestone v1.1 en cours sur la branche `milestone/v1.1-marketplace-de-notes` (worktree séparé, ne pas dupliquer)
+
+**Précédent milestone shipped :** v1.0 Monétisation & Paiements — voir `.planning/MILESTONES.md` pour le détail complet
 
 ## Requirements
 
@@ -37,9 +43,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - ✓ CI/CD GitHub Actions + Vercel (staging/production) — v0.x
 - ✓ Stripe webhooks update subscription status in Convex — Phase 2 (PAY-03)
 - ✓ Pro user receives monthly AI credits quota (granted at initial checkout, reset on billing cycle) — Phase 2 + Phase 06.1 (CRED-01, PLAN-05)
-- ✓ Free tier user is limited to 20 notes maximum, enforced server-side in Convex `createNote` (cannot be bypassed by client) — Phase 4 (PLAN-02)
 - ✓ Pro tier user has unlimited notes — Phase 4 (PLAN-03)
-- ✓ User sees a clear upgrade prompt when hitting the Free note limit — Phase 4 (PLAN-04)
 - ✓ User can view remaining AI credits balance in the app (toolbar badge, visible for both Free and Pro tiers) — Phase 5 (CRED-02)
 - ✓ AI credits are deducted atomically when an AI action is used, with TOCTOU-safe concurrency protection — Phase 5 (CRED-04)
 - ✓ User can trigger a top-up purchase when credits are low; blocked with plan-appropriate prompt at 0 credits — Phase 5 (CRED-03)
@@ -51,16 +55,17 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 ### Active
 
-<!-- Scope actuel — prochain milestone (à définir via /gsd:new-milestone). -->
+<!-- Scope milestone v1.2 — voir .planning/REQUIREMENTS.md une fois généré (étape suivante du workflow new-milestone). -->
 
-(none yet — v1.0 shipped in full; run `/gsd:new-milestone` to define the next milestone's scope)
+(à définir — REQUIREMENTS.md pas encore généré pour v1.2)
 
 ### Out of Scope
 
-- Plan Business/Teams — complexité équipe hors scope pour v1.0
-- Marketplace de vente de notes — futur milestone, nécessite plus de maturité produit
+- Free tier limité à 20 notes — **invalidé pour v1.2** : la philosophie produit passe à "notes illimitées pour tous, seule l'IA est un usage mesuré/facturé". La feature `PLAN-02`/`PLAN-04` (Phase 4 v1.0) sera supprimée par cette milestone.
+- Plan Business/Teams — complexité équipe hors scope pour l'instant
 - Portail Stripe natif — UI custom dans l'app choisie à la place
 - Remboursements / prorations manuels — Stripe gère automatiquement
+- Collaboration temps réel (co-édition + chat) — reportée à une milestone future (hors scope v1.2)
 
 ## Context
 
@@ -107,4 +112,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-07-12 — v1.0 milestone shipped (all 19 requirements Validated)_
+_Last updated: 2026-08-25 — v1.2 milestone started (Pricing V2 & Fonctionnalités Sociales)_
