@@ -29,11 +29,11 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 
 ### 🚧 v1.1 Marketplace de notes (In Progress)
 
-**Milestone Goal:** Permettre aux utilisateurs de vendre et acheter des notes entre eux via Stripe Connect, avec commission Noetree (15%).
+**Milestone Goal:** Permettre aux utilisateurs de vendre et acheter des notes entre eux via Stripe Connect, avec commission Noetree différenciée (20% vendeur Free, 10% vendeur Premium).
 
 - [ ] **Phase 7: Connect Onboarding & Seller Enablement** - Sellers complete Stripe Connect (Express) onboarding; server enforces payout-readiness
 - [ ] **Phase 8: Listings & Marketplace Browse/Search** - Sellers list notes for sale; buyers discover them via a public browse/search page
-- [ ] **Phase 9: Marketplace Checkout & Webhook Fix** - Buyers purchase listings via Stripe Checkout with 15% commission split at source
+- [ ] **Phase 9: Marketplace Checkout & Webhook Fix** - Buyers purchase listings via Stripe Checkout with tiered commission (20%/10%) split at source
 - [ ] **Phase 10: Purchase Fulfillment (Copy & Access Grants)** - Completed purchases reliably deliver content to buyers exactly once
 - [ ] **Phase 11: Buyer & Seller History UI** - Buyers and sellers can review purchase/sales history
 
@@ -79,12 +79,12 @@ Plans:
 
 ### Phase 9: Marketplace Checkout & Webhook Fix
 
-**Goal**: Buyers can purchase a listing through Stripe Checkout with the 15% platform commission correctly split at source, and the existing `checkout.session.completed` webhook handler correctly discriminates marketplace purchases from AI-credit top-ups without regressing the existing top-up path.
+**Goal**: Buyers can purchase a listing through Stripe Checkout with the platform commission (20% for Free-tier sellers, 10% for Premium sellers) correctly split at source, and the existing `checkout.session.completed` webhook handler correctly discriminates marketplace purchases from AI-credit top-ups without regressing the existing top-up path.
 **Depends on**: Phase 8 (checkout requires a listing to buy)
 **Requirements**: BUY-01, BUY-02, BUY-03, BUY-04, BUY-05
 **Success Criteria** (what must be TRUE):
 
-1. User can purchase a listing via Stripe Checkout, with 15% commission taken at source (destination charge: `application_fee_amount` + `transfer_data.destination`) and the seller receiving the net amount via Connect payout
+1. User can purchase a listing via Stripe Checkout, with commission taken at source (destination charge: `application_fee_amount` + `transfer_data.destination`) computed from the seller's subscription tier at the time of purchase — 20% if the seller is on the Free plan, 10% if the seller is on Premium — and the seller receiving the net amount via Connect payout
 2. A seller cannot purchase their own listing (self-purchase blocked server-side)
 3. An already-purchased listing shows an "owned" indicator instead of a Buy control
 4. For copy-mode listings, the Free-tier 20-note quota is checked before a Checkout session is created, not after payment
@@ -113,7 +113,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
 1. Buyer can view a "My Purchases" page listing everything they've bought, both copy-mode and read-only-mode
-2. Seller can view a basic earnings view per sale (gross, 15% commission, net) with running balance and payout status
+2. Seller can view a basic earnings view per sale (gross, commission at their tier's rate — 20% Free / 10% Premium, net) with running balance and payout status
 
 **Plans**: TBD
 **UI hint**: yes
