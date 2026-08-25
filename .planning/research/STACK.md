@@ -1,142 +1,185 @@
-# Technology Stack: Stripe Integration (v1.0 Monetisation)
+# Stack Research: v1.2 Pricing V2 & Fonctionnalités Sociales
 
-**Project:** Noetree — Stripe subscription + AI credits system
-**Researched:** 2026-07-07
-**Scope:** Additions only — existing stack (Next.js 15, Convex 1.19.5, Clerk 6.x, Shadcn) is NOT re-evaluated.
+**Domain:** Extending an existing Next.js 15 + Convex + Clerk + Stripe note-taking app with sharing/public links, comments, notifications, version history, tiered Stripe pricing, and a multi-SKU AI credit-pack purchase flow.
 
----
+**Researched:** 2026-08-25
+**Confidence:** HIGH (Convex/Stripe primitives verified via Context7 + official docs; npm versions verified live; shadcn Sonner migration verified via web search with multiple corroborating sources)
 
-## New Libraries to Add
+**Scope note:** This is an _additive_ stack review only. Existing stack (Next.js 15.1.6 / React 19.2.7, Convex 1.40.0, Clerk 7.4.3, Stripe 22.3.0, Shadcn/Radix, TipTap 3.26.1, `react-resizable-panels`, `use-debounce`) is validated and NOT re-evaluated. The companion `.planning/research/ARCHITECTURE.md` covers the new Convex table designs (`shareLinks`, `comments`, `notifications`, `noteVersions`) in depth — this file focuses on _what libraries/APIs to add or reuse_ and version-specific integration details.
 
-### Core Payment
-
-| Library             | Version                                                                          | Purpose                                                                                          | Why                                                                                                                                     |
-| ------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `stripe`            | `^17.x` (latest ~17.x on npm as of research; ctx7 shows v19.1.0 for stripe-node) | Server-side Stripe API calls: create Checkout sessions, retrieve subscriptions, manage customers | Official Stripe Node SDK. Runs in Convex actions (`"use node"` pragma) and Next.js Route Handlers. Only option — no viable alternative. |
-| `@stripe/stripe-js` | `^4.x` (latest ~4.x)                                                             | Client-side redirect to Stripe Checkout                                                          | Needed only for the `loadStripe()` call that redirects the browser to Stripe Checkout. Tiny — loaded lazily.                            |
-
-**Confidence:** HIGH — verified via Context7 (`/stripe/stripe-node`) and npm search.
-
-**Version note:** The Context7 docs show stripe-node at v19.1.0 in their snapshot, but npm search found v22.3.0 as latest. Install with `^` and pin at project start. Do NOT install `@stripe/react-stripe-js` — Checkout redirect requires no Stripe Elements UI in this project.
+**Headline finding: almost nothing new needs to be installed.** Four of the five feature areas (sharing/public links, comments, notifications, version history) are fully servable with Convex primitives already in `package.json` (reactive queries, `ctx.scheduler`/`crons.ts`, `ctx.db`) plus one small UI addition (`sonner`, replacing the deprecated shadcn Toast pattern this project never adopted). Only the Stripe-facing work (tiered pricing + credit packs) touches an external API surface, and the existing `stripe` SDK (22.3.0) already supports every API call needed — no version bump required.
 
 ---
 
-### Convex Infrastructure (new files, not new npm packages)
+## Recommended Stack
 
-No new npm packages beyond `stripe` are needed on the Convex side. The integration uses existing Convex primitives:
+### Core Technologies (already present — reused, not added)
 
-| New File                  | Type                       | Purpose                                                                                               |
-| ------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `convex/http.ts`          | Convex HTTP Router         | Registers the Stripe webhook endpoint as a Convex HTTP action. This file does not exist yet.          |
-| `convex/subscriptions.ts` | Convex actions + mutations | Stripe API calls (create Checkout session, cancel subscription) and DB writes for subscription state. |
-| `convex/credits.ts`       | Convex mutations + queries | Deduct/reset/top-up AI credits.                                                                       |
+| Technology                              | Version (installed)                                  | Purpose in v1.2                                                                                                                                                                                           | Why Recommended                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Convex reactive queries (`useQuery`)    | `convex@1.40.0`                                      | Real-time in-app notification bell/badge, live comment threads, live share-link list                                                                                                                      | This is the "don't add a second real-time engine" answer explicitly flagged in the milestone brief. Convex's `useQuery` already gives every new table (`notifications`, `comments`, `shareLinks`) push-based reactivity for free — the exact same mechanism already driving the credits balance badge (Phase 5) and subscription status (Phase 6). No WebSocket library, no Pusher/Ably/Socket.io, no polling needed.                            |
+| Convex `crons.ts` (native cron jobs)    | `convex@1.40.0`                                      | Monthly Free-tier AI credit reset (Free has no Stripe lifecycle event to hook a reset off, unlike Premium's `invoice.paid`); storage-hygiene pruning of very old `noteVersions` rows                      | Native to Convex since early versions, zero extra dependency. Verified current API via Context7 (`get-convex/convex-backend`): `crons.interval(...)` / `crons.cron(...)` / `crons.monthly(...)` registered in `convex/crons.ts`, dispatching to `internalMutation`/`internalAction`. This project has no `convex/crons.ts` yet — it is a **new file**, not a new package.                                                                        |
+| Convex `ctx.db` transactional mutations | `convex@1.40.0`                                      | Version snapshot on `updateNoteContent` (same-transaction insert, per the codebase's own documented rule — see `applyDeduction`'s comments in `convex/aiCredits.ts`), notification fan-out on new comment | No change needed — this milestone's version-history and notification writes follow the exact same "read+write in one mutation handler" discipline already established for credit deduction. Flagged explicitly in `ARCHITECTURE.md`'s Anti-Pattern 2.                                                                                                                                                                                            |
+| `stripe` (Node SDK)                     | `22.3.0` (installed; `22.5.0` latest, optional bump) | Subscription Schedules / `subscriptions.update` for Premium price migration; multiple pre-created one-time `Price` objects for the 3 credit packs                                                         | Already supports everything needed: `SubscriptionScheduleUpdateParams` (phases + `proration_behavior`) and `SubscriptionUpdateParams.items[].price` + `proration_behavior: "none"` for the renewal-boundary migration were verified present in the current major version via Context7 (`/stripe/stripe-node`). No SDK upgrade is required to ship this milestone; bumping to `22.5.0` is a routine patch-level update, not a feature-gating one. |
+| `@stripe/stripe-js`                     | `9.9.0`                                              | Unchanged — still only used for the `loadStripe()` → Checkout redirect                                                                                                                                    | No Stripe Elements needed for credit packs or tiered pricing; Checkout (hosted) remains the integration mode, consistent with the existing subscription and top-up flows.                                                                                                                                                                                                                                                                        |
 
-**Why Convex HTTP action for webhooks, not a Next.js API route:**
-The webhook handler must write to Convex DB. A Next.js API route would need to call Convex as an HTTP client (adding latency and auth complexity). A Convex HTTP action runs inside Convex, calls `ctx.runMutation()` directly, and gets atomicity guarantees. The `stack.convex.dev` article on Stripe explicitly uses this pattern. The endpoint URL becomes `https://<convex-deployment>.convex.site/stripe/webhook`.
+### Supporting Libraries (new dependencies)
 
-**Why NOT `@convex-dev/stripe` component:**
-The official `@convex-dev/stripe` component (v0.1.3) is new and requires adding `convex/convex.config.ts` (the Convex Components system). This project has no `convex.config.ts` — adding it now introduces a migration surface. More critically, the component's fixed schema (5 auto-created tables) does not map cleanly to the existing `users` + `roles` table structure where subscription state belongs on the user record. There is an open GitHub issue (`get-convex/stripe#7`) showing `customer.subscription.updated` not updating `priceId` — a known reliability gap. Manual implementation with ~150 lines of code gives full control over the schema and avoids this dependency. **Confidence: MEDIUM** (based on component README + GitHub issue + schema mismatch reasoning).
+| Library         | Version | Purpose                                                                                                             | When to Use                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------- | ------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sonner`        | `2.0.8` | Toast notifications — "comment added," "link copied," "restored version X," credit-pack purchase confirmation, etc. | Add now. This project has **no toast/notification-UI primitive installed at all** (no `sonner`, no legacy `components/ui/toast.tsx`). Shadcn deprecated its old Radix-Toast-based `toast` component; **Sonner is the current shadcn-recommended replacement** (confirmed via shadcn issue tracker + docs, multiple sources, August 2026). Since this milestone is the first to need transient UI feedback beyond dialogs/badges (comment posted, link copied, notification received), install `sonner` directly rather than the deprecated component. |
+| `nanoid`        | `6.0.1` | Generate the `shareLinks.token` (and optionally the public-note slug)                                               | **Optional — see "Alternatives Considered."** Recommended default is actually `crypto.randomUUID()` (see below), but if a shorter, more shareable URL is a product requirement (`/share/V1StGXR8` vs `/share/550e8400-e29b-...`), `nanoid` is the standard, actively maintained choice (used by Convex itself internally). Do not hand-roll a token generator — reusing `notes._id`/`shares._id` as the token is an explicitly flagged pitfall in `PITFALLS.md` Pitfall 2 (predictable/enumerable IDs).                                               |
+| `diff` (jsdiff) | `9.0.0` | Word/line-level diff rendering between two `noteVersions` snapshots                                                 | **Defer, do not install for v1.2 MVP.** `FEATURES.md` explicitly scopes "visual diff between versions" as a v1.x/v2 differentiator, not MVP — full-snapshot preview-before-restore is sufficient for launch. Listed here only so the future phase that adds diffing doesn't have to re-research the choice: `diff` is the standard, zero-dependency, actively maintained (Node.js Foundation-adopted) library for this; avoid building a custom diff algorithm.                                                                                       |
 
----
+### Development Tools
 
-## Schema Additions (Convex)
-
-The existing `users` table needs new fields. Do NOT create a separate `subscriptions` table — subscription state is 1:1 with user and needs to be readable in the same query that checks the user, keeping the real-time reactivity simple.
-
-**Add to `users` table in `convex/schema.ts`:**
-
-```typescript
-stripeCustomerId: v.optional(v.string()),        // links Clerk user → Stripe Customer
-stripeSubscriptionId: v.optional(v.string()),    // active subscription ID
-subscriptionStatus: v.optional(v.string()),      // "active" | "canceled" | "past_due" | "trialing"
-subscriptionPeriodEnd: v.optional(v.number()),   // Unix timestamp — for renewal display
-planTier: v.optional(v.string()),                // "free" | "pro" — derived from subscriptionStatus, stored for fast gating
-aiCreditsBalance: v.optional(v.number()),        // current credits remaining
-aiCreditsResetAt: v.optional(v.number()),        // Unix timestamp of next monthly reset
-```
-
-**Add index on `users` table:**
-
-```typescript
-.index("by_stripeCustomerId", ["stripeCustomerId"])
-```
-
-This is required because the Stripe webhook arrives with a `customer` ID, not a Clerk user ID. Without this index, finding the user on webhook receipt requires a full table scan.
-
-**Confidence:** HIGH — pattern is validated by Convex docs, `stack.convex.dev` Stripe article, and the get-convex/stripe component schema (which uses equivalent fields in its `customers` + `subscriptions` tables, just separated).
-
----
-
-## Stripe Configuration (no new libs)
-
-| What                                 | Where                         | Notes                                                                                                                       |
-| ------------------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `STRIPE_SECRET_KEY`                  | Convex env vars (Dashboard)   | Used in Convex actions. Never in Next.js env.                                                                               |
-| `STRIPE_WEBHOOK_SECRET`              | Convex env vars (Dashboard)   | Needed for `stripe.webhooks.constructEvent()` in the HTTP action.                                                           |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Next.js `.env.local` + Vercel | Used client-side for `loadStripe()`. Safe to expose.                                                                        |
-| Stripe Product/Price IDs             | Convex env vars               | `STRIPE_PRO_PRICE_ID`, `STRIPE_CREDITS_PRICE_ID` — configured in Stripe Dashboard, referenced in checkout session creation. |
-
----
-
-## Next.js Changes (minimal)
-
-One new Next.js Route Handler is needed — but only for **initiating** Checkout, not for receiving webhooks.
-
-| New File                                  | Purpose                                               | Why API route (not Server Action)                                                                                                                                                                                                                       |
-| ----------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/api/stripe/create-checkout/route.ts` | Creates a Stripe Checkout Session and returns the URL | Stripe checkout requires returning a URL that Next.js redirects to. Server Actions can redirect but the checkout session creation involves sensitive Stripe API key and needs explicit error handling with HTTP status codes. Route Handler is clearer. |
-
-**No** `app/api/stripe/webhook/route.ts` — webhook goes to Convex HTTP action directly.
-
-**Confidence:** MEDIUM — the Next.js + Stripe community uses both Server Actions and Route Handlers for checkout creation. Route Handler is the safer, more explicit choice here.
-
----
-
-## What NOT to Add
-
-| Library                                  | Why Not                                                                                                                                                                                               |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@stripe/react-stripe-js`                | Only needed for Stripe Elements (embedding card inputs). This project uses Stripe Checkout (redirect) — no Elements needed.                                                                           |
-| `@convex-dev/stripe`                     | Component is v0.1.3, requires Convex Components migration, schema conflicts with existing `users` table, known webhook reliability issue. Manual implementation is ~150 lines and gives full control. |
-| `micro` / `raw-body`                     | Legacy Pages Router raw body hack. App Router uses `await request.text()` natively — no extra library needed.                                                                                         |
-| `stripe-js` (old package)                | Deprecated. Use `@stripe/stripe-js` instead.                                                                                                                                                          |
-| Any Stripe metering/usage libs           | Out of scope — the credits model is a simple integer counter in Convex, not Stripe usage-based billing.                                                                                               |
-| Customer Portal (`stripe.billingPortal`) | Explicitly out of scope per PROJECT.md ("UI custom dans l'app"). Do not add portal redirect logic.                                                                                                    |
+| Tool                         | Purpose                                                                      | Notes                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stripe CLI (`stripe listen`) | Already used per `PROJECT.md` for live webhook verification                  | Re-use for the new event types this milestone touches: `customer.subscription.updated` (fires once per migrated subscriber during the Premium repricing migration script) and repeated `checkout.session.completed` (payment mode) for the 3 new credit-pack Price IDs. No new CLI tooling needed.                            |
+| Stripe Dashboard (test mode) | Create the new Product ("Premium," renamed from "Pro") and its Price objects | Manual one-time setup step, not a code dependency: 1 recurring monthly Price (6.99€), 1 recurring annual Price (59€), 3 one-time Prices (Découverte 2€/100cr, Boost 5€/300cr, Pro 10€/700cr) = 5 new Price IDs total, all env-var-configured exactly like the existing `STRIPE_PRO_PRICE_ID`/`STRIPE_TOPUP_PRICE_ID` pattern. |
 
 ---
 
 ## Installation
 
 ```bash
-# Production dependencies
-npm install stripe @stripe/stripe-js
+# New runtime dependency — toast/notification UI (replaces the deprecated shadcn Toast, which was never installed here)
+npm install sonner
 
-# No dev dependencies needed — stripe types are bundled with the stripe package
+# Optional — only if shorter share-link tokens are wanted over crypto.randomUUID()
+npm install nanoid
+
+# Do NOT install for v1.2 (deferred to a future phase — see Supporting Libraries):
+# npm install diff
+
+# Optional Convex Component — only if public/anonymous write endpoints (e.g. anonymous
+# comments on public notes, if that product decision is made) need abuse-rate limiting
+# beyond token-space unguessability. See "Alternatives Considered."
+# npm install @convex-dev/rate-limiter
 ```
 
-**Peer dependency note:** The `stripe` package v17+ requires Node.js 18+. Vercel's default runtime satisfies this. Convex actions with `"use node"` also run Node 18+.
+No other `npm install` is required. Every other new capability (comments, notifications, version history, share links, credit-pack checkout) is built from Convex tables/functions and existing UI primitives (`@radix-ui/react-dialog`, `@radix-ui/react-avatar`, `@radix-ui/react-popover` — all already resolvable transitively through the installed `radix-ui@1.5.0` umbrella package, confirmed via `npm view radix-ui@1.5.0 dependencies`) plus one new Next.js route group for public/unauthenticated access.
 
 ---
 
-## Convex Webhook Endpoint Pattern
+## Feature-by-Feature Stack Notes
 
-The Stripe webhook URL registered in the Stripe Dashboard will be:
+### (a) Sharing/permission links + public notes
 
-```
-https://<convex-deployment-name>.convex.site/stripe/webhook
-```
+- **Token generation:** `crypto.randomUUID()` — built into both the Node.js runtime (Next.js Route Handlers/Server Actions) and Convex's V8 runtime, zero dependency, 122 bits of entropy (cryptographically unguessable, which is the actual security property needed since `shareLinks.token` is a bearer credential — see `PITFALLS.md` Pitfall 2). Use `nanoid` only if a shorter URL is a stated product/UX requirement; it is not a security upgrade over `randomUUID()`, only a cosmetic one.
+- **New Convex table:** `shareLinks` (see `ARCHITECTURE.md` for full schema) — do not overload the existing `shares` table; bearer-token/anonymous access and identity-bound invite access are structurally different and should stay two tables/two resolution functions.
+- **New Next.js route:** a route group **outside** the Clerk-gated `(app)` group — e.g. `app/[locale]/(public)/share/[token]/page.tsx` — is required because every existing note route currently sits under an authenticated layout. This is a genuinely new architectural surface for this codebase: the first unauthenticated Convex query path (`getPublicNoteByToken` or equivalent) that must never call `ctx.auth.getUserIdentity()`-gated helpers.
+- **What NOT to add:** no separate short-link/URL-shortener service (e.g. Bitly API) — Next.js dynamic routes already give a clean `/share/[token]` URL; no auth provider changes — Clerk is not involved in the anonymous path at all, by design.
+- **Rate limiting (optional):** `@convex-dev/rate-limiter@0.3.2` is the official Convex Component for this if public link-creation or anonymous note-view endpoints need throttling against abuse (e.g. scripted `createShareLink` spam). This is the **first Convex Component this project would adopt** — it requires creating `convex/convex.config.ts`, which does not exist yet. Given token space is unguessable (brute-forcing a UUID token is computationally infeasible regardless of rate limiting) and the abuse surface for v1.2 is narrow (view-only public notes, no anonymous writes unless the "anonymous commenting" product decision — flagged as an open gap in `ARCHITECTURE.md` — is made "yes"), treat this as a **should-have if anonymous commenting ships, not a hard requirement for public note viewing alone**.
 
-Not a Vercel/Next.js URL. This is important for Vercel deployment config — no changes to `vercel.json` needed for the webhook.
+### (b) Comments + notifications
+
+- **No new real-time library.** This is the milestone's clearest instance of "don't introduce a second sync engine" — Convex's existing reactive-query mechanism (already powering the AI-credits balance badge and subscription status) is architecturally identical to what a comment thread or unread-notification-count badge needs. Adding Pusher/Ably/Socket.io/Supabase Realtime here would be pure redundancy.
+- **Fan-out pattern:** in-process, inside the `addComment` mutation (`ctx.db.insert("notifications", …)` once per recipient, same transaction as the comment insert) — no queue/job library needed at this app's scale (personal/small-team note sharing, not thousands of watchers per note).
+- **UI:** `sonner` for one-shot toasts (new comment while note is open elsewhere), plus a `notifications` table + `useQuery` for a persistent bell/badge — the badge pattern directly mirrors the already-shipped AI-credits toolbar badge, no new UI paradigm.
+- **Email/push notifications: explicitly out of scope for v1.2.** No `resend`, `@convex-dev/resend`, `@sendgrid/mail`, or web-push library should be added this milestone — there is no transactional-email infra in this codebase today (`package.json` has zero email dependencies), and `ARCHITECTURE.md` recommends scoping v1.2 to in-app-only notifications, consistent with the milestone's own "real-time co-editing deferred" precedent. If a later milestone adds email digests, `@convex-dev/resend` (`0.2.7`, official Convex Component wrapping the Resend API with built-in retry/idempotency) is the correct future choice over a hand-rolled `fetch()` call to Resend's API or a generic mailer.
+- **Comment editor:** plain text or minimal markdown — reuse nothing from TipTap for comments. Introducing a second rich-text surface for comment bodies is unnecessary complexity `ARCHITECTURE.md` already flags ("avoid another rich-text engine").
+
+### (c) Version history storage + point-in-time restoration
+
+- **No new storage/versioning library.** `noteVersions` is a plain Convex table (full-content snapshot per accepted `updateNoteContent` mutation, written in the same transaction as the content patch — per `ARCHITECTURE.md` Anti-Pattern 2). Convex document writes and the existing `by_noteId` index pattern (already used by `notes`/`shares`) are sufficient; no external object storage (e.g., Convex File Storage, S3) is needed because note content is a plain string, not binary/large media.
+- **Retention enforcement:** read-time query filtering (`q.gte("createdAt", cutoff)` on the `by_noteId` index) for the Free-tier ~24h window, not delete-on-write — this is a query-shape decision, not a library choice.
+- **Storage-hygiene pruning:** Convex native `crons.ts` (see Core Technologies above), decoupled from the tier-gating logic.
+- **Diff viewer:** deferred (see `diff`/jsdiff in Supporting Libraries) — not needed for v1.2's full-snapshot-preview-before-restore MVP.
+- **Consideration, not a library gap:** Convex has a per-document size ceiling (~1MB). A note's HTML content snapshotted on every save is very unlikely to approach this for a personal note-taking app, but if a note grows unusually large, unbounded version accumulation is a storage-hygiene (cron pruning), not a schema, problem — already covered by the cron above.
+
+### (d) Tiered/annual Stripe subscription pricing with migration path
+
+- **No new package** — `stripe@22.3.0` already exposes everything needed:
+  - **New Price objects, not edited ones.** Stripe Prices are immutable (`unit_amount` cannot be changed post-creation) — confirmed via Context7 and independently via `PITFALLS.md` Pitfall 1. Create 2 new recurring Prices (monthly 6.99€, annual 59€) on the renamed Product; never attempt to mutate the existing 9€ Price.
+  - **Migration mechanism:** `stripe.subscriptions.update(subId, { items: [{ id: existingItemId, price: newPriceId }], proration_behavior: "none" })` for an immediate-but-unbilled swap, or the `SubscriptionSchedules` resource (`phases` + top-level `proration_behavior`) if the swap should apply precisely at each subscriber's own next renewal rather than immediately. Both APIs were verified present in the currently-installed SDK version via Context7's `/stripe/stripe-node` docs (`SubscriptionUpdateParams.items[].price`, `SubscriptionScheduleUpdateParams.phases`).
+  - Because this repricing is a **decrease** (9€ → 6.99€), the industry-standard 30-60-day advance-notice choreography for price _increases_ does not apply — this simplifies the migration to a mechanical batch/script concern (pace `subscriptions.update` calls, e.g. one every few hundred ms, so the resulting burst of `customer.subscription.updated` webhooks doesn't trip Stripe API rate limits — per `PITFALLS.md` Pitfall 1).
+- **Convex-side change:** add `subscriptions.priceId: v.optional(v.string())` (denormalized from Stripe) so the Settings page can distinguish monthly-Premium vs annual-Premium for display — this is a schema addition, not a library addition, and is additive/backward-compatible (`v.optional`).
+- **What NOT to add:** no Stripe Billing "Customer Portal" (already explicitly out of scope per `PROJECT.md` — custom in-app UI is the chosen pattern); no third-party subscription-migration SaaS tool (e.g. a bulk-migration service) — at this app's subscriber scale, a scripted loop over `stripe.subscriptions.list()` + `subscriptions.update()` calls, run once, is sufficient and keeps the whole flow auditable in this codebase rather than an opaque external tool.
+
+### (e) Multi-tier one-time credit-pack purchase flow (3 SKUs)
+
+- **No new package** — this is a direct, mechanical extension of the already-shipped single-SKU top-up flow (`app/[locale]/(app)/notes/actions.ts` → `stripe.checkout.sessions.create({ mode: "payment", line_items: [{ price: process.env.STRIPE_TOPUP_PRICE_ID! }] })` → `checkout.session.completed` in `convex/stripeWebhooks.ts` → `internal.aiCredits.addCredits`).
+- **Required change (not a new dependency, a code-shape fix):** today the webhook **hardcodes `amount: 50`** for every payment-mode checkout completion regardless of what was purchased. For 3 SKUs this must become a lookup — either keyed by `session.metadata.packTier` (set explicitly at Checkout Session creation, e.g. `metadata: { clerkUserId, packTier: "boost" }`) or by the Stripe `price` ID already present on the completed session's line item (`session.line_items` via `expand: ["line_items"]`, or read from `session.metadata` set at creation — metadata is the simpler, already-established pattern in this codebase and should be preferred over re-fetching/expanding line items). **Do not infer the credit amount from the payment amount** (e.g. `amount_total / X`) — that is fragile against currency/tax/promo-code changes; look it up from an explicit server-side map (`packTier → creditAmount`) keyed by the metadata value set at session-creation time, mirroring the AI action-cost registry pattern `ARCHITECTURE.md` recommends for Feature 6's differentiated credit costs.
+- **Stripe object shape:** 3 pre-created one-time `Price` objects on a single "Credits" Product (not `price_data` inline pricing) — confirmed as the recommended pattern for a reusable, reportable SKU catalog vs. per-request dynamic pricing (Stripe's own Prices API guidance: "different levels of service should be represented by products [and] pricing of that product should be represented by prices"). This also matches the existing single-SKU top-up's use of a pre-created `STRIPE_TOPUP_PRICE_ID`, so the pattern is a straight 1→3 extension, not a new integration style.
+- **Env vars:** 3 new price-ID env vars (e.g. `STRIPE_CREDITS_DECOUVERTE_PRICE_ID`, `STRIPE_CREDITS_BOOST_PRICE_ID`, `STRIPE_CREDITS_PRO_PACK_PRICE_ID`), configured identically to the existing `STRIPE_TOPUP_PRICE_ID`/`STRIPE_PRO_PRICE_ID` pattern (Vercel + Convex Dashboard env vars, never committed).
+- **`creditTransactions` schema:** already has a `type: "topup"` literal and `amount`/`stripePaymentIntentId` fields — no schema change required for the pack purchase itself; only the webhook's amount-resolution logic changes. Optionally add `packTier: v.optional(v.string())` to `creditTransactions` for a more informative purchase-history UI in `SettingsCreditsCard.tsx` (additive, backward-compatible).
+
+---
+
+## Alternatives Considered
+
+| Recommended                                                                                | Alternative                                                           | When to Use Alternative                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Convex reactive queries for in-app notifications                                           | Pusher / Ably / Socket.io                                             | Never for this milestone — would be a second real-time sync engine duplicating Convex's built-in reactivity for no benefit. Only reconsider if a future milestone needs cross-app-instance push notifications to native mobile (out of scope here). |
+| `crypto.randomUUID()` for share tokens                                                     | `nanoid`                                                              | If product/design wants visibly shorter share URLs. Functionally interchangeable for the security property needed (unguessable bearer token); `nanoid` wins only on URL aesthetics.                                                                 |
+| `sonner`                                                                                   | Rebuilding shadcn's deprecated Radix-Toast `toast` component          | Never — it's deprecated upstream, not actively maintained by shadcn, and this project never installed it in the first place, so there's no migration cost being avoided by choosing it.                                                             |
+| Pre-created Stripe Price objects (3 SKUs)                                                  | `price_data` inline/dynamic pricing at Checkout-session-creation time | Only if credit-pack pricing needs to be fully dynamic/computed per request (e.g. a promotional calculator) — not the case here; 3 fixed SKUs is exactly what pre-created Prices are for.                                                            |
+| Subscriptions migrated via `subscriptions.update`/Subscription Schedules (in-house script) | A third-party Stripe migration/bulk-ops tool                          | Only at subscriber counts where a manual scripted loop becomes operationally painful (thousands+) — not relevant at this app's current scale per `PITFALLS.md`'s own throttling guidance ("fine at this app's current scale").                      |
+| In-app-only notifications (no email)                                                       | `@convex-dev/resend` / raw Resend API                                 | Defer to a future milestone once product explicitly requests email digests — no email infra exists in this codebase today, and `PROJECT.md`/`ARCHITECTURE.md` both treat this as intentionally out of scope for v1.2.                               |
+
+---
+
+## What NOT to Use
+
+| Avoid                                                                                                      | Why                                                                                                                                                                                                                                                        | Use Instead                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A second real-time/pub-sub library (Pusher, Ably, Socket.io, Supabase Realtime) for comments/notifications | Convex's `useQuery` already provides push-based reactivity to every new table this milestone adds — this is explicitly the trap the milestone brief calls out ("avoid introducing a second real-time sync engine when Convex already provides reactivity") | Convex reactive queries, exactly as already used for the credits badge and subscription status                                                     |
+| Editing an existing Stripe `Price.unit_amount` via the Dashboard or API                                    | Stripe Prices are immutable — there is no edit operation; attempting it either fails outright or (worse, if confused with Product fields) silently changes the wrong object                                                                                | Create a new `Price` on the (renamed) `Product`; archive the old Price (`active: false`) only after confirming no subscriptions still reference it |
+| Swapping only the `STRIPE_*_PRICE_ID` env var and calling the repricing "migrated"                         | Existing active `Subscription` objects keep referencing whatever Price they were created with — an env var swap affects only _new_ checkouts, not existing subscribers, with zero error/signal anywhere in the app (`PITFALLS.md` Pitfall 1)               | Explicit `stripe.subscriptions.update(...)`/Subscription Schedule migration script per existing subscriber                                         |
+| Inferring which credit pack was purchased from `amount_total` or hardcoding a single amount in the webhook | Fragile against tax/currency/promo-code variance; already the exact bug pattern present in the current single-SKU top-up (`amount: 50` hardcoded) that must be fixed, not replicated, when extending to 3 SKUs                                             | Explicit `packTier`/price-ID → credit-amount lookup, set at Checkout-session-creation time via `metadata`                                          |
+| Reusing `notes._id` / `shares._id` as the public share-link token                                          | Convex document IDs are not designed as unguessable bearer-secrets and are exposed elsewhere in the app's own URLs/DOM — reusing them as a public-access token conflates "resource identifier" with "access credential" (`PITFALLS.md` Pitfall 2)          | A dedicated `shareLinks.token` field generated via `crypto.randomUUID()` (or `nanoid`), stored and indexed separately from any resource ID         |
+| A dedicated diff/version-control UI library (e.g. a Git-graph visualization component) for version history | `FEATURES.md` explicitly flags "manual named save-points / Git-like branching" as an anti-feature — massively over-engineered for a note app's actual job-to-be-done (undo a mistake)                                                                      | Simple chronological list + full-snapshot preview + restore; defer even simple text diffing (`diff`/jsdiff) past v1.2 MVP                          |
+| Rebuilding shadcn's deprecated `components/ui/toast.tsx` (old Radix-Toast pattern)                         | Deprecated upstream by shadcn itself; this project never installed it, so choosing it now would mean adopting a component shadcn's own docs steer users away from                                                                                          | `sonner`                                                                                                                                           |
+| Adding `@convex-dev/rate-limiter` (or any Convex Component) purely for public-note-view throttling         | Token space (UUID/nanoid) is cryptographically unguessable — rate limiting a read-only, unauthenticated view endpoint against brute-force token enumeration is solving a threat that isn't the actual risk at this scale                                   | Reserve the Components-system adoption decision for if/when anonymous _writes_ (e.g. anonymous commenting) are confirmed in scope                  |
+
+---
+
+## Stack Patterns by Variant
+
+**If anonymous commenting on public notes is confirmed in scope (open gap flagged in `ARCHITECTURE.md`):**
+
+- Add `@convex-dev/rate-limiter@0.3.2` (first Convex Component adoption — requires `convex/convex.config.ts`) to throttle the `addComment` mutation's unauthenticated path specifically, not the read-only public note view.
+- Because it's the project's first Components-system dependency, treat the `convex.config.ts` scaffolding itself as a small, isolated first step (verify `npx convex dev` still boots cleanly) before wiring the rate limiter into `addComment`.
+
+**If anonymous commenting is decided view-only-for-anonymous (comment requires sign-in, per `ARCHITECTURE.md`'s own recommendation):**
+
+- Skip `@convex-dev/rate-limiter` entirely for v1.2 — every write path stays behind Clerk auth, and Convex's platform-level function-call limits are sufficient at this app's scale.
+
+**If the Premium price migration should apply immediately (not at each subscriber's next renewal):**
+
+- Use `stripe.subscriptions.update(subId, { items: [...], proration_behavior: "none" })` directly (simpler, one API call per subscriber, immediate effect at the batch-run time).
+
+**If it should apply exactly at each subscriber's own renewal date (gentler, avoids any mid-cycle billing-date reset):**
+
+- Use `SubscriptionSchedules` (`phases` array), which is the API `stripe-node` exposes specifically for "change takes effect at natural renewal" — more moving parts (a schedule object per subscription) but avoids resetting anyone's billing anchor date, which `proration_behavior: "none"` combined with an interval change (monthly→monthly stays same interval here, so this mostly matters only for subscribers choosing to also switch monthly→annual at migration time).
+
+---
+
+## Version Compatibility
+
+| Package A                                             | Compatible With                                                                                                        | Notes                                                                                                                                                                         |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stripe@22.3.0` (installed)                           | `SubscriptionUpdateParams.items[].price`, `SubscriptionScheduleUpdateParams.phases`, multi-Price Checkout `line_items` | All verified present in this major version via Context7 — no SDK upgrade required for any feature in this milestone. `22.5.0` is available as an optional routine patch bump. |
+| `sonner@2.0.8`                                        | React `19.2.7` (installed), Next.js `16.2.7` (installed)                                                               | Current major version targets React 18/19 — matches this project's React 19 exactly.                                                                                          |
+| `@convex-dev/rate-limiter@0.3.2` (if adopted)         | `convex@^1.24.8` minimum (installed: `1.40.0`, well above minimum)                                                     | Verified via `npm view` peer dependency. Requires the project's first `convex/convex.config.ts` — not currently present.                                                      |
+| `nanoid@6.0.1` (if chosen over `crypto.randomUUID()`) | ESM-only since v4+                                                                                                     | This project already uses ESM throughout (Next.js 15/16 App Router, `"type": "module"`-equivalent tooling); no CommonJS interop concern.                                      |
 
 ---
 
 ## Sources
 
-- [Stripe Node SDK docs (Context7)](https://github.com/stripe/stripe-node) — HIGH confidence
-- [Stripe + Convex (official Convex blog)](https://stack.convex.dev/stripe-with-convex) — HIGH confidence
-- [Convex HTTP Actions docs](https://docs.convex.dev/functions/http-actions) — HIGH confidence
-- [@convex-dev/stripe component README](https://github.com/get-convex/stripe/blob/master/README.md) — HIGH confidence
-- [Convex Stripe component issue: subscription.updated not updating priceId](https://github.com/get-convex/stripe/issues/7) — MEDIUM confidence
-- [Next.js 15 App Router webhook raw body pattern](https://kitson-broadhurst.medium.com/next-js-app-router-stripe-webhook-signature-verification-ea9d59f3593f) — MEDIUM confidence
-- [Stripe Checkout in Next.js 15 (2025)](https://medium.com/@gragson.john/stripe-checkout-and-webhook-in-a-next-js-15-2025-925d7529855e) — MEDIUM confidence
-- [Stripe subscriptions design guide](https://docs.stripe.com/billing/subscriptions/design-an-integration) — HIGH confidence
+- Context7 `/stripe/stripe-node` — `SubscriptionScheduleUpdateParams`, `SubscriptionUpdateParams` (`proration_behavior`, `items[].price`) — HIGH confidence, verified against the actual installed major version's API surface.
+- Context7 `/get-convex/convex-backend` — cron job definition API (`crons.interval`/`crons.cron`/`crons.monthly`, `convex/crons.ts`) — HIGH confidence.
+- [Stripe: Change the price of existing subscriptions](https://docs.stripe.com/billing/subscriptions/change-price) — HIGH confidence, official docs.
+- [Stripe Prices API reference](https://docs.stripe.com/api/prices) — HIGH confidence, confirms Price immutability and the Product/Price catalog pattern for multi-SKU one-time purchases.
+- WebSearch: shadcn Toast deprecation → Sonner replacement, corroborated across `github.com/shadcn-ui/ui` issue #7120, `ui.shadcn.com/docs/components/sonner`, and multiple third-party shadcn component docs — MEDIUM-HIGH confidence (community + upstream issue tracker agree; no single canonical "deprecation announcement" doc page found, but converging evidence is strong).
+- WebSearch: Stripe subscriber price-migration best practices (subscription schedules, renewal-boundary migration, batching) — MEDIUM confidence, cross-referenced against Context7's stripe-node API surface for feasibility (the batching/pacing recommendation is standard operational advice, not a documented Stripe-mandated rate limit figure).
+- Live repo inspection (`convex/schema.ts`, `convex/subscriptions.ts`, `convex/stripeWebhooks.ts`, `convex/aiCredits.ts`, `app/[locale]/(marketing)/pricing/actions.ts`, `app/[locale]/(app)/notes/actions.ts`, `package.json`) — HIGH confidence, ground truth for "what's already installed/implemented."
+- `npm view` (live registry queries) for `@convex-dev/rate-limiter`, `@convex-dev/resend`, `nanoid`, `diff`, `sonner`, `resend`, `convex`, `stripe`, `radix-ui@1.5.0` dependencies — HIGH confidence, current as of research date.
+- Companion research files in this same batch: `.planning/research/ARCHITECTURE.md` (schema/table design), `.planning/research/PITFALLS.md` (Stripe Price-immutability pitfall, share-token predictability pitfall), `.planning/research/FEATURES.md` (MVP scope boundaries, e.g. diff-viewer deferral) — used to keep this file's recommendations scoped to what's actually in v1.2, not gold-plated.
+
+---
+
+_Stack research for: Noetree v1.2 Pricing V2 & Fonctionnalités Sociales_
+_Researched: 2026-08-25_
