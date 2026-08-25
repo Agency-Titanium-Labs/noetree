@@ -9,11 +9,20 @@ import { redirect as localeRedirect, routing } from "@/i18n/routing";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-export async function createCheckoutSession(locale: string): Promise<void> {
+export async function createCheckoutSession(
+  locale: string,
+  interval: "monthly" | "annual",
+): Promise<void> {
   // T-03-01: never interpolate an unvalidated locale into a redirect URL.
   const safeLocale = (routing.locales as readonly string[]).includes(locale)
     ? locale
     : routing.defaultLocale;
+
+  // T-12-05-01: the TypeScript union is not a runtime guarantee at a Server
+  // Action boundary — normalise against a closed allowlist, mirroring the
+  // safeLocale pattern above. A tampered/forced value (including a raw
+  // Stripe price ID) always falls back to "monthly".
+  const safeInterval = interval === "annual" ? "annual" : "monthly";
 
   const { userId, redirectToSignIn, getToken } = await auth();
   if (!userId) {
@@ -54,6 +63,14 @@ export async function createCheckoutSession(locale: string): Promise<void> {
   }
 
   const baseUrl = process.env.APP_URL!;
+  // T-12-05-01/T-12-05-02: the price ID is resolved server-side from a
+  // closed monthly/annual allowlist just before the Stripe call, gated
+  // exclusively on safeInterval — never accepted as a parameter, never
+  // interpolated from the caller's raw `interval` value.
+  const priceId =
+    safeInterval === "annual"
+      ? process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID!
+      : process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID!;
   let session: Stripe.Checkout.Session;
   try {
     session = await stripe.checkout.sessions.create({
@@ -64,7 +81,7 @@ export async function createCheckoutSession(locale: string): Promise<void> {
       ...(existing?.stripeCustomerId
         ? { customer: existing.stripeCustomerId }
         : {}),
-      line_items: [{ price: process.env.STRIPE_PRO_PRICE_ID!, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       // D-07 (locked Phase 1): clerkUserId sourced ONLY from auth() (T-03-02),
       // written into both session.metadata and subscription_data.metadata.
       metadata: { clerkUserId: userId },
