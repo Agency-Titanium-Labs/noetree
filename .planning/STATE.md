@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: roadmapped
-last_updated: "2026-08-25T00:00:00.000Z"
-last_activity: 2026-08-25
+status: planning
+stopped_at: Phase 12 context gathered
+last_updated: "2026-08-25T13:00:57.076Z"
+last_activity: 2026-08-25 — ROADMAP.md created for v1.2, phases 12-16 defined, 27/27 requirements mapped
 progress:
   total_phases: 5
   completed_phases: 0
@@ -91,9 +92,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-08-25
-Stopped at: v1.2 ROADMAP.md and STATE.md created, REQUIREMENTS.md traceability updated — awaiting roadmap approval
-Resume file: none — next step is `/gsd:plan-phase 12`
+Last session: 2026-08-25T13:00:57.066Z
+Stopped at: Phase 12 context gathered
+Resume file: .planning/phases/12-plan-restructure-tier-foundation/12-CONTEXT.md
 
 ## Operator Next Steps
 
