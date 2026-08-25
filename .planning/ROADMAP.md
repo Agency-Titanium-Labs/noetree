@@ -58,8 +58,8 @@ Plans:
 
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — Remove the Free-tier 20-note cap and every UpgradeModal/PlanEnforcement remnant (wave 1)
-- [ ] 12-02-PLAN.md — Scripts toolchain + Stripe Premium Product rename and 6.99€/59€ Price creation (wave 1)
+- [x] 12-01-PLAN.md — Remove the Free-tier 20-note cap and every UpgradeModal/PlanEnforcement remnant (wave 1)
+- [x] 12-02-PLAN.md — Scripts toolchain + Stripe Premium Product rename and 6.99€/59€ Price creation (wave 1)
 
 **Wave 2** _(blocked on Wave 1 completion)_
 
@@ -151,7 +151,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 5. AI Credits System                           | v1.0      | 5/5            | Complete    | 2026-07-10 |
 | 6. Settings Page                               | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
-| 12. Plan Restructure & Tier Foundation         | v1.2      | 0/6            | Planned     | -          |
+| 12. Plan Restructure & Tier Foundation         | v1.2      | 2/6            | In Progress |            |
 | 13. Sharing — Links & Public Notes             | v1.2      | 0/TBD          | Not started | -          |
 | 14. Comments & Notifications                   | v1.2      | 0/TBD          | Not started | -          |
 | 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |

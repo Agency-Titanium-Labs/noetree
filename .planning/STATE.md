@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
 status: executing
 stopped_at: Phase 12 UI-SPEC approved
-last_updated: "2026-08-25T14:27:29.629Z"
-last_activity: 2026-08-25 -- Phase 12 planning complete
+last_updated: "2026-08-25T16:39:17.864Z"
+last_activity: 2026-08-25 -- Phase 12 execution started
 progress:
   total_phases: 5
   completed_phases: 0
@@ -16,10 +16,10 @@ progress:
 
 ## Current Position
 
-Phase: 12 of 16 (Plan Restructure & Tier Foundation) — first phase of v1.2, ready to plan
-Plan: — (not yet planned)
-Status: Ready to execute
-Last activity: 2026-08-25 -- Phase 12 planning complete
+Phase: 12 (Plan Restructure & Tier Foundation) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 12
+Last activity: 2026-08-25 -- Phase 12 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
