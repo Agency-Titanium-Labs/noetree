@@ -150,7 +150,7 @@ export const getTreeById = query({
 
     // step 2 Check if user exists
     if (!user) {
-      throw new Error("User not found");
+      return null;
     }
 
     //step 3 Get the note
@@ -271,7 +271,7 @@ export const getTreesByMe = query({
 
     //step 2 - check if user exists
     if (!user) {
-      throw new Error("User not found");
+      return [];
     }
 
     //step 3 - get all top parent notes owned by me

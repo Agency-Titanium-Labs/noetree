@@ -13,8 +13,12 @@ const isPublicRoute = createRouteMatcher(["/api/webhooks/(.*)"]);
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req) && isProtectedRoute(req)) await auth.protect();
 
-  // Skip running next-intl for API routes
-  if (req.nextUrl.pathname.startsWith("/api")) {
+  // Skip running next-intl for API routes and static metadata files
+  if (
+    req.nextUrl.pathname.startsWith("/api") ||
+    req.nextUrl.pathname === "/manifest.json" ||
+    req.nextUrl.pathname === "/manifest.webmanifest"
+  ) {
     return;
   }
 
@@ -23,7 +27,7 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!_next|manifest\\.json|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
 };
