@@ -143,6 +143,20 @@ const customCollisionDetection = ({
   const distance = Math.sqrt(dx * dx + dy * dy) || 1;
 
   const targetIdStr = String(droppable.id);
+  const rawTargetId = targetIdStr.startsWith("empty-placeholder-")
+    ? targetIdStr.replace("empty-placeholder-", "")
+    : targetIdStr;
+  const sourceId = (
+    dragOperation as unknown as { source?: { id?: string | number } }
+  )?.source?.id;
+  if (
+    sourceId &&
+    (rawTargetId === String(sourceId) ||
+      targetIdStr === `empty-placeholder-${sourceId}`)
+  ) {
+    return null;
+  }
+
   const isCard =
     !targetIdStr.startsWith("empty-placeholder-") &&
     targetIdStr !== "root-droppable";
@@ -485,22 +499,36 @@ export default function NotesTree() {
                 return;
               }
 
+              const draggedId = source.id as Id<"notes">;
               const targetIdStr = String(target.id);
+              const targetNoteId = (
+                targetIdStr.startsWith("empty-placeholder-")
+                  ? targetIdStr.replace("empty-placeholder-", "")
+                  : targetIdStr
+              ) as Id<"notes">;
+
+              // Zero-loss guard: Never indicate or allow dropping onto self or descendant
+              if (
+                targetNoteId === draggedId ||
+                isSelfOrDescendantOfDragged(targetNoteId, draggedId, tree)
+              ) {
+                setDropIndicator(null);
+                return;
+              }
+
               if (targetIdStr.startsWith("empty-placeholder-")) {
-                const noteId = targetIdStr.replace(
-                  "empty-placeholder-",
-                  "",
-                ) as Id<"notes">;
-                const targetNote = tree ? findNoteInTree(noteId, tree) : null;
+                const targetNote = tree
+                  ? findNoteInTree(targetNoteId, tree)
+                  : null;
                 if (targetNote && targetNote.role !== "view") {
-                  setDropIndicator({ noteId, position: "child" });
+                  setDropIndicator({ noteId: targetNoteId, position: "child" });
                 } else {
                   setDropIndicator(null);
                 }
               } else {
                 const targetId = target.id as Id<"notes">;
                 if (targetIdStr === "root-droppable") {
-                  if (tree && tree.role !== "view") {
+                  if (tree && tree.role !== "view" && draggedId !== tree._id) {
                     setDropIndicator({
                       noteId: tree._id as Id<"notes">,
                       position: "child",
@@ -526,7 +554,13 @@ export default function NotesTree() {
                     parentId && tree ? findNoteInTree(parentId, tree) : null;
 
                   if (relativeX < 0.15) {
-                    if (parentNote && parentNote.role !== "view") {
+                    if (
+                      parentId &&
+                      parentNote &&
+                      parentNote.role !== "view" &&
+                      parentId !== draggedId &&
+                      !isSelfOrDescendantOfDragged(parentId, draggedId, tree)
+                    ) {
                       setDropIndicator({
                         noteId: targetId,
                         position: "before",
@@ -535,13 +569,24 @@ export default function NotesTree() {
                       setDropIndicator(null);
                     }
                   } else if (relativeX > 0.85) {
-                    if (parentNote && parentNote.role !== "view") {
+                    if (
+                      parentId &&
+                      parentNote &&
+                      parentNote.role !== "view" &&
+                      parentId !== draggedId &&
+                      !isSelfOrDescendantOfDragged(parentId, draggedId, tree)
+                    ) {
                       setDropIndicator({ noteId: targetId, position: "after" });
                     } else {
                       setDropIndicator(null);
                     }
                   } else {
-                    if (targetNote && targetNote.role !== "view") {
+                    if (
+                      targetNote &&
+                      targetNote.role !== "view" &&
+                      targetId !== draggedId &&
+                      !isSelfOrDescendantOfDragged(targetId, draggedId, tree)
+                    ) {
                       setDropIndicator({ noteId: targetId, position: "child" });
                     } else {
                       setDropIndicator(null);
@@ -560,11 +605,22 @@ export default function NotesTree() {
               const draggedId = source.id as Id<"notes">;
               const oldParentId = source.data.parentId as Id<"notes">;
 
+              // Absolute root & identity protections:
+              // Cannot drag root note, cannot drag without an old parent
+              if (!draggedId || draggedId === tree._id || !oldParentId) return;
+
               if (String(target.id).startsWith("empty-placeholder-")) {
                 const newParentId = String(target.id).replace(
                   "empty-placeholder-",
                   "",
                 ) as Id<"notes">;
+
+                // STRICT INTEGRITY GUARDS:
+                if (!newParentId) return;
+                if (draggedId === newParentId) return;
+                if (isSelfOrDescendantOfDragged(newParentId, draggedId, tree))
+                  return;
+
                 const parentNote = tree
                   ? findNoteInTree(newParentId, tree)
                   : null;
@@ -581,6 +637,14 @@ export default function NotesTree() {
                   | undefined;
 
                 if (!newParentId) return;
+
+                // STRICT INTEGRITY GUARDS:
+                if (draggedId === newParentId) return;
+                if (draggedId === targetId) return;
+                if (isSelfOrDescendantOfDragged(newParentId, draggedId, tree))
+                  return;
+                if (isSelfOrDescendantOfDragged(targetId, draggedId, tree))
+                  return;
 
                 // Find target index in the parent's children list
                 const parentNote = findNoteInTree(newParentId, tree);
