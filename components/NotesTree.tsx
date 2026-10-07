@@ -138,40 +138,14 @@ const customCollisionDetection = ({
   const distance = Math.sqrt(dx * dx + dy * dy) || 1;
 
   const targetIdStr = String(droppable.id);
-  const rawTargetId = targetIdStr.startsWith("empty-placeholder-")
-    ? targetIdStr.replace("empty-placeholder-", "")
-    : targetIdStr;
   const sourceId = (
     dragOperation as unknown as { source?: { id?: string | number } }
   )?.source?.id;
-  if (
-    sourceId &&
-    (rawTargetId === String(sourceId) ||
-      targetIdStr === `empty-placeholder-${sourceId}`)
-  ) {
+  if (sourceId && targetIdStr === String(sourceId)) {
     return null;
   }
 
-  const isCard =
-    !targetIdStr.startsWith("empty-placeholder-") &&
-    targetIdStr !== "root-droppable";
-
   if (isInside) {
-    if (isCard && droppable.data?.hasChildren === false) {
-      const rect = droppable.shape.boundingRectangle;
-      const relativeX = (pointerCoordinates.x - rect.left) / rect.width;
-
-      // If cursor is in the middle 70% of the card, treat it as hovering the child placeholder
-      if (relativeX >= 0.15 && relativeX <= 0.85) {
-        return {
-          id: `empty-placeholder-${droppable.id}`,
-          value: 10000 / distance, // prioritize items the cursor is directly over
-          type: 2, // PointerIntersection
-          priority: 3, // High
-        };
-      }
-    }
-
     return {
       id: droppable.id,
       value: 10000 / distance, // prioritize items the cursor is directly over
@@ -270,8 +244,6 @@ export default function NotesTree() {
     collisionDetector: customCollisionDetection as unknown as undefined,
   });
 
-  const [hoveredNoteId, setHoveredNoteId] = useState<Id<"notes"> | null>(null);
-
   useEffect(() => {
     if (!isDraggingActive) return;
 
@@ -351,10 +323,7 @@ export default function NotesTree() {
   ) => {
     const hasChildren = note.childNotes && note.childNotes.length > 0;
     const isEditing = editingNoteId === note._id;
-    const isDraggedOverEligible =
-      isDraggingActive && hoveredNoteId === note._id;
-    const showChildrenSection =
-      hasChildren || isEditing || isDraggedOverEligible;
+    const showChildrenSection = hasChildren || isEditing;
 
     const isIndicatorActive = dropIndicator?.noteId === note._id;
     const isBefore = isIndicatorActive && dropIndicator?.position === "before";
@@ -435,30 +404,6 @@ export default function NotesTree() {
             );
           })}
 
-          {/* Empty child drop target: always rendered in JSX if no children, collapsed if not active/eligible */}
-          {!hasChildren && !isEditing && (
-            <TreeSortableBranch
-              key={`empty-placeholder-${note._id}`}
-              id={`empty-placeholder-${note._id}` as Id<"notes">}
-              index={0}
-              parentId={note._id}
-              className={cn(
-                !isDraggedOverEligible && "hidden pointer-events-none",
-              )}
-            >
-              {(_, sortableTargetRef) => (
-                <div
-                  ref={sortableTargetRef as (el: HTMLDivElement | null) => void}
-                  className="w-45 h-20 border-2 border-dashed border-primary/30 rounded-lg flex items-center justify-center bg-primary/5 hover:bg-primary/10 hover:border-primary/50 opacity-70"
-                >
-                  <span className="text-xs text-muted-foreground font-medium">
-                    {t("dropHere")}
-                  </span>
-                </div>
-              )}
-            </TreeSortableBranch>
-          )}
-
           {editingNoteId === note._id && (
             <div className="tree-child relative flex flex-col items-center">
               <NewNoteCard
@@ -523,119 +468,86 @@ export default function NotesTree() {
               const { source, target } = operation;
               if (!source || !target) {
                 setDropIndicator(null);
-                setHoveredNoteId(null);
                 return;
               }
 
               const draggedId = source.id as Id<"notes">;
               const targetIdStr = String(target.id);
-              const targetNoteId = (
-                targetIdStr.startsWith("empty-placeholder-")
-                  ? targetIdStr.replace("empty-placeholder-", "")
-                  : targetIdStr
-              ) as Id<"notes">;
 
-              // Zero-loss guard: Never indicate or allow dropping onto self or descendant
-              if (
-                targetNoteId === draggedId ||
-                isSelfOrDescendantOfDragged(targetNoteId, draggedId, tree)
-              ) {
-                setDropIndicator(null);
-                setHoveredNoteId(null);
-                return;
-              }
-
-              // Update hoveredNoteId for visual nesting feedback
-              if (targetNoteId) {
-                const targetNote = tree
-                  ? findNoteInTree(targetNoteId, tree)
-                  : null;
-                if (targetNote && targetNote.role !== "view") {
-                  setHoveredNoteId(targetNoteId);
-                } else {
-                  setHoveredNoteId(null);
-                }
-              } else {
-                setHoveredNoteId(null);
-              }
-
-              if (targetIdStr.startsWith("empty-placeholder-")) {
-                const targetNote = tree
-                  ? findNoteInTree(targetNoteId, tree)
-                  : null;
-                if (targetNote && targetNote.role !== "view") {
-                  setDropIndicator({ noteId: targetNoteId, position: "child" });
+              if (targetIdStr === "root-droppable") {
+                if (tree && tree.role !== "view" && draggedId !== tree._id) {
+                  setDropIndicator({
+                    noteId: tree._id as Id<"notes">,
+                    position: "child",
+                  });
                 } else {
                   setDropIndicator(null);
                 }
-              } else {
-                const targetId = target.id as Id<"notes">;
-                if (targetIdStr === "root-droppable") {
-                  if (tree && tree.role !== "view" && draggedId !== tree._id) {
+                return;
+              }
+
+              const targetId = target.id as Id<"notes">;
+
+              // Zero-loss guard: Never indicate or allow dropping onto self or descendant
+              if (
+                targetId === draggedId ||
+                isSelfOrDescendantOfDragged(targetId, draggedId, tree)
+              ) {
+                setDropIndicator(null);
+                return;
+              }
+
+              if (target.element && operation.position.current) {
+                const rect = target.element.getBoundingClientRect();
+                const relativeX =
+                  (operation.position.current.x - rect.left) / rect.width;
+                const relativeY =
+                  (operation.position.current.y - rect.top) / rect.height;
+
+                const targetNote = tree ? findNoteInTree(targetId, tree) : null;
+                const parentId = target.data.parentId as
+                  | Id<"notes">
+                  | undefined;
+                const parentNote =
+                  parentId && tree ? findNoteInTree(parentId, tree) : null;
+
+                if (relativeY <= 1.0 && relativeX < 0.15) {
+                  if (
+                    parentId &&
+                    parentNote &&
+                    parentNote.role !== "view" &&
+                    parentId !== draggedId &&
+                    !isSelfOrDescendantOfDragged(parentId, draggedId, tree)
+                  ) {
                     setDropIndicator({
-                      noteId: tree._id as Id<"notes">,
-                      position: "child",
+                      noteId: targetId,
+                      position: "before",
                     });
                   } else {
                     setDropIndicator(null);
                   }
-                  return;
-                }
-
-                if (target.element && operation.position.current) {
-                  const rect = target.element.getBoundingClientRect();
-                  const relativeX =
-                    (operation.position.current.x - rect.left) / rect.width;
-                  const relativeY =
-                    (operation.position.current.y - rect.top) / rect.height;
-
-                  const targetNote = tree
-                    ? findNoteInTree(targetId, tree)
-                    : null;
-                  const parentId = target.data.parentId as
-                    | Id<"notes">
-                    | undefined;
-                  const parentNote =
-                    parentId && tree ? findNoteInTree(parentId, tree) : null;
-
-                  if (relativeY <= 1.0 && relativeX < 0.15) {
-                    if (
-                      parentId &&
-                      parentNote &&
-                      parentNote.role !== "view" &&
-                      parentId !== draggedId &&
-                      !isSelfOrDescendantOfDragged(parentId, draggedId, tree)
-                    ) {
-                      setDropIndicator({
-                        noteId: targetId,
-                        position: "before",
-                      });
-                    } else {
-                      setDropIndicator(null);
-                    }
-                  } else if (relativeY <= 1.0 && relativeX > 0.85) {
-                    if (
-                      parentId &&
-                      parentNote &&
-                      parentNote.role !== "view" &&
-                      parentId !== draggedId &&
-                      !isSelfOrDescendantOfDragged(parentId, draggedId, tree)
-                    ) {
-                      setDropIndicator({ noteId: targetId, position: "after" });
-                    } else {
-                      setDropIndicator(null);
-                    }
+                } else if (relativeY <= 1.0 && relativeX > 0.85) {
+                  if (
+                    parentId &&
+                    parentNote &&
+                    parentNote.role !== "view" &&
+                    parentId !== draggedId &&
+                    !isSelfOrDescendantOfDragged(parentId, draggedId, tree)
+                  ) {
+                    setDropIndicator({ noteId: targetId, position: "after" });
                   } else {
-                    if (
-                      targetNote &&
-                      targetNote.role !== "view" &&
-                      targetId !== draggedId &&
-                      !isSelfOrDescendantOfDragged(targetId, draggedId, tree)
-                    ) {
-                      setDropIndicator({ noteId: targetId, position: "child" });
-                    } else {
-                      setDropIndicator(null);
-                    }
+                    setDropIndicator(null);
+                  }
+                } else {
+                  if (
+                    targetNote &&
+                    targetNote.role !== "view" &&
+                    targetId !== draggedId &&
+                    !isSelfOrDescendantOfDragged(targetId, draggedId, tree)
+                  ) {
+                    setDropIndicator({ noteId: targetId, position: "child" });
+                  } else {
+                    setDropIndicator(null);
                   }
                 }
               }
@@ -648,7 +560,6 @@ export default function NotesTree() {
               setOpenDropdownNoteId(null);
             }
             setIsDraggingActive(false);
-            setHoveredNoteId(null);
             setTimeout(() => {
               setDropIndicator(null);
               const { source, target } = operation;
@@ -661,27 +572,7 @@ export default function NotesTree() {
               // Cannot drag root note, cannot drag without an old parent
               if (!draggedId || draggedId === tree._id || !oldParentId) return;
 
-              if (String(target.id).startsWith("empty-placeholder-")) {
-                const newParentId = String(target.id).replace(
-                  "empty-placeholder-",
-                  "",
-                ) as Id<"notes">;
-
-                // STRICT INTEGRITY GUARDS:
-                if (!newParentId) return;
-                if (draggedId === newParentId) return;
-                if (isSelfOrDescendantOfDragged(newParentId, draggedId, tree))
-                  return;
-
-                const parentNote = tree
-                  ? findNoteInTree(newParentId, tree)
-                  : null;
-                if (!parentNote || parentNote.role === "view") return;
-
-                if (oldParentId !== newParentId) {
-                  onMoveNote(draggedId, oldParentId, newParentId, 0);
-                }
-              } else if (String(target.id) === "root-droppable") {
+              if (String(target.id) === "root-droppable") {
                 if (tree && tree.role !== "view" && draggedId !== tree._id) {
                   const newIndex = tree.childNotes?.length ?? 0;
                   if (oldParentId !== tree._id) {

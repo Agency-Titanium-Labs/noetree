@@ -253,9 +253,6 @@ export function NoteCard({
               isSelected
                 ? "bg-accent/30 border-primary ring-2 ring-primary/20"
                 : "",
-              isNestingHovered
-                ? "border-primary ring-2 ring-primary/50 bg-primary/5 scale-105"
-                : "",
             )}
             onClick={() =>
               !isRenaming && !isTemp && onSelectNote(note, getCurrentContent)
@@ -400,6 +397,9 @@ export function NoteCard({
           open={isShareOpen}
           onOpenChange={setIsShareOpen}
         />
+      )}
+      {isNestingHovered && (
+        <div className="absolute -bottom-3 left-4 right-4 h-1 bg-primary rounded-full shadow-[0_0_8px_var(--color-primary)] z-30 pointer-events-none" />
       )}
     </div>
   );
