@@ -47,6 +47,11 @@ interface NoteCardProps {
   handleRef?: (el: HTMLDivElement | null) => void;
   targetRef?: (el: HTMLDivElement | null) => void;
   isNestingHovered?: boolean;
+  isDraggingActive?: boolean;
+  isContextMenuOpen?: boolean;
+  onContextMenuOpenChange?: (open: boolean) => void;
+  isDropdownOpen?: boolean;
+  onDropdownOpenChange?: (open: boolean) => void;
 }
 
 export function NoteCard({
@@ -58,6 +63,11 @@ export function NoteCard({
   handleRef,
   targetRef,
   isNestingHovered,
+  isDraggingActive,
+  isContextMenuOpen: controlledContextMenuOpen,
+  onContextMenuOpenChange: setControlledContextMenuOpen,
+  isDropdownOpen: controlledDropdownOpen,
+  onDropdownOpenChange: setControlledDropdownOpen,
 }: NoteCardProps) {
   const t = useTranslations("NoteCard");
   const { onSelectNote, onUpdateNoteTitle, onDuplicateNote, selectedNote } =
@@ -66,8 +76,31 @@ export function NoteCard({
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [internalContextMenuOpen, setInternalContextMenuOpen] = useState(false);
+  const [internalDropdownOpen, setInternalDropdownOpen] = useState(false);
+
+  const isContextMenuOpen =
+    controlledContextMenuOpen !== undefined
+      ? controlledContextMenuOpen
+      : internalContextMenuOpen;
+  const setContextMenuOpen =
+    setControlledContextMenuOpen ?? setInternalContextMenuOpen;
+
+  const isDropdownOpen =
+    controlledDropdownOpen !== undefined
+      ? controlledDropdownOpen
+      : internalDropdownOpen;
+  const setDropdownOpen = setControlledDropdownOpen ?? setInternalDropdownOpen;
+
   const [editedTitle, setEditedTitle] = useState(note.title);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isDraggingActive) {
+      setContextMenuOpen(false);
+      setDropdownOpen(false);
+    }
+  }, [isDraggingActive, setContextMenuOpen, setDropdownOpen]);
 
   const isSelected = selectedNote?._id === note._id;
   const isTemp = typeof note._id === "string" && note._id.startsWith("temp-");
@@ -196,9 +229,24 @@ export function NoteCard({
         "relative group/node",
         isTemp && "opacity-60 pointer-events-none animate-pulse",
       )}
+      onContextMenu={e => {
+        if (isDraggingActive) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
     >
-      <ContextMenu>
-        <ContextMenuTrigger disabled={isRenaming || isTemp}>
+      <ContextMenu
+        open={!isDraggingActive && isContextMenuOpen}
+        onOpenChange={open => {
+          if (isDraggingActive) {
+            setContextMenuOpen(false);
+            return;
+          }
+          setContextMenuOpen(open);
+        }}
+      >
+        <ContextMenuTrigger disabled={isRenaming || isTemp || isDraggingActive}>
           <Card
             className={cn(
               "cursor-pointer transition-all bg-background hover:bg-accent/50 group border-border shadow-md min-w-30 max-w-60 relative overflow-hidden",
@@ -265,7 +313,16 @@ export function NoteCard({
                     <Plus />
                   </Button>
                 )}
-                <DropdownMenu>
+                <DropdownMenu
+                  open={!isDraggingActive && isDropdownOpen}
+                  onOpenChange={open => {
+                    if (isDraggingActive) {
+                      setDropdownOpen(false);
+                      return;
+                    }
+                    setDropdownOpen(open);
+                  }}
+                >
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"

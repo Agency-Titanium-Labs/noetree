@@ -23,12 +23,7 @@ import { NoteCard } from "./NoteCard";
 import { NewNoteCard } from "./NewNoteCard";
 import { useTranslations } from "next-intl";
 import { useHeaderConfig } from "@/providers/HeaderProvider";
-import {
-  DragDropProvider,
-  PointerSensor,
-  useDragOperation,
-  useDroppable,
-} from "@dnd-kit/react";
+import { DragDropProvider, PointerSensor, useDroppable } from "@dnd-kit/react";
 import { PointerActivationConstraints } from "@dnd-kit/dom";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { cn } from "@/lib/utils";
@@ -260,8 +255,12 @@ export default function NotesTree() {
     title: tree?.title || "",
   });
   const { getCurrentContent } = useEditorContext();
-  const { source, target } = useDragOperation();
-  const isDraggingActive = !!source;
+  const [isDraggingActive, setIsDraggingActive] = useState(false);
+  const [openMenuNoteId, setOpenMenuNoteId] = useState<Id<"notes"> | null>(
+    null,
+  );
+  const [openDropdownNoteId, setOpenDropdownNoteId] =
+    useState<Id<"notes"> | null>(null);
 
   const { ref: rootDroppableRef } = useDroppable({
     id: (tree?._id ?? "root-droppable") as string,
@@ -274,33 +273,23 @@ export default function NotesTree() {
   const [hoveredNoteId, setHoveredNoteId] = useState<Id<"notes"> | null>(null);
 
   useEffect(() => {
-    if (!isDraggingActive || !target) {
-      setHoveredNoteId(null);
-      return;
-    }
-    const targetIdStr = String(target.id);
-    const noteId = (
-      targetIdStr.startsWith("empty-placeholder-")
-        ? targetIdStr.replace("empty-placeholder-", "")
-        : targetIdStr
-    ) as Id<"notes">;
+    if (!isDraggingActive) return;
 
-    const targetNote = noteId && tree ? findNoteInTree(noteId, tree) : null;
+    // Prevent any native browser context menu from opening while dragging (e.g. mobile long-press)
+    const handleContextMenu = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
 
-    if (
-      noteId &&
-      targetNote?.role !== "view" &&
-      !isSelfOrDescendantOfDragged(
-        noteId,
-        source?.id as Id<"notes"> | undefined,
-        tree,
-      )
-    ) {
-      setHoveredNoteId(noteId);
-    } else {
-      setHoveredNoteId(null);
-    }
-  }, [target, isDraggingActive, source?.id, tree]);
+    window.addEventListener("contextmenu", handleContextMenu, {
+      capture: true,
+    });
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu, {
+        capture: true,
+      });
+    };
+  }, [isDraggingActive]);
 
   const [dropIndicator, setDropIndicator] = useState<{
     noteId: Id<"notes">;
@@ -312,6 +301,7 @@ export default function NotesTree() {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const selectedCardRef = useRef<HTMLDivElement | null>(null);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const scrollToSelected = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -392,6 +382,17 @@ export default function NotesTree() {
             handleRef={handleRef as (el: HTMLDivElement | null) => void}
             targetRef={targetRef as (el: HTMLDivElement | null) => void}
             isNestingHovered={isNesting}
+            isDraggingActive={isDraggingActive}
+            isContextMenuOpen={openMenuNoteId === note._id}
+            onContextMenuOpenChange={open => {
+              if (isDraggingActive) return;
+              setOpenMenuNoteId(open ? note._id : null);
+            }}
+            isDropdownOpen={openDropdownNoteId === note._id}
+            onDropdownOpenChange={open => {
+              if (isDraggingActive) return;
+              setOpenDropdownNoteId(open ? note._id : null);
+            }}
           />
 
           {isAfter && (
@@ -486,16 +487,43 @@ export default function NotesTree() {
       >
         <DragDropProvider
           sensors={customSensors}
-          onDragStart={() => {
+          onDragStart={({ operation }) => {
+            dragStartPosRef.current = operation.position.current
+              ? {
+                  x: operation.position.current.x,
+                  y: operation.position.current.y,
+                }
+              : null;
             setTimeout(() => {
               setDropIndicator(null);
             }, 0);
           }}
           onDragMove={({ operation }) => {
+            const initialPos = dragStartPosRef.current;
+            const currentPos = operation.position.current;
+            let movedFarEnough = false;
+
+            if (initialPos && currentPos) {
+              const dx = currentPos.x - initialPos.x;
+              const dy = currentPos.y - initialPos.y;
+              if (dx * dx + dy * dy > 64) {
+                movedFarEnough = true;
+              }
+            } else {
+              movedFarEnough = true;
+            }
+
+            if (movedFarEnough) {
+              setIsDraggingActive(true);
+              if (openMenuNoteId) setOpenMenuNoteId(null);
+              if (openDropdownNoteId) setOpenDropdownNoteId(null);
+            }
+
             setTimeout(() => {
               const { source, target } = operation;
               if (!source || !target) {
                 setDropIndicator(null);
+                setHoveredNoteId(null);
                 return;
               }
 
@@ -513,7 +541,22 @@ export default function NotesTree() {
                 isSelfOrDescendantOfDragged(targetNoteId, draggedId, tree)
               ) {
                 setDropIndicator(null);
+                setHoveredNoteId(null);
                 return;
+              }
+
+              // Update hoveredNoteId for visual nesting feedback
+              if (targetNoteId) {
+                const targetNote = tree
+                  ? findNoteInTree(targetNoteId, tree)
+                  : null;
+                if (targetNote && targetNote.role !== "view") {
+                  setHoveredNoteId(targetNoteId);
+                } else {
+                  setHoveredNoteId(null);
+                }
+              } else {
+                setHoveredNoteId(null);
               }
 
               if (targetIdStr.startsWith("empty-placeholder-")) {
@@ -599,6 +642,13 @@ export default function NotesTree() {
             }, 0);
           }}
           onDragEnd={({ operation }) => {
+            dragStartPosRef.current = null;
+            if (isDraggingActive) {
+              setOpenMenuNoteId(null);
+              setOpenDropdownNoteId(null);
+            }
+            setIsDraggingActive(false);
+            setHoveredNoteId(null);
             setTimeout(() => {
               setDropIndicator(null);
               const { source, target } = operation;
