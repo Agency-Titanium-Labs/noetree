@@ -192,3 +192,211 @@ describe("notes.createNote — Free-tier 20-note limit (NOTE_LIMIT_REACHED)", ()
     );
   });
 });
+
+describe("notes.moveNote & Tree Hierarchy Integrity Safeguards", () => {
+  async function seedTree(
+    t: ReturnType<typeof convexTest>,
+    tokenIdentifier: string,
+  ) {
+    return await t.run(async ctx => {
+      const roleId = await ctx.db.insert("roles", { role: "user" });
+      const userId = await ctx.db.insert("users", {
+        tokenIdentifier,
+        role: roleId,
+      });
+
+      const rootId = await ctx.db.insert("notes", {
+        owner: userId,
+        title: "Root",
+        content: "{}",
+      });
+
+      const childAId = await ctx.db.insert("notes", {
+        owner: userId,
+        title: "Child A",
+        content: "{}",
+        parentNote: rootId,
+      });
+
+      const grandchildAId = await ctx.db.insert("notes", {
+        owner: userId,
+        title: "Grandchild A1",
+        content: "{}",
+        parentNote: childAId,
+      });
+
+      const childBId = await ctx.db.insert("notes", {
+        owner: userId,
+        title: "Child B",
+        content: "{}",
+        parentNote: rootId,
+      });
+
+      await ctx.db.patch(rootId, { childNotes: [childAId, childBId] });
+      await ctx.db.patch(childAId, { childNotes: [grandchildAId] });
+
+      return { userId, rootId, childAId, grandchildAId, childBId };
+    });
+  }
+
+  test("CRITICAL: moveNote rejects moving a note into itself", async () => {
+    const t = convexTest(schema, modules);
+    const { childAId, rootId } = await seedTree(
+      t,
+      "https://clerk.dev|user_move",
+    );
+
+    const identity = t.withIdentity({
+      tokenIdentifier: "https://clerk.dev|user_move",
+      subject: "user_move",
+    });
+
+    await expect(
+      identity.mutation(api.notes.moveNote, {
+        id: childAId,
+        from: rootId,
+        to: childAId,
+      }),
+    ).rejects.toThrow(/Cannot move a note into itself/);
+  });
+
+  test("CRITICAL: moveNote rejects moving a note into its own descendant", async () => {
+    const t = convexTest(schema, modules);
+    const { childAId, grandchildAId, rootId } = await seedTree(
+      t,
+      "https://clerk.dev|user_move_desc",
+    );
+
+    const identity = t.withIdentity({
+      tokenIdentifier: "https://clerk.dev|user_move_desc",
+      subject: "user_move_desc",
+    });
+
+    await expect(
+      identity.mutation(api.notes.moveNote, {
+        id: childAId,
+        from: rootId,
+        to: grandchildAId,
+      }),
+    ).rejects.toThrow(/Cannot move a note into its own descendant/);
+  });
+
+  test("CRITICAL: moveNote rejects moving a root note", async () => {
+    const t = convexTest(schema, modules);
+    const { rootId, childBId } = await seedTree(
+      t,
+      "https://clerk.dev|user_move_root",
+    );
+
+    const identity = t.withIdentity({
+      tokenIdentifier: "https://clerk.dev|user_move_root",
+      subject: "user_move_root",
+    });
+
+    await expect(
+      identity.mutation(api.notes.moveNote, {
+        id: rootId,
+        from: rootId,
+        to: childBId,
+      }),
+    ).rejects.toThrow(/Root note cannot be moved/);
+  });
+
+  test("Valid move moves note properly without loss", async () => {
+    const t = convexTest(schema, modules);
+    const { childAId, grandchildAId, childBId } = await seedTree(
+      t,
+      "https://clerk.dev|user_valid_move",
+    );
+
+    const identity = t.withIdentity({
+      tokenIdentifier: "https://clerk.dev|user_valid_move",
+      subject: "user_valid_move",
+    });
+
+    await identity.mutation(api.notes.moveNote, {
+      id: grandchildAId,
+      from: childAId,
+      to: childBId,
+    });
+
+    await t.run(async ctx => {
+      const movedNote = await ctx.db.get(grandchildAId);
+      const fromParent = await ctx.db.get(childAId);
+      const toParent = await ctx.db.get(childBId);
+
+      expect(movedNote?.parentNote).toBe(childBId);
+      expect(fromParent?.childNotes).not.toContain(grandchildAId);
+      expect(toParent?.childNotes).toContain(grandchildAId);
+    });
+  });
+
+  test("repairNoteHierarchy automatically breaks cycles and restores orphaned notes", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedTree(t, "https://clerk.dev|user_repair");
+
+    // Manually create a self-loop note like the bug caused
+    const corruptedId = await t.run(async ctx => {
+      const corruptNote = await ctx.db.insert("notes", {
+        owner: userId,
+        title: "Disappeared note",
+        content: "{}",
+      });
+      await ctx.db.patch(corruptNote, {
+        parentNote: corruptNote,
+        childNotes: [corruptNote],
+      });
+      return corruptNote;
+    });
+
+    // Run repair
+    const repairResult = await t.mutation(api.notes.repairNoteHierarchy, {});
+    expect(repairResult.repairedCount).toBeGreaterThanOrEqual(1);
+
+    // Verify corrupt note is healed to a root note
+    await t.run(async ctx => {
+      const healedNote = await ctx.db.get(corruptedId);
+      expect(healedNote?.parentNote).toBeUndefined();
+      expect(healedNote?.childNotes).not.toContain(corruptedId);
+    });
+  });
+
+  test("Cycle in DB does not cause infinite recursion in getNoteShares", async () => {
+    const t = convexTest(schema, modules);
+    await seedTree(t, "https://clerk.dev|user_cycle_shares");
+
+    // Create cyclic notes A -> B -> A owned by another user
+    const cyclicNoteA = await t.run(async ctx => {
+      const otherRoleId = await ctx.db.insert("roles", { role: "user" });
+      const otherUser = await ctx.db.insert("users", {
+        tokenIdentifier: "https://clerk.dev|other_user",
+        role: otherRoleId,
+      });
+
+      const noteA = await ctx.db.insert("notes", {
+        owner: otherUser,
+        title: "A",
+        content: "{}",
+      });
+      const noteB = await ctx.db.insert("notes", {
+        owner: otherUser,
+        title: "B",
+        content: "{}",
+        parentNote: noteA,
+      });
+      await ctx.db.patch(noteA, { parentNote: noteB });
+      return noteA;
+    });
+
+    // Call getNoteShares as current user on cyclic note
+    const identity = t.withIdentity({
+      tokenIdentifier: "https://clerk.dev|user_cycle_shares",
+      subject: "user_cycle_shares",
+    });
+
+    // It should reject with Unauthorized without infinite recursion/stack overflow!
+    await expect(
+      identity.query(api.notes.getNoteShares, { noteId: cyclicNoteA }),
+    ).rejects.toThrow(/Unauthorized/);
+  });
+});

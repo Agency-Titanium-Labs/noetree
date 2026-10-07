@@ -23,12 +23,7 @@ import { NoteCard } from "./NoteCard";
 import { NewNoteCard } from "./NewNoteCard";
 import { useTranslations } from "next-intl";
 import { useHeaderConfig } from "@/providers/HeaderProvider";
-import {
-  DragDropProvider,
-  PointerSensor,
-  useDragOperation,
-  useDroppable,
-} from "@dnd-kit/react";
+import { DragDropProvider, PointerSensor, useDroppable } from "@dnd-kit/react";
 import { PointerActivationConstraints } from "@dnd-kit/dom";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { cn } from "@/lib/utils";
@@ -143,26 +138,14 @@ const customCollisionDetection = ({
   const distance = Math.sqrt(dx * dx + dy * dy) || 1;
 
   const targetIdStr = String(droppable.id);
-  const isCard =
-    !targetIdStr.startsWith("empty-placeholder-") &&
-    targetIdStr !== "root-droppable";
+  const sourceId = (
+    dragOperation as unknown as { source?: { id?: string | number } }
+  )?.source?.id;
+  if (sourceId && targetIdStr === String(sourceId)) {
+    return null;
+  }
 
   if (isInside) {
-    if (isCard && droppable.data?.hasChildren === false) {
-      const rect = droppable.shape.boundingRectangle;
-      const relativeX = (pointerCoordinates.x - rect.left) / rect.width;
-
-      // If cursor is in the middle 70% of the card, treat it as hovering the child placeholder
-      if (relativeX >= 0.15 && relativeX <= 0.85) {
-        return {
-          id: `empty-placeholder-${droppable.id}`,
-          value: 10000 / distance, // prioritize items the cursor is directly over
-          type: 2, // PointerIntersection
-          priority: 3, // High
-        };
-      }
-    }
-
     return {
       id: droppable.id,
       value: 10000 / distance, // prioritize items the cursor is directly over
@@ -246,8 +229,12 @@ export default function NotesTree() {
     title: tree?.title || "",
   });
   const { getCurrentContent } = useEditorContext();
-  const { source, target } = useDragOperation();
-  const isDraggingActive = !!source;
+  const [isDraggingActive, setIsDraggingActive] = useState(false);
+  const [openMenuNoteId, setOpenMenuNoteId] = useState<Id<"notes"> | null>(
+    null,
+  );
+  const [openDropdownNoteId, setOpenDropdownNoteId] =
+    useState<Id<"notes"> | null>(null);
 
   const { ref: rootDroppableRef } = useDroppable({
     id: (tree?._id ?? "root-droppable") as string,
@@ -257,36 +244,24 @@ export default function NotesTree() {
     collisionDetector: customCollisionDetection as unknown as undefined,
   });
 
-  const [hoveredNoteId, setHoveredNoteId] = useState<Id<"notes"> | null>(null);
-
   useEffect(() => {
-    if (!isDraggingActive || !target) {
-      setHoveredNoteId(null);
-      return;
-    }
-    const targetIdStr = String(target.id);
-    const noteId = (
-      targetIdStr.startsWith("empty-placeholder-")
-        ? targetIdStr.replace("empty-placeholder-", "")
-        : targetIdStr
-    ) as Id<"notes">;
+    if (!isDraggingActive) return;
 
-    const targetNote = noteId && tree ? findNoteInTree(noteId, tree) : null;
+    // Prevent any native browser context menu from opening while dragging (e.g. mobile long-press)
+    const handleContextMenu = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
 
-    if (
-      noteId &&
-      targetNote?.role !== "view" &&
-      !isSelfOrDescendantOfDragged(
-        noteId,
-        source?.id as Id<"notes"> | undefined,
-        tree,
-      )
-    ) {
-      setHoveredNoteId(noteId);
-    } else {
-      setHoveredNoteId(null);
-    }
-  }, [target, isDraggingActive, source?.id, tree]);
+    window.addEventListener("contextmenu", handleContextMenu, {
+      capture: true,
+    });
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu, {
+        capture: true,
+      });
+    };
+  }, [isDraggingActive]);
 
   const [dropIndicator, setDropIndicator] = useState<{
     noteId: Id<"notes">;
@@ -298,6 +273,7 @@ export default function NotesTree() {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const selectedCardRef = useRef<HTMLDivElement | null>(null);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const scrollToSelected = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -347,10 +323,7 @@ export default function NotesTree() {
   ) => {
     const hasChildren = note.childNotes && note.childNotes.length > 0;
     const isEditing = editingNoteId === note._id;
-    const isDraggedOverEligible =
-      isDraggingActive && hoveredNoteId === note._id;
-    const showChildrenSection =
-      hasChildren || isEditing || isDraggedOverEligible;
+    const showChildrenSection = hasChildren || isEditing;
 
     const isIndicatorActive = dropIndicator?.noteId === note._id;
     const isBefore = isIndicatorActive && dropIndicator?.position === "before";
@@ -378,6 +351,17 @@ export default function NotesTree() {
             handleRef={handleRef as (el: HTMLDivElement | null) => void}
             targetRef={targetRef as (el: HTMLDivElement | null) => void}
             isNestingHovered={isNesting}
+            isDraggingActive={isDraggingActive}
+            isContextMenuOpen={openMenuNoteId === note._id}
+            onContextMenuOpenChange={open => {
+              if (isDraggingActive) return;
+              setOpenMenuNoteId(open ? note._id : null);
+            }}
+            isDropdownOpen={openDropdownNoteId === note._id}
+            onDropdownOpenChange={open => {
+              if (isDraggingActive) return;
+              setOpenDropdownNoteId(open ? note._id : null);
+            }}
           />
 
           {isAfter && (
@@ -420,30 +404,6 @@ export default function NotesTree() {
             );
           })}
 
-          {/* Empty child drop target: always rendered in JSX if no children, collapsed if not active/eligible */}
-          {!hasChildren && !isEditing && (
-            <TreeSortableBranch
-              key={`empty-placeholder-${note._id}`}
-              id={`empty-placeholder-${note._id}` as Id<"notes">}
-              index={0}
-              parentId={note._id}
-              className={cn(
-                !isDraggedOverEligible && "hidden pointer-events-none",
-              )}
-            >
-              {(_, sortableTargetRef) => (
-                <div
-                  ref={sortableTargetRef as (el: HTMLDivElement | null) => void}
-                  className="w-45 h-20 border-2 border-dashed border-primary/30 rounded-lg flex items-center justify-center bg-primary/5 hover:bg-primary/10 hover:border-primary/50 opacity-70"
-                >
-                  <span className="text-xs text-muted-foreground font-medium">
-                    {t("dropHere")}
-                  </span>
-                </div>
-              )}
-            </TreeSortableBranch>
-          )}
-
           {editingNoteId === note._id && (
             <div className="tree-child relative flex flex-col items-center">
               <NewNoteCard
@@ -472,12 +432,38 @@ export default function NotesTree() {
       >
         <DragDropProvider
           sensors={customSensors}
-          onDragStart={() => {
+          onDragStart={({ operation }) => {
+            dragStartPosRef.current = operation.position.current
+              ? {
+                  x: operation.position.current.x,
+                  y: operation.position.current.y,
+                }
+              : null;
             setTimeout(() => {
               setDropIndicator(null);
             }, 0);
           }}
           onDragMove={({ operation }) => {
+            const initialPos = dragStartPosRef.current;
+            const currentPos = operation.position.current;
+            let movedFarEnough = false;
+
+            if (initialPos && currentPos) {
+              const dx = currentPos.x - initialPos.x;
+              const dy = currentPos.y - initialPos.y;
+              if (dx * dx + dy * dy > 64) {
+                movedFarEnough = true;
+              }
+            } else {
+              movedFarEnough = true;
+            }
+
+            if (movedFarEnough) {
+              setIsDraggingActive(true);
+              if (openMenuNoteId) setOpenMenuNoteId(null);
+              if (openDropdownNoteId) setOpenDropdownNoteId(null);
+            }
+
             setTimeout(() => {
               const { source, target } = operation;
               if (!source || !target) {
@@ -485,73 +471,95 @@ export default function NotesTree() {
                 return;
               }
 
+              const draggedId = source.id as Id<"notes">;
               const targetIdStr = String(target.id);
-              if (targetIdStr.startsWith("empty-placeholder-")) {
-                const noteId = targetIdStr.replace(
-                  "empty-placeholder-",
-                  "",
-                ) as Id<"notes">;
-                const targetNote = tree ? findNoteInTree(noteId, tree) : null;
-                if (targetNote && targetNote.role !== "view") {
-                  setDropIndicator({ noteId, position: "child" });
+
+              if (targetIdStr === "root-droppable") {
+                if (tree && tree.role !== "view" && draggedId !== tree._id) {
+                  setDropIndicator({
+                    noteId: tree._id as Id<"notes">,
+                    position: "child",
+                  });
                 } else {
                   setDropIndicator(null);
                 }
-              } else {
-                const targetId = target.id as Id<"notes">;
-                if (targetIdStr === "root-droppable") {
-                  if (tree && tree.role !== "view") {
+                return;
+              }
+
+              const targetId = target.id as Id<"notes">;
+
+              // Zero-loss guard: Never indicate or allow dropping onto self or descendant
+              if (
+                targetId === draggedId ||
+                isSelfOrDescendantOfDragged(targetId, draggedId, tree)
+              ) {
+                setDropIndicator(null);
+                return;
+              }
+
+              if (target.element && operation.position.current) {
+                const rect = target.element.getBoundingClientRect();
+                const relativeX =
+                  (operation.position.current.x - rect.left) / rect.width;
+                const relativeY =
+                  (operation.position.current.y - rect.top) / rect.height;
+
+                const targetNote = tree ? findNoteInTree(targetId, tree) : null;
+                const parentId = target.data.parentId as
+                  | Id<"notes">
+                  | undefined;
+                const parentNote =
+                  parentId && tree ? findNoteInTree(parentId, tree) : null;
+
+                if (relativeY <= 1.0 && relativeX < 0.15) {
+                  if (
+                    parentId &&
+                    parentNote &&
+                    parentNote.role !== "view" &&
+                    parentId !== draggedId &&
+                    !isSelfOrDescendantOfDragged(parentId, draggedId, tree)
+                  ) {
                     setDropIndicator({
-                      noteId: tree._id as Id<"notes">,
-                      position: "child",
+                      noteId: targetId,
+                      position: "before",
                     });
                   } else {
                     setDropIndicator(null);
                   }
-                  return;
-                }
-
-                if (target.element && operation.position.current) {
-                  const rect = target.element.getBoundingClientRect();
-                  const relativeX =
-                    (operation.position.current.x - rect.left) / rect.width;
-
-                  const targetNote = tree
-                    ? findNoteInTree(targetId, tree)
-                    : null;
-                  const parentId = target.data.parentId as
-                    | Id<"notes">
-                    | undefined;
-                  const parentNote =
-                    parentId && tree ? findNoteInTree(parentId, tree) : null;
-
-                  if (relativeX < 0.15) {
-                    if (parentNote && parentNote.role !== "view") {
-                      setDropIndicator({
-                        noteId: targetId,
-                        position: "before",
-                      });
-                    } else {
-                      setDropIndicator(null);
-                    }
-                  } else if (relativeX > 0.85) {
-                    if (parentNote && parentNote.role !== "view") {
-                      setDropIndicator({ noteId: targetId, position: "after" });
-                    } else {
-                      setDropIndicator(null);
-                    }
+                } else if (relativeY <= 1.0 && relativeX > 0.85) {
+                  if (
+                    parentId &&
+                    parentNote &&
+                    parentNote.role !== "view" &&
+                    parentId !== draggedId &&
+                    !isSelfOrDescendantOfDragged(parentId, draggedId, tree)
+                  ) {
+                    setDropIndicator({ noteId: targetId, position: "after" });
                   } else {
-                    if (targetNote && targetNote.role !== "view") {
-                      setDropIndicator({ noteId: targetId, position: "child" });
-                    } else {
-                      setDropIndicator(null);
-                    }
+                    setDropIndicator(null);
+                  }
+                } else {
+                  if (
+                    targetNote &&
+                    targetNote.role !== "view" &&
+                    targetId !== draggedId &&
+                    !isSelfOrDescendantOfDragged(targetId, draggedId, tree)
+                  ) {
+                    setDropIndicator({ noteId: targetId, position: "child" });
+                  } else {
+                    setDropIndicator(null);
                   }
                 }
               }
             }, 0);
           }}
           onDragEnd={({ operation }) => {
+            dragStartPosRef.current = null;
+            if (isDraggingActive) {
+              setOpenMenuNoteId(null);
+              setOpenDropdownNoteId(null);
+            }
+            setIsDraggingActive(false);
             setTimeout(() => {
               setDropIndicator(null);
               const { source, target } = operation;
@@ -560,72 +568,111 @@ export default function NotesTree() {
               const draggedId = source.id as Id<"notes">;
               const oldParentId = source.data.parentId as Id<"notes">;
 
-              if (String(target.id).startsWith("empty-placeholder-")) {
-                const newParentId = String(target.id).replace(
-                  "empty-placeholder-",
-                  "",
-                ) as Id<"notes">;
-                const parentNote = tree
-                  ? findNoteInTree(newParentId, tree)
-                  : null;
-                if (!parentNote || parentNote.role === "view") return;
+              // Absolute root & identity protections:
+              // Cannot drag root note, cannot drag without an old parent
+              if (!draggedId || draggedId === tree._id || !oldParentId) return;
 
-                if (oldParentId !== newParentId) {
-                  onMoveNote(draggedId, oldParentId, newParentId, 0);
+              if (String(target.id) === "root-droppable") {
+                if (tree && tree.role !== "view" && draggedId !== tree._id) {
+                  const newIndex = tree.childNotes?.length ?? 0;
+                  if (oldParentId !== tree._id) {
+                    onMoveNote(draggedId, oldParentId, tree._id, newIndex);
+                  }
                 }
               } else {
                 // Dropped on a card (sibling sortable or other note card)
                 const targetId = target.id as Id<"notes">;
-                const newParentId = target.data.parentId as
-                  | Id<"notes">
-                  | undefined;
+                const targetNote = tree ? findNoteInTree(targetId, tree) : null;
+                if (!targetNote || targetNote.role === "view") return;
 
-                if (!newParentId) return;
-
-                // Find target index in the parent's children list
-                const parentNote = findNoteInTree(newParentId, tree);
-                if (
-                  !parentNote ||
-                  !parentNote.childNotes ||
-                  parentNote.role === "view"
-                )
-                  return;
-
-                const childIds = parentNote.childNotes.map(c => c._id);
-                const targetIndex = childIds.indexOf(targetId);
-                if (targetIndex === -1) return;
-
-                // Calculate relative pointer position to decide whether to insert before or after target
-                let insertAfter = false;
+                // Calculate whether the drop intent is before, after, or child
+                let position: "before" | "after" | "child" = "child";
                 if (operation.position.current && target.element) {
                   const rect = target.element.getBoundingClientRect();
                   const relativeX =
                     (operation.position.current.x - rect.left) / rect.width;
-                  if (relativeX > 0.5) {
-                    insertAfter = true;
+                  const relativeY =
+                    (operation.position.current.y - rect.top) / rect.height;
+
+                  if (relativeY <= 1.0) {
+                    if (relativeX < 0.15) {
+                      position = "before";
+                    } else if (relativeX > 0.85) {
+                      position = "after";
+                    } else {
+                      position = "child";
+                    }
+                  } else {
+                    // Pointer is underneath the card: drop as child!
+                    position = "child";
                   }
                 }
 
-                const newIndex = insertAfter ? targetIndex + 1 : targetIndex;
+                if (position === "child") {
+                  // DROP AS CHILD OF TARGET NOTE
+                  const newParentId = targetId;
 
-                if (oldParentId !== newParentId) {
-                  onMoveNote(draggedId, oldParentId, newParentId, newIndex);
-                } else {
-                  // Sibling sorting under same parent
-                  const initialIndex = childIds.indexOf(draggedId);
-                  if (initialIndex === -1 || initialIndex === newIndex) return;
+                  // STRICT INTEGRITY GUARDS:
+                  if (draggedId === newParentId) return;
+                  if (isSelfOrDescendantOfDragged(newParentId, draggedId, tree))
+                    return;
 
-                  const updatedIds = [...childIds];
-                  const [movedId] = updatedIds.splice(initialIndex, 1);
-
-                  // Adjust index if we spliced before the insert target
-                  let adjustedNewIndex = newIndex;
-                  if (initialIndex < newIndex) {
-                    adjustedNewIndex = newIndex - 1;
+                  const newIndex = targetNote.childNotes?.length ?? 0;
+                  if (oldParentId !== newParentId) {
+                    onMoveNote(draggedId, oldParentId, newParentId, newIndex);
                   }
+                } else {
+                  // DROP AS SIBLING OF TARGET NOTE (before or after)
+                  const newParentId = target.data.parentId as
+                    | Id<"notes">
+                    | undefined;
 
-                  updatedIds.splice(adjustedNewIndex, 0, movedId);
-                  onUpdateChildNotesOrder(newParentId, updatedIds);
+                  if (!newParentId) return;
+
+                  // STRICT INTEGRITY GUARDS:
+                  if (draggedId === newParentId) return;
+                  if (draggedId === targetId) return;
+                  if (isSelfOrDescendantOfDragged(newParentId, draggedId, tree))
+                    return;
+                  if (isSelfOrDescendantOfDragged(targetId, draggedId, tree))
+                    return;
+
+                  // Find target index in the parent's children list
+                  const parentNote = findNoteInTree(newParentId, tree);
+                  if (
+                    !parentNote ||
+                    !parentNote.childNotes ||
+                    parentNote.role === "view"
+                  )
+                    return;
+
+                  const childIds = parentNote.childNotes.map(c => c._id);
+                  const targetIndex = childIds.indexOf(targetId);
+                  if (targetIndex === -1) return;
+
+                  const newIndex =
+                    position === "after" ? targetIndex + 1 : targetIndex;
+
+                  if (oldParentId !== newParentId) {
+                    onMoveNote(draggedId, oldParentId, newParentId, newIndex);
+                  } else {
+                    // Sibling sorting under same parent
+                    const initialIndex = childIds.indexOf(draggedId);
+                    if (initialIndex === -1 || initialIndex === newIndex)
+                      return;
+
+                    const updatedIds = [...childIds];
+                    const [movedId] = updatedIds.splice(initialIndex, 1);
+
+                    // Adjust index if we spliced before the insert target
+                    let adjustedNewIndex = newIndex;
+                    if (initialIndex < newIndex) {
+                      adjustedNewIndex = newIndex - 1;
+                    }
+
+                    updatedIds.splice(adjustedNewIndex, 0, movedId);
+                    onUpdateChildNotesOrder(newParentId, updatedIds);
+                  }
                 }
               }
             }, 0);

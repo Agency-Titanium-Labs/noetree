@@ -59,7 +59,39 @@ export const addChildNoteToTree = (
 };
 
 /**
+ * Finds a note in the tree by ID.
+ */
+export const findNoteInTree = (
+  root: NoteTree,
+  noteId: Id<"notes">,
+): NoteTree | null => {
+  if (root._id === noteId) return root;
+  if (!root.childNotes?.length) return null;
+  for (const child of root.childNotes) {
+    const found = findNoteInTree(child, noteId);
+    if (found) return found;
+  }
+  return null;
+};
+
+/**
+ * Helper to check if a node or any of its descendants has the target ID.
+ */
+export const isNodeInSubtree = (
+  node: NoteTree,
+  targetId: Id<"notes">,
+): boolean => {
+  if (node._id === targetId) return true;
+  if (!node.childNotes?.length) return false;
+  for (const child of node.childNotes) {
+    if (isNodeInSubtree(child, targetId)) return true;
+  }
+  return false;
+};
+
+/**
  * Moves a node from one parent to another at a specific index within a NoteTree.
+ * Guarantees zero note loss: if moving is invalid or fails, the original tree is returned intact.
  */
 export const moveNoteInTree = (
   root: NoteTree,
@@ -68,6 +100,20 @@ export const moveNoteInTree = (
   toId: Id<"notes">,
   index?: number,
 ): NoteTree => {
+  // Safeguard 1: Cannot move into itself
+  if (noteId === toId) return root;
+
+  // Safeguard 2: Root note cannot be moved
+  if (root._id === noteId) return root;
+
+  // Safeguard 3: Both moving node and target parent must exist in tree
+  const movingNode = findNoteInTree(root, noteId);
+  const targetParent = findNoteInTree(root, toId);
+  if (!movingNode || !targetParent) return root;
+
+  // Safeguard 4: Target parent cannot be a descendant of the moving note
+  if (isNodeInSubtree(movingNode, toId)) return root;
+
   const clone = JSON.parse(JSON.stringify(root)) as NoteTree;
 
   let movedNode: NoteTree | null = null;
@@ -90,7 +136,7 @@ export const moveNoteInTree = (
       if (!node.childNotes) node.childNotes = [];
       if (movedNode) {
         movedNode.parentNote = toId;
-        if (index !== undefined) {
+        if (index !== undefined && index >= 0) {
           node.childNotes.splice(index, 0, movedNode);
         } else {
           node.childNotes.push(movedNode);
@@ -106,14 +152,19 @@ export const moveNoteInTree = (
     return false;
   };
 
-  if (clone._id === noteId) {
-    movedNode = { ...clone };
-  } else {
-    removeNode(clone);
+  const removed = removeNode(clone);
+  if (!removed || !movedNode) {
+    return root;
   }
 
-  if (movedNode) {
-    insertNode(clone);
+  const inserted = insertNode(clone);
+  if (!inserted) {
+    // CRITICAL INTEGRITY SAFEGUARD:
+    // If insertion failed for any reason, NEVER return a damaged tree with a missing note!
+    console.error(
+      "[treeUtils] Failed to insert moved node into target; rolling back to prevent note loss",
+    );
+    return root;
   }
 
   return clone;
@@ -135,7 +186,11 @@ export const updateChildOrderInTree = (
         const mapped = orderedChildIds
           .map(id => node.childNotes!.find(c => c._id === id))
           .filter((c): c is NoteTree => !!c);
-        node.childNotes = mapped;
+        // SAFETY: Never lose children that were omitted in orderedChildIds
+        const remaining = node.childNotes.filter(
+          c => !orderedChildIds.includes(c._id),
+        );
+        node.childNotes = [...mapped, ...remaining];
       }
       return true;
     }
