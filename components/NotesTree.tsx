@@ -543,6 +543,8 @@ export default function NotesTree() {
                   const rect = target.element.getBoundingClientRect();
                   const relativeX =
                     (operation.position.current.x - rect.left) / rect.width;
+                  const relativeY =
+                    (operation.position.current.y - rect.top) / rect.height;
 
                   const targetNote = tree
                     ? findNoteInTree(targetId, tree)
@@ -553,7 +555,7 @@ export default function NotesTree() {
                   const parentNote =
                     parentId && tree ? findNoteInTree(parentId, tree) : null;
 
-                  if (relativeX < 0.15) {
+                  if (relativeY <= 1.0 && relativeX < 0.15) {
                     if (
                       parentId &&
                       parentNote &&
@@ -568,7 +570,7 @@ export default function NotesTree() {
                     } else {
                       setDropIndicator(null);
                     }
-                  } else if (relativeX > 0.85) {
+                  } else if (relativeY <= 1.0 && relativeX > 0.85) {
                     if (
                       parentId &&
                       parentNote &&
@@ -629,67 +631,107 @@ export default function NotesTree() {
                 if (oldParentId !== newParentId) {
                   onMoveNote(draggedId, oldParentId, newParentId, 0);
                 }
+              } else if (String(target.id) === "root-droppable") {
+                if (tree && tree.role !== "view" && draggedId !== tree._id) {
+                  const newIndex = tree.childNotes?.length ?? 0;
+                  if (oldParentId !== tree._id) {
+                    onMoveNote(draggedId, oldParentId, tree._id, newIndex);
+                  }
+                }
               } else {
                 // Dropped on a card (sibling sortable or other note card)
                 const targetId = target.id as Id<"notes">;
-                const newParentId = target.data.parentId as
-                  | Id<"notes">
-                  | undefined;
+                const targetNote = tree ? findNoteInTree(targetId, tree) : null;
+                if (!targetNote || targetNote.role === "view") return;
 
-                if (!newParentId) return;
-
-                // STRICT INTEGRITY GUARDS:
-                if (draggedId === newParentId) return;
-                if (draggedId === targetId) return;
-                if (isSelfOrDescendantOfDragged(newParentId, draggedId, tree))
-                  return;
-                if (isSelfOrDescendantOfDragged(targetId, draggedId, tree))
-                  return;
-
-                // Find target index in the parent's children list
-                const parentNote = findNoteInTree(newParentId, tree);
-                if (
-                  !parentNote ||
-                  !parentNote.childNotes ||
-                  parentNote.role === "view"
-                )
-                  return;
-
-                const childIds = parentNote.childNotes.map(c => c._id);
-                const targetIndex = childIds.indexOf(targetId);
-                if (targetIndex === -1) return;
-
-                // Calculate relative pointer position to decide whether to insert before or after target
-                let insertAfter = false;
+                // Calculate whether the drop intent is before, after, or child
+                let position: "before" | "after" | "child" = "child";
                 if (operation.position.current && target.element) {
                   const rect = target.element.getBoundingClientRect();
                   const relativeX =
                     (operation.position.current.x - rect.left) / rect.width;
-                  if (relativeX > 0.5) {
-                    insertAfter = true;
+                  const relativeY =
+                    (operation.position.current.y - rect.top) / rect.height;
+
+                  if (relativeY <= 1.0) {
+                    if (relativeX < 0.15) {
+                      position = "before";
+                    } else if (relativeX > 0.85) {
+                      position = "after";
+                    } else {
+                      position = "child";
+                    }
+                  } else {
+                    // Pointer is underneath the card: drop as child!
+                    position = "child";
                   }
                 }
 
-                const newIndex = insertAfter ? targetIndex + 1 : targetIndex;
+                if (position === "child") {
+                  // DROP AS CHILD OF TARGET NOTE
+                  const newParentId = targetId;
 
-                if (oldParentId !== newParentId) {
-                  onMoveNote(draggedId, oldParentId, newParentId, newIndex);
-                } else {
-                  // Sibling sorting under same parent
-                  const initialIndex = childIds.indexOf(draggedId);
-                  if (initialIndex === -1 || initialIndex === newIndex) return;
+                  // STRICT INTEGRITY GUARDS:
+                  if (draggedId === newParentId) return;
+                  if (isSelfOrDescendantOfDragged(newParentId, draggedId, tree))
+                    return;
 
-                  const updatedIds = [...childIds];
-                  const [movedId] = updatedIds.splice(initialIndex, 1);
-
-                  // Adjust index if we spliced before the insert target
-                  let adjustedNewIndex = newIndex;
-                  if (initialIndex < newIndex) {
-                    adjustedNewIndex = newIndex - 1;
+                  const newIndex = targetNote.childNotes?.length ?? 0;
+                  if (oldParentId !== newParentId) {
+                    onMoveNote(draggedId, oldParentId, newParentId, newIndex);
                   }
+                } else {
+                  // DROP AS SIBLING OF TARGET NOTE (before or after)
+                  const newParentId = target.data.parentId as
+                    | Id<"notes">
+                    | undefined;
 
-                  updatedIds.splice(adjustedNewIndex, 0, movedId);
-                  onUpdateChildNotesOrder(newParentId, updatedIds);
+                  if (!newParentId) return;
+
+                  // STRICT INTEGRITY GUARDS:
+                  if (draggedId === newParentId) return;
+                  if (draggedId === targetId) return;
+                  if (isSelfOrDescendantOfDragged(newParentId, draggedId, tree))
+                    return;
+                  if (isSelfOrDescendantOfDragged(targetId, draggedId, tree))
+                    return;
+
+                  // Find target index in the parent's children list
+                  const parentNote = findNoteInTree(newParentId, tree);
+                  if (
+                    !parentNote ||
+                    !parentNote.childNotes ||
+                    parentNote.role === "view"
+                  )
+                    return;
+
+                  const childIds = parentNote.childNotes.map(c => c._id);
+                  const targetIndex = childIds.indexOf(targetId);
+                  if (targetIndex === -1) return;
+
+                  const newIndex =
+                    position === "after" ? targetIndex + 1 : targetIndex;
+
+                  if (oldParentId !== newParentId) {
+                    onMoveNote(draggedId, oldParentId, newParentId, newIndex);
+                  } else {
+                    // Sibling sorting under same parent
+                    const initialIndex = childIds.indexOf(draggedId);
+                    if (initialIndex === -1 || initialIndex === newIndex)
+                      return;
+
+                    const updatedIds = [...childIds];
+                    const [movedId] = updatedIds.splice(initialIndex, 1);
+
+                    // Adjust index if we spliced before the insert target
+                    let adjustedNewIndex = newIndex;
+                    if (initialIndex < newIndex) {
+                      adjustedNewIndex = newIndex - 1;
+                    }
+
+                    updatedIds.splice(adjustedNewIndex, 0, movedId);
+                    onUpdateChildNotesOrder(newParentId, updatedIds);
+                  }
                 }
               }
             }, 0);
