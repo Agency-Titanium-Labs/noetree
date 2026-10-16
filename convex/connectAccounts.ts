@@ -8,6 +8,21 @@ import {
 import { internal } from "./_generated/api";
 import { v, ConvexError } from "convex/values";
 
+// Constant-time shared-secret comparison (WR-04). Node's crypto.timingSafeEqual
+// is unavailable in the default Convex runtime, so this folds every character
+// (and the length difference) into a single accumulator with no early exit.
+// A missing/empty server-side secret never authenticates anyone.
+function isValidInternalSecret(provided: string): boolean {
+  const expected = process.env.INTERNAL_WEBHOOK_SECRET;
+  if (!expected) return false;
+  const len = Math.max(provided.length, expected.length);
+  let diff = provided.length ^ expected.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (provided.charCodeAt(i) || 0) ^ (expected.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
 // Security: clerkUserId is derived exclusively from the caller's
 // authenticated Convex identity (never a client-supplied argument) so a
 // signed-in user cannot read another user's Connect onboarding/payout status
@@ -232,7 +247,7 @@ export const processConnectWebhookEvent = action({
   args: { event: v.any(), secret: v.string() },
   returns: v.any(),
   handler: async (ctx, args): Promise<any> => {
-    if (args.secret !== process.env.INTERNAL_WEBHOOK_SECRET) {
+    if (!isValidInternalSecret(args.secret)) {
       // ConvexError (not a plain Error) is required here: Convex's documented
       // production behavior only preserves thrown data across the action
       // boundary for ConvexError — a plain Error's message gets redacted, which
