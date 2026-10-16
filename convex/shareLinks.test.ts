@@ -406,3 +406,192 @@ describe("shareLinks - tier parity (SHARE-06)", () => {
     }
   });
 });
+
+describe("shareLinks - anonymous read (SHARE-02)", () => {
+  test("anonymous: valid token returns only whitelisted keys", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedUser(t, "a1");
+    const note = await seedNote(t, userId, { title: "T" });
+    await seedNote(t, userId, { parentNote: note, title: "kid" });
+    await seedLink(t, note, userId, tok("m"), "view");
+    const res = await t.query(api.shareLinks.getSharedNote, {
+      token: tok("m"),
+    });
+    expect(res).not.toBeNull();
+    expect(Object.keys(res!).sort()).toEqual([
+      "canEdit",
+      "content",
+      "isAuthenticated",
+      "role",
+      "title",
+    ]);
+    expect(res!.canEdit).toBe(false);
+    expect(res!.isAuthenticated).toBe(false);
+  });
+
+  test("anonymous: unknown and revoked tokens return null", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, identity } = await seedUser(t, "a2");
+    const note = await seedNote(t, userId);
+    await seedLink(t, note, userId, tok("n"));
+    expect(
+      await t.query(api.shareLinks.getSharedNote, { token: tok("z") }),
+    ).toBeNull();
+    await t
+      .withIdentity(identity)
+      .mutation(api.shareLinks.revokeLink, { noteId: note });
+    expect(
+      await t.query(api.shareLinks.getSharedNote, { token: tok("n") }),
+    ).toBeNull();
+  });
+});
+
+describe("shareLinks - edit via link (SHARE-03)", () => {
+  const doc = JSON.stringify({ type: "doc", content: [] });
+
+  test("edit: canEdit true only for signed-in user on edit link", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "e1");
+    const other = await seedUser(t, "e1b");
+    const n1 = await seedNote(t, owner.userId);
+    const n2 = await seedNote(t, owner.userId);
+    await seedLink(t, n1, owner.userId, tok("o"), "edit");
+    await seedLink(t, n2, owner.userId, tok("p"), "view");
+    const as = t.withIdentity(other.identity);
+    const e = await as.query(api.shareLinks.getSharedNote, { token: tok("o") });
+    const v = await as.query(api.shareLinks.getSharedNote, { token: tok("p") });
+    expect(e?.canEdit).toBe(true);
+    expect(e?.isAuthenticated).toBe(true);
+    expect(v?.canEdit).toBe(false);
+  });
+
+  test("edit: anonymous caller with valid edit token is rejected, content unchanged", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedUser(t, "e2");
+    const note = await seedNote(t, userId);
+    await seedLink(t, note, userId, tok("q"), "edit");
+    await expect(
+      t.mutation(api.shareLinks.updateSharedNoteContent, {
+        token: tok("q"),
+        content: doc,
+      }),
+    ).rejects.toThrow(/UNAUTHENTICATED/);
+    const n = await t.run(ctx => ctx.db.get("notes", note));
+    expect(n?.content).toBe("");
+  });
+
+  test("edit: view token and unknown token rejected LINK_INVALID", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "e3");
+    const editor = await seedUser(t, "e3b");
+    const note = await seedNote(t, owner.userId);
+    await seedLink(t, note, owner.userId, tok("r"), "view");
+    const as = t.withIdentity(editor.identity);
+    for (const token of [tok("r"), tok("y")]) {
+      await expect(
+        as.mutation(api.shareLinks.updateSharedNoteContent, {
+          token,
+          content: doc,
+        }),
+      ).rejects.toThrow(/LINK_INVALID/);
+    }
+  });
+
+  test("edit: success patches only content and updated_at, no shares row", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "e4");
+    const editor = await seedUser(t, "e4b");
+    const parent = await seedNote(t, owner.userId);
+    const note = await seedNote(t, owner.userId, {
+      parentNote: parent,
+      title: "Keep",
+    });
+    await seedLink(t, note, owner.userId, tok("s"), "edit");
+    const before = await t.run(ctx => ctx.db.get("notes", note));
+    await t
+      .withIdentity(editor.identity)
+      .mutation(api.shareLinks.updateSharedNoteContent, {
+        token: tok("s"),
+        content: doc,
+      });
+    const after = await t.run(ctx => ctx.db.get("notes", note));
+    expect(after?.content).toBe(doc);
+    expect(after?.updated_at).toBeDefined();
+    expect({ ...after, content: "", updated_at: undefined }).toEqual({
+      ...before,
+      content: "",
+      updated_at: undefined,
+    });
+    const shares = await t.run(ctx => ctx.db.query("shares").collect());
+    expect(shares).toHaveLength(0);
+  });
+
+  test("edit: invalid JSON and oversized content rejected", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "e5");
+    const editor = await seedUser(t, "e5b");
+    const note = await seedNote(t, owner.userId);
+    await seedLink(t, note, owner.userId, tok("u"), "edit");
+    const as = t.withIdentity(editor.identity);
+    await expect(
+      as.mutation(api.shareLinks.updateSharedNoteContent, {
+        token: tok("u"),
+        content: "{not json",
+      }),
+    ).rejects.toThrow(/INVALID_CONTENT/);
+    await expect(
+      as.mutation(api.shareLinks.updateSharedNoteContent, {
+        token: tok("u"),
+        content: " ".repeat(500001),
+      }),
+    ).rejects.toThrow(/CONTENT_TOO_LARGE/);
+  });
+});
+
+describe("shareLinks - public read (SHARE-05)", () => {
+  test("public: getPublicNote root, grandchild, private sibling, garbage, unpublish", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedUser(t, "g1");
+    const root = await seedNote(t, userId, { isPublic: true, title: "R" });
+    const child = await seedNote(t, userId, { parentNote: root, title: "C" });
+    const grand = await seedNote(t, userId, { parentNote: child, title: "G" });
+    const priv = await seedNote(t, userId);
+
+    const r = await t.query(api.shareLinks.getPublicNote, { noteId: root });
+    expect(Object.keys(r!).sort()).toEqual([
+      "_id",
+      "children",
+      "content",
+      "title",
+    ]);
+    expect(r!.children).toEqual([{ _id: child, title: "C" }]);
+    expect(
+      (await t.query(api.shareLinks.getPublicNote, { noteId: grand }))?.title,
+    ).toBe("G");
+    expect(
+      await t.query(api.shareLinks.getPublicNote, { noteId: priv }),
+    ).toBeNull();
+    expect(
+      await t.query(api.shareLinks.getPublicNote, { noteId: "garbage" }),
+    ).toBeNull();
+    await t.run(ctx => ctx.db.patch("notes", root, { isPublic: false }));
+    expect(
+      await t.query(api.shareLinks.getPublicNote, { noteId: root }),
+    ).toBeNull();
+  });
+
+  test("public: note moved out of public subtree returns null", async () => {
+    const t = convexTest(schema, modules);
+    const { userId } = await seedUser(t, "g2");
+    const root = await seedNote(t, userId, { isPublic: true });
+    const other = await seedNote(t, userId);
+    const note = await seedNote(t, userId, { parentNote: root });
+    expect(
+      await t.query(api.shareLinks.getPublicNote, { noteId: note }),
+    ).not.toBeNull();
+    await t.run(ctx => ctx.db.patch("notes", note, { parentNote: other }));
+    expect(
+      await t.query(api.shareLinks.getPublicNote, { noteId: note }),
+    ).toBeNull();
+  });
+});
