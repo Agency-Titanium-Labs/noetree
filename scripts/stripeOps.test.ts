@@ -70,6 +70,7 @@ describe("setupPremiumPrices", () => {
     expect(fake.prices.retrieve).toHaveBeenCalledWith("price_old_pro");
     expect(fake.products.update).toHaveBeenCalledWith("prod_123", {
       name: "Premium",
+      description: "Premium subscription - 100 AI credits/month",
     });
   });
 
@@ -89,6 +90,7 @@ describe("setupPremiumPrices", () => {
 
     expect(fake.products.update).toHaveBeenCalledWith("prod_expanded_456", {
       name: "Premium",
+      description: "Premium subscription - 100 AI credits/month",
     });
     expect(result.productId).toBe("prod_expanded_456");
   });

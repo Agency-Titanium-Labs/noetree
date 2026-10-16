@@ -7,6 +7,9 @@ import type Stripe from "stripe";
 // the real client.
 
 export const PREMIUM_PRODUCT_NAME = "Premium";
+// Shown by Stripe Checkout under the product title — must not say "Pro".
+export const PREMIUM_PRODUCT_DESCRIPTION =
+  "Premium subscription - 100 AI credits/month";
 export const PREMIUM_CURRENCY = "eur";
 export const PREMIUM_MONTHLY_AMOUNT_CENTS = 699;
 export const PREMIUM_ANNUAL_AMOUNT_CENTS = 5900;
@@ -25,7 +28,7 @@ export interface SetupPremiumPricesParams {
 
 /**
  * One-time Premium price setup: renames the existing Stripe Product to
- * "Premium" (Product.name is mutable) and creates the two new recurring
+ * "Premium" (Product.name and description are mutable) and creates the two new recurring
  * Price objects (6.99 EUR/month, 59 EUR/year) if they don't already exist
  * (Price.unit_amount is immutable, so re-running this is safe and creates
  * no duplicates). This function never mutates an existing Price object —
@@ -42,7 +45,10 @@ export async function setupPremiumPrices(
       ? oldPrice.product
       : oldPrice.product.id;
 
-  await stripe.products.update(productId, { name: PREMIUM_PRODUCT_NAME });
+  await stripe.products.update(productId, {
+    name: PREMIUM_PRODUCT_NAME,
+    description: PREMIUM_PRODUCT_DESCRIPTION,
+  });
 
   let monthlyPriceId: string | undefined;
   let annualPriceId: string | undefined;
