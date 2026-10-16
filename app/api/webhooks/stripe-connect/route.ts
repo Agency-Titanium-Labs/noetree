@@ -11,8 +11,25 @@ import { api } from "@/convex/_generated/api";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: Request): Promise<Response> {
+  // WR-03: a missing server-side env var is OUR misconfiguration, not a bad
+  // request — report 500 (names only, never values) so it is noticed and
+  // Stripe retries once fixed, instead of masquerading as a 400 signature
+  // failure.
+  const connectSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+  const internalSecret = process.env.INTERNAL_WEBHOOK_SECRET;
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!connectSecret || !internalSecret || !convexUrl) {
+    console.error(
+      "[stripe connect webhook] server misconfigured (500): missing STRIPE_CONNECT_WEBHOOK_SECRET, INTERNAL_WEBHOOK_SECRET or NEXT_PUBLIC_CONVEX_URL",
+    );
+    return new Response("Server misconfigured", { status: 500 });
+  }
+
   const rawBody = await req.text();
   const signature = req.headers.get("stripe-signature");
+  if (!signature) {
+    return new Response("Missing stripe-signature header", { status: 400 });
+  }
 
   let event: Stripe.Event;
   try {
@@ -22,11 +39,7 @@ export async function POST(req: Request): Promise<Response> {
     // two. Connected-account events are signed with a DIFFERENT secret than
     // platform events, and are delivered ONLY to an endpoint registered with
     // `connect: true`.
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      signature!,
-      process.env.STRIPE_CONNECT_WEBHOOK_SECRET!,
-    );
+    event = stripe.webhooks.constructEvent(rawBody, signature, connectSecret);
   } catch (err) {
     // Spoofed/forged payload or missing/invalid Stripe-Signature header —
     // never a 500, Stripe would otherwise retry a request that can never
@@ -42,13 +55,13 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   try {
-    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+    const convex = new ConvexHttpClient(convexUrl);
     await convex.action(api.connectAccounts.processConnectWebhookEvent, {
       event,
       // Authenticates the Next.js-route-to-Convex-action hop only — the SAME
       // shared secret the platform route uses, unrelated to which Stripe
       // secret verified the inbound signature above.
-      secret: process.env.INTERNAL_WEBHOOK_SECRET!,
+      secret: internalSecret,
     });
     // Covers success, anomaly-sentinel, and skipped-event-type outcomes —
     // the dispatcher action resolves normally (never throws) in all three.

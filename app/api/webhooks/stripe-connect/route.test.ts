@@ -62,6 +62,34 @@ describe("POST /api/webhooks/stripe-connect", () => {
     errorSpy.mockRestore();
   });
 
+  it("returns 400 when the stripe-signature header is missing, without calling constructEvent (WR-03)", async () => {
+    const res = await POST(
+      new Request("http://localhost/api/webhooks/stripe-connect", {
+        method: "POST",
+        body: "{}",
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockConstructEvent).not.toHaveBeenCalled();
+    expect(mockAction).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 (not 400) when STRIPE_CONNECT_WEBHOOK_SECRET is not configured (WR-03)", async () => {
+    const saved = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+    delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(makeRequest("{}"));
+
+    expect(res.status).toBe(500);
+    expect(mockConstructEvent).not.toHaveBeenCalled();
+    expect(mockAction).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+    process.env.STRIPE_CONNECT_WEBHOOK_SECRET = saved;
+  });
+
   it("returns 200 when the signature is valid and the Convex action resolves", async () => {
     mockConstructEvent.mockReturnValue({
       id: "evt_1",
