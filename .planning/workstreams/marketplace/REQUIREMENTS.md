@@ -17,17 +17,17 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [ ] **LIST-01**: User can create a listing from an existing note or note+subtree, setting price, scope, and access mode (copy/read-only)
 - [ ] **LIST-02**: Seller can view, edit, and unpublish their own listings
-- [ ] **LIST-03**: Note+subtree listings are capped at 100 notes
-- [ ] **LIST-04**: Unpublishing a listing does not revoke already-granted access to prior buyers
+- [x] **LIST-03**: Note+subtree listings are capped at 100 notes
+- [x] **LIST-04**: Unpublishing a listing does not revoke already-granted access to prior buyers
 
 ### Découverte (BROWSE)
 
 - [ ] **BROWSE-01**: User can browse a public marketplace grid/list of published listings
 - [ ] **BROWSE-02**: User can search listings by keyword (title/description)
-- [ ] **BROWSE-03**: User can filter listings by seller-defined tags
+- [x] **BROWSE-03**: User can filter listings by seller-defined tags
 - [ ] **BROWSE-04**: User can sort listings (newest, price, popularity)
 - [ ] **BROWSE-05**: Filter/search state persists on back-navigation (URL params)
-- [ ] **BROWSE-06**: Listing detail page shows partial preview (title, description, excerpt, subtree note count) without revealing full content
+- [x] **BROWSE-06**: Listing detail page shows partial preview (title, description, excerpt, subtree note count) without revealing full content
 
 ### Achat & Paiement (BUY)
 
@@ -86,14 +86,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONNECT-03  | Phase 7  | Complete |
 | LIST-01     | Phase 8  | Pending  |
 | LIST-02     | Phase 8  | Pending  |
-| LIST-03     | Phase 8  | Pending  |
-| LIST-04     | Phase 8  | Pending  |
+| LIST-03     | Phase 8  | Complete |
+| LIST-04     | Phase 8  | Complete |
 | BROWSE-01   | Phase 8  | Pending  |
 | BROWSE-02   | Phase 8  | Pending  |
-| BROWSE-03   | Phase 8  | Pending  |
+| BROWSE-03   | Phase 8  | Complete |
 | BROWSE-04   | Phase 8  | Pending  |
 | BROWSE-05   | Phase 8  | Pending  |
-| BROWSE-06   | Phase 8  | Pending  |
+| BROWSE-06   | Phase 8  | Complete |
 | BUY-01      | Phase 9  | Pending  |
 | BUY-02      | Phase 9  | Pending  |
 | BUY-03      | Phase 9  | Pending  |

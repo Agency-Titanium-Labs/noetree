@@ -4,29 +4,29 @@ milestone: v1.1
 milestone_name: Marketplace de notes
 status: executing
 stopped_at: Phase 8 UI-SPEC approved
-last_updated: "2026-10-16T15:56:20.668Z"
-last_activity: 2026-10-16 -- Phase 8 planning complete
+last_updated: "2026-10-16T16:19:02.137Z"
+last_activity: 2026-10-16
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 15
-  completed_plans: 6
+  completed_plans: 7
   percent: 20
 ---
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
+Phase: 8 (Listings & Marketplace Browse/Search) — EXECUTING
+Plan: 2 of 9
 Status: Ready to execute
-Last activity: 2026-10-16 -- Phase 8 planning complete
+Last activity: 2026-10-16
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-10-16)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente.
-**Current focus:** Phase 8 — listings & marketplace browse/search
+**Current focus:** Phase 8 — Listings & Marketplace Browse/Search
 
 ## Performance Metrics
 
@@ -103,9 +103,9 @@ v1.1 deferred to v2 (see REQUIREMENTS.md v2 Requirements): seller public profile
 
 ## Session Continuity
 
-Last session: 2026-10-16T15:18:23.267Z
+Last session: 2026-10-16T16:19:02.127Z
 Stopped at: Phase 8 UI-SPEC approved
-Resume file: .planning/workstreams/marketplace/phases/08-listings-marketplace-browse-search/08-UI-SPEC.md
+Resume file: None
 
 ## Operator Next Steps
 
