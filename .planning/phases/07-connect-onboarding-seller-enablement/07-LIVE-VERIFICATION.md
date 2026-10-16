@@ -64,3 +64,21 @@ Account `acct_1U0jXmBgc0YYKblP` (Express, test mode).
 
 **PASS.** Connected-account events reach the dedicated Connect route and only that route; seller status is
 webhook-driven; evidence recorded; no signing secret in this file.
+
+## Deployed preview verification (2026-10-16)
+
+Preview: branch alias `noetree-git-milestone-v11-marketplace-de-notes-selenium-studio.vercel.app`
+(project `noetree`, team `selenium-studio`; SSO-protected, reached with a temporary automation-bypass secret in the
+endpoint URL query string — **revoke it after use**).
+
+- Stripe test-mode Connect endpoint `we_1URA3PBWPMSBebOk84jJfEJj` (`connect: true`; `account.updated`,
+  `account.application.authorized`, `capability.updated`) -> `/api/webhooks/stripe-connect`. Its signing secret is
+  distinct from the platform endpoints' secrets (a real, separately registered endpoint, unlike the local
+  `stripe listen` case above). Temporary: delete the endpoint when done.
+- Preview env (branch-scoped): `STRIPE_CONNECT_WEBHOOK_SECRET`, `APP_URL`, and `INTERNAL_WEBHOOK_SECRET` overridden to
+  the Convex dev deployment's value (the project-level value did not match, so the route returned 400 `Unauthorized`
+  from the Convex action).
+- Build: needed `tsconfig.json` to exclude `*.test.ts(x)` (Vercel installs with npm; `@testing-library` types differ).
+- Results: correctly signed event -> **200**; bad signature -> **400**; unsigned/no bypass -> SSO 302; a real
+  `account.updated` fired from a test Express account was delivered by Stripe (`pending_webhooks` 1 -> 0).
+- Not verified: browser flows needing a signed-in Clerk user (seller onboarding, badge flip, `connectAccounts` row).
