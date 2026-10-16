@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: Marketplace de notes
 status: ready_to_plan
 stopped_at: Phase 7 complete (6/6) — ready to discuss Phase 8
-last_updated: 2026-10-16T12:34:35.611Z
-last_activity: 2026-08-04 -- Phase 07 execution started
+last_updated: 2026-10-16T16:30:00.000Z
+last_activity: 2026-10-16 -- Phase 07 complete (live Connect verification, review fixes applied)
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
   completed_plans: 6
-  percent: 0
+  percent: 20
 ---
 
 ## Current Position
@@ -23,7 +23,7 @@ Last activity: 2026-10-16
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-12)
+See: .planning/PROJECT.md (updated 2026-10-16)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente.
 **Current focus:** Phase 8 — listings & marketplace browse/search
@@ -87,7 +87,7 @@ None open. v1.0 blockers/concerns (Stripe setup sequencing, decision-coverage ga
 
 Carried forward as phase-planning flags from research (not yet blockers — flagged for deeper research during `/gsd:plan-phase`):
 
-- Phase 7: Confirm current Stripe Dashboard/CLI steps for registering a second, Connect-scoped webhook endpoint (distinct signing secret) in this account; live-verify with `stripe listen --forward-connect-to` + `stripe trigger --stripe-account`.
+- Phase 7 (RESOLVED 2026-10-16): live-verified with `stripe listen --forward-connect-to`; locally one CLI secret signs both streams (distinct secrets only for separate Dashboard endpoints). Deployed-preview signed-event check still outstanding. Open: Phase 8/9 must call `internal.connectAccounts.isSellerActive` and throw `CONNECT_ONBOARDING_REQUIRED`.
 - Phase 9: Re-read `convex/stripeWebhooks.ts` fresh at implementation time (cited line numbers in research may have drifted); write a replay-idempotency test per the Phase 06.1 precedent.
 - Phase 10: The Free-tier quota pre-flight check for subtree-sized copies is new logic (existing `createNote` only checks one note at a time) — needs its own design pass, not a copy-paste of the existing limit check; also needs a concrete numeric bound to avoid Convex per-mutation execution/size limits on large trees.
 
@@ -103,11 +103,11 @@ v1.1 deferred to v2 (see REQUIREMENTS.md v2 Requirements): seller public profile
 
 ## Session Continuity
 
-Last session: 2026-08-01T10:14:17.953Z
-Stopped at: Phase 07 UI-SPEC approved
-Resume file: .planning/phases/07-connect-onboarding-seller-enablement/07-UI-SPEC.md
+Last session: 2026-10-16T16:30:00.000Z
+Stopped at: Phase 7 complete; ready to plan Phase 8
+Resume file: None
 
 ## Operator Next Steps
 
-- Review `.planning/ROADMAP.md` v1.1 section and `.planning/REQUIREMENTS.md` traceability table
+- Run `/gsd-plan-phase 8 --ws marketplace` (optionally `/gsd-discuss-phase 8` first)
 - Run `/gsd:plan-phase 7` to begin planning Phase 7 (Connect Onboarding & Seller Enablement)
