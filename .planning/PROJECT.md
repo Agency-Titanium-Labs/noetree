@@ -62,7 +62,6 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - [ ] Mise en vente d'une note (prix, portée note/sous-arbre, mode copie/lecture seule)
 - [ ] Aperçu partiel avant achat
 - [ ] Achat via Stripe Checkout + payout vendeur via Stripe Connect
-- [ ] Onboarding Stripe Connect pour vendeurs
 - [ ] Commission Noetree (15%) prélevée à la source
 
 ### Out of Scope
