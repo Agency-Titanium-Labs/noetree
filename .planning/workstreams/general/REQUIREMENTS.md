@@ -16,11 +16,11 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Sharing & Access Rights
 
-- [ ] **SHARE-01**: User can generate a unique shareable link for a note with view-only or edit permission
+- [x] **SHARE-01**: User can generate a unique shareable link for a note with view-only or edit permission
 - [ ] **SHARE-02**: A visitor with a view-only link can read the note without an account
 - [ ] **SHARE-03**: A visitor must be signed in to make changes via an edit-permission link (no anonymous edits)
-- [ ] **SHARE-04**: User can revoke a share link, immediately invalidating it
-- [ ] **SHARE-05**: User can toggle a note fully public, distinct from unlisted link-sharing; making a note public cascades public visibility to its descendant notes
+- [x] **SHARE-04**: User can revoke a share link, immediately invalidating it
+- [x] **SHARE-05**: User can toggle a note fully public, distinct from unlisted link-sharing; making a note public cascades public visibility to its descendant notes
 - [ ] **SHARE-06**: Sharing (share links and public notes) is available and unlimited on both Free and Premium plans
 
 ### Comments
@@ -98,11 +98,11 @@ Explicitly excluded. Documented to prevent scope creep.
 | PLAN-07     | Phase 12 — Plan Restructure & Tier Foundation | Complete |
 | PLAN-08     | Phase 12 — Plan Restructure & Tier Foundation | Complete |
 | PLAN-09     | Phase 12 — Plan Restructure & Tier Foundation | Complete |
-| SHARE-01    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
+| SHARE-01    | Phase 13 — Sharing — Links & Public Notes     | Complete |
 | SHARE-02    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
 | SHARE-03    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
-| SHARE-04    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
-| SHARE-05    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
+| SHARE-04    | Phase 13 — Sharing — Links & Public Notes     | Complete |
+| SHARE-05    | Phase 13 — Sharing — Links & Public Notes     | Complete |
 | SHARE-06    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
 | COMMENT-01  | Phase 14 — Comments & Notifications           | Pending  |
 | COMMENT-02  | Phase 14 — Comments & Notifications           | Pending  |
