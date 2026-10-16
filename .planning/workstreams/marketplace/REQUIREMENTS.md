@@ -31,7 +31,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Achat & Paiement (BUY)
 
-- [ ] **BUY-01**: User can purchase a listing via Stripe Checkout with a commission taken at source (20% for Free-tier sellers, 10% for Premium sellers)
+- [x] **BUY-01**: User can purchase a listing via Stripe Checkout with a commission taken at source (20% for Free-tier sellers, 10% for Premium sellers)
 - [ ] **BUY-02**: Self-purchase is prevented
 - [ ] **BUY-03**: Already-purchased listings show an "owned" indicator instead of Buy
 - [x] **BUY-04**: ~~Free-tier 20-note quota check before Checkout~~ — superseded: the 20-note cap was removed in v1.2 (97b0637); no check built
@@ -94,7 +94,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BROWSE-04   | Phase 8  | Complete |
 | BROWSE-05   | Phase 8  | Complete |
 | BROWSE-06   | Phase 8  | Complete |
-| BUY-01      | Phase 9  | Pending  |
+| BUY-01      | Phase 9  | Complete |
 | BUY-02      | Phase 9  | Pending  |
 | BUY-03      | Phase 9  | Pending  |
 | BUY-04      | Phase 9  | Pending  |
