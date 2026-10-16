@@ -4,19 +4,22 @@ import { useState } from "react";
 import EditorToolbar from "./editor/EditorToolbar";
 import { EditorContent } from "@tiptap/react";
 import ConditionChecker from "./helpers/ConditionChecker";
-import { AlertCircle, CheckCircle2, UserPlus } from "lucide-react";
+import { AlertCircle, CheckCircle2, Store, UserPlus } from "lucide-react";
 import { useEditorContext } from "@/providers/EditorProvider";
 import { useTreeContext } from "@/providers/TreeProvider";
 import { Skeleton } from "./ui/skeleton";
 import { useTranslations } from "next-intl";
 import { Button } from "./ui/button";
 import ShareDialog from "./ShareDialog";
+import ListingFormDialog from "./ListingFormDialog";
 
 export default function NoteContent() {
   const t = useTranslations("NoteContent");
   const tShare = useTranslations("ShareDialog");
   const { selectedNote } = useTreeContext();
+  const tListing = useTranslations("ListingForm");
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isListingOpen, setIsListingOpen] = useState(false);
 
   const { editor, saveStatus } = useEditorContext();
 
@@ -38,6 +41,17 @@ export default function NoteContent() {
               >
                 <UserPlus />
               </Button>
+              {selectedNote?.role === "owner" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsListingOpen(true)}
+                  title={tListing("triggerTooltip")}
+                >
+                  <Store />
+                  {tListing("triggerLabel")}
+                </Button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <ConditionChecker condition={saveStatus === "error"}>
@@ -90,6 +104,14 @@ export default function NoteContent() {
           noteId={selectedNote._id}
           open={isShareOpen}
           onOpenChange={setIsShareOpen}
+        />
+      )}
+      {selectedNote && isListingOpen && (
+        <ListingFormDialog
+          noteId={selectedNote._id}
+          noteTitle={selectedNote.title}
+          open={isListingOpen}
+          onOpenChange={setIsListingOpen}
         />
       )}
     </div>
