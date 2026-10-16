@@ -102,7 +102,17 @@ Plans:
 4. For copy-mode listings, the Free-tier 20-note quota is checked before a Checkout session is created, not after payment
 5. No refund path exists in the UI or backend — sales are final, consistent with the existing metadata-type discriminator added to the shared webhook handler
 
-**Plans**: TBD
+**Plans**: 6 plans
+**UI hint**: yes
+
+Plans:
+
+- [ ] 09-01-PLAN.md — commission helper (20%/10% integer bps) + purchases table + schema push
+- [ ] 09-02-PLAN.md — convex/purchases.ts: preparePurchase guards/snapshot, attachCheckoutSession, getMyListingState, no-refund guard
+- [ ] 09-03-PLAN.md — webhook metadata.type discrimination + markPaidFromCheckout (verify, idempotent, salesCount) + top-up metadata.type
+- [ ] 09-04-PLAN.md — createMarketplaceCheckout server action (destination charge, session reuse)
+- [ ] 09-05-PLAN.md — BuyPanel/BuyButton on listing detail page, FR/EN copy, component tests
+- [ ] 09-06-PLAN.md — phase gate: docs drift fix (15% -> 20/10, BUY-04 superseded), full suite/build/push, live Stripe purchase verification
 
 ### Phase 10: Purchase Fulfillment (Copy & Access Grants)
 
@@ -146,7 +156,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 06.1. Close gap — initial AI credits grant      | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 7. Connect Onboarding & Seller Enablement       | v1.1      | 6/6            | Complete    | 2026-10-16 |
 | 8. Listings & Marketplace Browse/Search         | v1.1      | 9/9            | Complete    | 2026-10-16 |
-| 9. Marketplace Checkout & Webhook Fix           | v1.1      | 0/TBD          | Not started | -          |
+| 9. Marketplace Checkout & Webhook Fix           | v1.1      | 0/6            | Planned     | -          |
 | 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 0/TBD          | Not started | -          |
 | 11. Buyer & Seller History UI                   | v1.1      | 0/TBD          | Not started | -          |
 
