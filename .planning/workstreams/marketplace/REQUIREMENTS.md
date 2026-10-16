@@ -22,10 +22,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Découverte (BROWSE)
 
-- [ ] **BROWSE-01**: User can browse a public marketplace grid/list of published listings
-- [ ] **BROWSE-02**: User can search listings by keyword (title/description)
+- [x] **BROWSE-01**: User can browse a public marketplace grid/list of published listings
+- [x] **BROWSE-02**: User can search listings by keyword (title/description)
 - [x] **BROWSE-03**: User can filter listings by seller-defined tags
-- [ ] **BROWSE-04**: User can sort listings (newest, price, popularity)
+- [x] **BROWSE-04**: User can sort listings (newest, price, popularity)
 - [x] **BROWSE-05**: Filter/search state persists on back-navigation (URL params)
 - [x] **BROWSE-06**: Listing detail page shows partial preview (title, description, excerpt, subtree note count) without revealing full content
 
@@ -88,10 +88,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIST-02     | Phase 8  | Complete |
 | LIST-03     | Phase 8  | Complete |
 | LIST-04     | Phase 8  | Complete |
-| BROWSE-01   | Phase 8  | Pending  |
-| BROWSE-02   | Phase 8  | Pending  |
+| BROWSE-01   | Phase 8  | Complete |
+| BROWSE-02   | Phase 8  | Complete |
 | BROWSE-03   | Phase 8  | Complete |
-| BROWSE-04   | Phase 8  | Pending  |
+| BROWSE-04   | Phase 8  | Complete |
 | BROWSE-05   | Phase 8  | Complete |
 | BROWSE-06   | Phase 8  | Complete |
 | BUY-01      | Phase 9  | Pending  |
