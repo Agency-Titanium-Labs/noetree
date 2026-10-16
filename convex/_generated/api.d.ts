@@ -10,6 +10,7 @@
 
 import type * as aiCredits from "../aiCredits.js";
 import type * as connectAccounts from "../connectAccounts.js";
+import type * as helpers_commission from "../helpers/commission.js";
 import type * as helpers_helper from "../helpers/helper.js";
 import type * as helpers_listings from "../helpers/listings.js";
 import type * as helpers_permissions from "../helpers/permissions.js";
@@ -32,6 +33,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   aiCredits: typeof aiCredits;
   connectAccounts: typeof connectAccounts;
+  "helpers/commission": typeof helpers_commission;
   "helpers/helper": typeof helpers_helper;
   "helpers/listings": typeof helpers_listings;
   "helpers/permissions": typeof helpers_permissions;
