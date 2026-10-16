@@ -4,6 +4,7 @@ import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
 import { unpublishListingForNote } from "./helpers/listings";
 import { deleteShareLinkForNote } from "./helpers/sharing";
+import { deleteCommentsForNote } from "./helpers/commentAccess";
 import { getUserPermission } from "./helpers/permissions";
 
 type Notes = Doc<"notes">;
@@ -612,6 +613,7 @@ export const deleteNote = mutation({
       // D-18: auto-unpublish (never delete) the listing for every deleted note — same transaction; purchases keep pointing at the row (D-16)
       await unpublishListingForNote(ctx, noteId);
       await deleteShareLinkForNote(ctx, noteId);
+      await deleteCommentsForNote(ctx, noteId);
     };
 
     if (rootNote.parentNote) {
