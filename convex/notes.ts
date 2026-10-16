@@ -2,6 +2,7 @@ import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
+import { unpublishListingForNote } from "./helpers/listings";
 
 type Notes = Doc<"notes">;
 
@@ -673,6 +674,9 @@ export const deleteNote = mutation({
       for (const share of shares) {
         await ctx.db.delete(share._id);
       }
+
+      // D-18: auto-unpublish (never delete) the listing for every deleted note — same transaction; purchases keep pointing at the row (D-16)
+      await unpublishListingForNote(ctx, noteId);
     };
 
     if (rootNote.parentNote) {

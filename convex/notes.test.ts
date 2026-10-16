@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { buildSearchText, syncListingTags } from "./helpers/listings";
 
 const modules = (
   import.meta as unknown as {
@@ -147,5 +148,122 @@ describe("notes.createNote — unlimited notes on every plan (PLAN-06)", () => {
       title: "n50",
     });
     expect(note50).toBeTruthy();
+  });
+});
+
+describe("notes.deleteNote — auto-unpublish listing (D-18)", () => {
+  const token = "https://clerk.dev|seller_del";
+  const identity = { tokenIdentifier: token, subject: "seller_del" };
+
+  async function seedListed(
+    t: ReturnType<typeof convexTest>,
+    status: "published" | "unpublished" = "published",
+  ) {
+    return await t.run(async ctx => {
+      const roleId = await ctx.db.insert("roles", { role: "user" });
+      const userId = await ctx.db.insert("users", {
+        tokenIdentifier: token,
+        role: roleId,
+      });
+      const parent = await ctx.db.insert("notes", {
+        owner: userId,
+        title: "parent",
+        content: "{}",
+      });
+      const child = await ctx.db.insert("notes", {
+        owner: userId,
+        title: "child",
+        content: "{}",
+        parentNote: parent,
+      });
+      await ctx.db.patch("notes", parent, { childNotes: [child] });
+      const tags = ["a", "b"];
+      const listingId = await ctx.db.insert("listings", {
+        noteId: child,
+        sellerId: userId,
+        sellerClerkUserId: "seller_del",
+        title: "T",
+        description: "D",
+        excerpt: "",
+        noteCount: 1,
+        priceCents: 500,
+        currency: "eur",
+        scope: "note",
+        accessMode: "copy",
+        tags,
+        status,
+        salesCount: 0,
+        searchText: buildSearchText("T", "D", tags),
+        attestedAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await syncListingTags(ctx, listingId);
+      return { parent, child, listingId };
+    });
+  }
+
+  async function readState(
+    t: ReturnType<typeof convexTest>,
+    listingId: Id<"listings">,
+  ) {
+    return await t.run(async ctx => {
+      const listing = await ctx.db.get("listings", listingId);
+      const rows = await ctx.db
+        .query("listingTags")
+        .withIndex("by_listingId", q => q.eq("listingId", listingId))
+        .take(10);
+      const stat = await ctx.db
+        .query("tagStats")
+        .withIndex("by_tag", q => q.eq("tag", "a"))
+        .unique();
+      return { listing, rows, stat };
+    });
+  }
+
+  test("delete of a listed note unpublishes its listing and keeps the row", async () => {
+    const t = convexTest(schema, modules);
+    const { child, listingId } = await seedListed(t);
+    await t
+      .withIdentity(identity)
+      .mutation(api.notes.deleteNote, { id: child });
+    const { listing, rows, stat } = await readState(t, listingId);
+    expect(listing?.status).toBe("unpublished");
+    expect(rows.length).toBe(2);
+    expect(rows.every(r => r.status === "unpublished")).toBe(true);
+    expect(stat).toBeNull();
+  });
+
+  test("delete of an ancestor unpublishes the descendant's listing", async () => {
+    const t = convexTest(schema, modules);
+    const { parent, listingId } = await seedListed(t);
+    await t
+      .withIdentity(identity)
+      .mutation(api.notes.deleteNote, { id: parent });
+    const { listing } = await readState(t, listingId);
+    expect(listing?.status).toBe("unpublished");
+  });
+
+  test("delete of a note with an already-unpublished listing leaves it unchanged", async () => {
+    const t = convexTest(schema, modules);
+    const { child, listingId } = await seedListed(t, "unpublished");
+    await t
+      .withIdentity(identity)
+      .mutation(api.notes.deleteNote, { id: child });
+    const { listing } = await readState(t, listingId);
+    expect(listing?.status).toBe("unpublished");
+  });
+
+  test("delete of a note without a listing behaves as before", async () => {
+    const t = convexTest(schema, modules);
+    await seedUserWithNotes(t, token, 1);
+    const noteId = await t.run(async ctx => {
+      const n = await ctx.db.query("notes").first();
+      return n!._id;
+    });
+    await t
+      .withIdentity(identity)
+      .mutation(api.notes.deleteNote, { id: noteId });
+    const gone = await t.run(async ctx => ctx.db.get("notes", noteId));
+    expect(gone).toBeNull();
   });
 });

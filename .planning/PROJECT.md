@@ -28,6 +28,24 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 **Précédent milestone shipped :** v1.0 Monétisation & Paiements — voir `.planning/MILESTONES.md` pour le détail complet
 
+## Parallel Milestone: v1.1 Marketplace de notes (branche milestone/v1.1-marketplace-de-notes)
+
+**Goal :** Permettre aux utilisateurs de vendre et acheter des notes entre eux via Stripe Connect, avec commission Noetree.
+
+**Target features :**
+
+- Page marketplace publique (browse + recherche)
+- Mise en vente d'une note : prix libre, choix note seule ou note+sous-arbre, choix copie éditable ou accès lecture seule pour l'acheteur
+- Aperçu partiel (titre + description + extrait) avant achat
+- Achat via Stripe Checkout, payout automatique vendeur via Stripe Connect (onboarding KYC géré par Stripe)
+- Commission Noetree fixe : 15% prélevée à la source sur chaque vente
+- Vente ouverte à tous (Free + Pro)
+- Notes achetées en mode copie comptent dans le quota 20 notes Free existant
+- Ventes finales, pas de remboursement (contenu numérique)
+- Pas de modération de contenu ce milestone (déféré à plus tard)
+
+**Previous milestone:** v1.0 Monétisation & Paiements — Shipped 2026-07-12, voir `.planning/MILESTONES.md` pour le détail complet
+
 ## Requirements
 
 ### Validated
@@ -52,12 +70,21 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - ✓ User can cancel Pro subscription with confirmation, without immediate access loss; correctly downgrades to Free at period end — Phase 6 (SET-04, PAY-04)
 - ✓ User can view pricing page (Free vs Pro plans) — Phase 3 (PLAN-01)
 - ✓ User can subscribe to Pro plan via Stripe Checkout, with in-app confirmation after activation — Phase 3 (PAY-01, PAY-02)
+- ✓ Seller can complete Stripe Connect (Express) onboarding from Settings; capability status is webhook-driven and enforceable server-side via `isSellerActive` — Phase 7 (CONNECT-01, CONNECT-02, CONNECT-03)
 
 ### Active
 
-<!-- Scope milestone v1.2 — voir .planning/REQUIREMENTS.md une fois généré (étape suivante du workflow new-milestone). -->
+<!-- Scope actif : deux milestones en parallèle (workstreams general = v1.2, marketplace = v1.1). -->
 
-(à définir — REQUIREMENTS.md pas encore généré pour v1.2)
+**Milestone v1.2 (Pricing V2 & social) :** voir `.planning/workstreams/general/REQUIREMENTS.md`.
+
+**Milestone v1.1 (Marketplace) :**
+
+- [ ] Page marketplace publique (browse + recherche de notes en vente)
+- [ ] Mise en vente d'une note (prix, portée note/sous-arbre, mode copie/lecture seule)
+- [ ] Aperçu partiel avant achat
+- [ ] Achat via Stripe Checkout + payout vendeur via Stripe Connect
+- [ ] Commission Noetree (15%) prélevée à la source
 
 ### Out of Scope
 
@@ -66,6 +93,8 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - Portail Stripe natif — UI custom dans l'app choisie à la place
 - Remboursements / prorations manuels — Stripe gère automatiquement
 - Collaboration temps réel (co-édition + chat) — reportée à une milestone future (hors scope v1.2)
+- Modération de contenu marketplace — déféré (v1.1)
+- Remboursement acheteur — ventes finales (v1.1)
 
 ## Context
 
@@ -112,4 +141,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-08-25 — v1.2 milestone started (Pricing V2 & Fonctionnalités Sociales)_
+_Last updated: 2026-10-16 — v1.1 (marketplace) et v1.2 (pricing/social) fusionnés_

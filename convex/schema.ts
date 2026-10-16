@@ -52,6 +52,33 @@ export default defineSchema({
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_stripeSubscriptionId", ["stripeSubscriptionId"]),
 
+  // Idempotency note (07-RESEARCH.md Pitfall 3): the Connect event stream
+  // (account.updated) reuses the existing processedStripeEvents table below
+  // with a bare stripeEventId key. That is safe only because this phase's
+  // handler is the sole consumer of account.updated events. If a future
+  // phase adds a second consumer of the same event, it must suffix its own
+  // idempotency key (e.g. `${event.id}:<operation>`, per the
+  // grantInitialCredits/upsertSubscription precedent in aiCredits.ts) rather
+  // than sharing this bare key.
+  connectAccounts: defineTable({
+    clerkUserId: v.string(),
+    stripeAccountId: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("restricted"),
+    ),
+    chargesEnabled: v.boolean(),
+    payoutsEnabled: v.boolean(),
+    detailsSubmitted: v.boolean(),
+    // Stripe event.created (unix seconds) of the newest account.updated
+    // applied to this row; older events are ignored (out-of-order delivery).
+    // Optional so rows written before this field existed stay valid.
+    lastEventCreated: v.optional(v.number()),
+  })
+    .index("by_clerkUserId", ["clerkUserId"])
+    .index("by_stripeAccountId", ["stripeAccountId"]),
+
   aiCredits: defineTable({
     clerkUserId: v.string(),
     balance: v.number(),
@@ -90,4 +117,80 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_user_note", ["userId", "noteId"])
     .index("by_email_note", ["email", "noteId"]),
+
+  // Listings invariants (Phase 8):
+  // - One listing row per note for life (D-17): unpublish flips status, rows
+  //   are never deleted so future purchases keep a valid reference (D-16/D-18).
+  // - Public queries read ONLY snapshot fields on this row (D-07), never the
+  //   live note.
+  // - Every write to tags/status/priceCents/salesCount/searchText MUST call
+  //   syncListingTags (convex/helpers/listings.ts) - Phase 9/10 included.
+  // - Purchases/shares must never depend on listing.status (LIST-04).
+  listings: defineTable({
+    noteId: v.id("notes"),
+    sellerId: v.id("users"),
+    sellerClerkUserId: v.string(),
+    sellerName: v.optional(v.string()),
+    title: v.string(),
+    description: v.string(),
+    excerpt: v.string(),
+    noteCount: v.number(),
+    priceCents: v.number(),
+    currency: v.literal("eur"),
+    scope: v.union(v.literal("note"), v.literal("subtree")),
+    accessMode: v.union(v.literal("copy"), v.literal("readonly")),
+    // Bounded to 5 (LISTING_LIMITS.TAGS_MAX).
+    tags: v.array(v.string()),
+    status: v.union(v.literal("published"), v.literal("unpublished")),
+    salesCount: v.number(),
+    searchText: v.string(),
+    attestedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_noteId", ["noteId"])
+    .index("by_sellerId", ["sellerId"])
+    .index("by_status", ["status"])
+    .index("by_status_and_priceCents", ["status", "priceCents"])
+    .index("by_status_and_salesCount", ["status", "salesCount"])
+    .searchIndex("search_text", {
+      searchField: "searchText",
+      filterFields: ["status"],
+    }),
+
+  // Per-tag join rows (max 5 per listing). Carries a copy of searchText so
+  // q+tag browse is a paginated search with tag as a filter field (D-13).
+  listingTags: defineTable({
+    listingId: v.id("listings"),
+    tag: v.string(),
+    status: v.union(v.literal("published"), v.literal("unpublished")),
+    priceCents: v.number(),
+    salesCount: v.number(),
+    listingCreatedAt: v.number(),
+    searchText: v.string(),
+  })
+    .index("by_listingId", ["listingId"])
+    .index("by_tag_and_status_and_listingCreatedAt", [
+      "tag",
+      "status",
+      "listingCreatedAt",
+    ])
+    .index("by_tag_and_status_and_priceCents", ["tag", "status", "priceCents"])
+    .index("by_tag_and_status_and_salesCount_and_listingCreatedAt", [
+      "tag",
+      "status",
+      "salesCount",
+      "listingCreatedAt",
+    ])
+    .searchIndex("search_text_by_tag", {
+      searchField: "searchText",
+      filterFields: ["tag", "status"],
+    }),
+
+  // Counter of PUBLISHED listings per tag; rows deleted when count hits 0.
+  tagStats: defineTable({
+    tag: v.string(),
+    count: v.number(),
+  })
+    .index("by_tag", ["tag"])
+    .index("by_count", ["count"]),
 });
