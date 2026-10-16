@@ -40,6 +40,16 @@ New shadcn official components to add (via `npx shadcn add`): `tabs` (Share dial
 
 Tab visibility (default): Link and Public tabs are shown only to owner/admin (`canManage`, matching server rule). Edit/view-role users see only People as today.
 
+### Primary visual anchor per surface
+
+| Surface                         | Primary anchor (first thing the eye lands on)                                                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Visitor pages (`/s/`, `/p/`)    | The 32px Display note title, followed by the editor content. Top bar, banner and footer are visually subordinate (muted, 14px labels).    |
+| Share dialog, Link tab (active) | The read-only URL field with the accent `Copy link` button directly beside it. Role select and destructive actions sit below a Separator. |
+| Share dialog, Link tab (empty)  | The accent `Create link` button under the explainer.                                                                                      |
+| Share dialog, Public tab        | The `Switch` row ("Make this note public"); when ON, the public URL field + `Copy link` button.                                           |
+| Visitor invalid state           | The 20px Heading "This link isn't available", with the outline `Go to Noetree` button as the single action.                               |
+
 ---
 
 ## Spacing Scale
@@ -107,14 +117,15 @@ States (driven by reactive `useQuery` on link state):
 
 Helper text under the role select (always visible): View: "Anyone with the link can read this note. They don't need an account." Edit: "Anyone with the link can read it. People who sign in can edit it." Plus note "The link only gives access to this note, not its sub-notes." (D-02)
 
-Revoke confirm (AlertDialog, no focus on destructive by default; focus Cancel). Regenerate confirm similar.
+Revoke and Regenerate confirms (AlertDialog): initial focus lands on the safe dismiss button ("Keep link active" / "Keep current link"), never on the destructive action. The trigger label and the confirm label use the same verb ("Regenerate link" in both places; "Revoke link" in both places).
 
 ### Public tab (owner/admin), D-05/D-06/D-14
 
 - `Switch` labelled "Make this note public" with description. Visually separated from the Link tab by being its own tab and by the `Globe` icon (clear distinction from link sharing).
-- Turning ON: no confirm modal; before toggling, the persistent `Alert` (always visible while OFF and ON) states the cascade. Turning ON writes immediately; success inline "This note is now public".
-- Turning OFF: `AlertDialog` confirm ("Make private?") because links already shared in the wild stop working.
-- When ON: show public URL read-only `Input` + `Copy` button (same component as link URL) and the `Badge` "Public". Helper: "Not listed in search engines. Only people with the address can find it." (D-07)
+- Turning ON: no confirm modal; before toggling, the persistent `Alert` (always visible while OFF and ON) states the cascade. Turning ON writes immediately; success inline "This note is now public."
+- Turning OFF: `AlertDialog` confirm ("Make this note private?") because links already shared in the wild stop working. Dismiss button: "Keep note public".
+- Failure of either toggle direction: the switch reverts to its previous position and an inline `FieldError` under the switch row shows the public-specific error string (see Copywriting: "Error: public toggle"). It does not reuse the link error string.
+- When ON: show public URL read-only `Input` + `Copy link` button (same component as link URL) and the `Badge` "Public". Helper: "Not listed in search engines. Only people with the address can find it." (D-07)
 - If this note is public only by inheritance (ancestor is public): switch is disabled/unchecked-off with info text "Public because a parent note is public." plus no URL change (default; server flag lives on root only per D-05).
 - Free and Premium identical: no upgrade prompts, no tier badges anywhere (SHARE-06).
 
@@ -124,9 +135,9 @@ Layout: top bar (h-14, border-b, `--background`): Noetree wordmark left (links t
 States:
 
 - Loading: `Skeleton` for title (h-8 w-2/3) and 4 lines of body.
-- Invalid/revoked/missing (query returns null): centered `Heading` + body + "Go to Noetree" outline button; identical for revoked and never-existed (no oracle). Live revoke while open: editor switches to read-only instantly and replaces content with this state.
+- Invalid/revoked/missing (query returns null): centered `Heading` + body + "Go to Noetree" outline button (links to marketing home); identical for revoked and never-existed (no oracle). Live revoke while open: editor switches to read-only instantly and replaces content with this state.
 - View link, any visitor: read-only editor, no toolbar, no sign-in prompt.
-- Edit link, signed out: read-only editor + non-modal sticky banner under top bar: "Sign in to edit this note" with accent `Sign in to edit` button (Clerk `SignInButton`, return to the same URL). No wall.
+- Edit link, signed out: read-only editor + non-modal sticky banner under top bar: "Sign in to edit this note." with accent `Sign in to edit` button (Clerk `SignInButton`, return to the same URL). No wall.
 - Edit link, signed in: editable editor (content only; title read-only per Open Question 2 default). Save indicator in top bar: "Saving..." / "Saved" (label size, muted). Autosave debounced 3s like the app editor. On `LINK_INVALID` mutation error: switch to read-only and show the revoked state.
 - Image/link marks render as in app editor; links open `target=_blank rel="noopener noreferrer"`.
 
@@ -152,31 +163,46 @@ Both routes: `robots: noindex,nofollow`, `referrer: no-referrer` (D-07, RESEARCH
 
 All strings live in `messages/en.json` and `messages/fr.json` (next-intl). New namespaces: extend `ShareDialog` (keys prefixed `link*`, `public*`) and add `SharedNote`. English below is canonical; FR must be provided for every key (executor translates; keep verbs imperative).
 
-| Element                       | Copy (en)                                                                                                                                                               |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tabs                          | "People" / "Link" / "Public"                                                                                                                                            |
-| Primary CTA (Link tab)        | "Create link"                                                                                                                                                           |
-| Copy button / done            | "Copy link" / "Copied"                                                                                                                                                  |
-| Role options                  | "View only" / "Can edit"                                                                                                                                                |
-| Link empty state heading      | "No link yet"                                                                                                                                                           |
-| Link empty state body         | "Create a link to let anyone read this note, or edit it once they sign in. You can turn it off at any time."                                                            |
-| Public toggle label           | "Make this note public"                                                                                                                                                 |
-| Public cascade warning        | "Everyone with the address can read this note and all of its sub-notes, including notes you add or move into it later. It is not listed in search engines."             |
-| Public ON confirmation        | "This note is now public."                                                                                                                                              |
-| Public inherited info         | "Public because a parent note is public."                                                                                                                               |
-| Error: create/update link     | "Couldn't update the link. Check your connection and try again."                                                                                                        |
-| Error: not allowed            | "Only the owner or an admin can manage links and public access."                                                                                                        |
-| Visitor invalid state heading | "This link isn't available"                                                                                                                                             |
-| Visitor invalid state body    | "The link may have been turned off or the address is wrong. Ask the owner for a new link."                                                                              |
-| Visitor sign-in banner        | "Sign in to edit this note."                                                                                                                                            |
-| Visitor sign-in CTA           | "Sign in to edit"                                                                                                                                                       |
-| Save status                   | "Saving..." / "Saved"                                                                                                                                                   |
-| Public children heading       | "Sub-notes"                                                                                                                                                             |
-| Footer                        | "Made with Noetree" / CTA "Try Noetree"                                                                                                                                 |
-| Edit error after revoke       | "This link was turned off. You can no longer edit this note."                                                                                                           |
-| Destructive: Revoke link      | "Revoke this link?": "Anyone using it will lose access immediately. This can't be undone, and the old address will never work again." Buttons: "Cancel" / "Revoke link" |
-| Destructive: Regenerate link  | "Generate a new link?": "The current address stops working immediately. Anyone who needs access will need the new link." Buttons: "Cancel" / "Generate new link"        |
-| Destructive: Make private     | "Make this note private?": "The public address and the public addresses of its sub-notes stop working immediately." Buttons: "Cancel" / "Make private"                  |
+| Element                       | Copy (en)                                                                                                                                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tabs                          | "People" / "Link" / "Public"                                                                                                                                                            |
+| Primary CTA (Link tab)        | "Create link"                                                                                                                                                                           |
+| Copy button / done            | "Copy link" / "Copied"                                                                                                                                                                  |
+| Role options                  | "View only" / "Can edit"                                                                                                                                                                |
+| Link empty state heading      | "No link yet"                                                                                                                                                                           |
+| Link empty state body         | "Create a link to let anyone read this note, or edit it once they sign in. You can turn it off at any time."                                                                            |
+| Public toggle label           | "Make this note public"                                                                                                                                                                 |
+| Public cascade warning        | "Everyone with the address can read this note and all of its sub-notes, including notes you add or move into it later. It is not listed in search engines."                             |
+| Public ON confirmation        | "This note is now public."                                                                                                                                                              |
+| Public inherited info         | "Public because a parent note is public."                                                                                                                                               |
+| Error: create/update link     | "Couldn't update the link. Check your connection and try again."                                                                                                                        |
+| Error: public toggle          | "Couldn't change public access. Check your connection and try again. This note's visibility has not changed."                                                                           |
+| Error: not allowed            | "Only the owner or an admin can manage links and public access."                                                                                                                        |
+| Visitor invalid state heading | "This link isn't available"                                                                                                                                                             |
+| Visitor invalid state body    | "The link may have been turned off or the address is wrong. Ask the owner for a new link."                                                                                              |
+| Visitor invalid state CTA     | "Go to Noetree" (outline button, links to marketing home)                                                                                                                               |
+| Visitor sign-in banner        | "Sign in to edit this note."                                                                                                                                                            |
+| Visitor sign-in CTA           | "Sign in to edit"                                                                                                                                                                       |
+| Save status                   | "Saving..." / "Saved"                                                                                                                                                                   |
+| Public children heading       | "Sub-notes"                                                                                                                                                                             |
+| Footer                        | "Made with Noetree" / CTA "Try Noetree"                                                                                                                                                 |
+| Edit error after revoke       | "This link was turned off. You can no longer edit this note."                                                                                                                           |
+| Destructive: Revoke link      | Title "Revoke this link?": "Anyone using it will lose access immediately. This can't be undone, and the old address will never work again." Buttons: "Keep link active" / "Revoke link" |
+| Destructive: Regenerate link  | Title "Regenerate this link?": "The current address stops working immediately. Anyone who needs access will need the new link." Buttons: "Keep current link" / "Regenerate link"        |
+| Destructive: Make private     | Title "Make this note private?": "The public address and the public addresses of its sub-notes stop working immediately." Buttons: "Keep note public" / "Make private"                  |
+
+Messages keys for the destructive dismiss labels (en and fr both required), under the `ShareDialog` namespace:
+
+| Key                        | en                       | fr (suggested)                                                                                                              |
+| -------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `linkRevokeDismiss`        | "Keep link active"       | "Garder le lien actif"                                                                                                      |
+| `linkRegenerateDismiss`    | "Keep current link"      | "Garder le lien actuel"                                                                                                     |
+| `publicMakePrivateDismiss` | "Keep note public"       | "Garder la note publique"                                                                                                   |
+| `linkRegenerateConfirm`    | "Regenerate link"        | "Régénérer le lien"                                                                                                         |
+| `linkRegenerateTrigger`    | "Regenerate link"        | "Régénérer le lien"                                                                                                         |
+| `publicToggleError`        | see Error: public toggle | "Impossible de modifier l'accès public. Vérifiez votre connexion et réessayez. La visibilité de cette note n'a pas changé." |
+
+The generic "Cancel" label is not used in any of the three destructive dialogs.
 
 ---
 
