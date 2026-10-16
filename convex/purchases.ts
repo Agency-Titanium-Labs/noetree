@@ -9,11 +9,17 @@
  *
  * There is intentionally no refund path (D-14) and no quota check (BUY-04).
  */
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalMutation,
+  QueryCtx,
+  MutationCtx,
+} from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import { getUser } from "./helpers/helper";
-import { countSubtree } from "./helpers/listings";
+import { countSubtree, syncListingTags } from "./helpers/listings";
 import { computeCommission } from "./helpers/commission";
 
 async function requireBuyer(ctx: MutationCtx | QueryCtx) {
@@ -214,6 +220,105 @@ export const attachCheckoutSession = mutation({
       stripeCheckoutSessionId: args.stripeCheckoutSessionId,
     });
     return null;
+  },
+});
+
+/**
+ * Webhook-only: flips a pending purchase to paid exactly once (D-12, D-13).
+ * Verifies against the stored SNAPSHOT only (D-11) and never reads
+ * listing.status (D-09). Data problems return an anomaly (2xx to Stripe, no
+ * retry storm) and never throw. No refund path (D-14): a duplicate payment is
+ * logged for manual Dashboard handling.
+ */
+export const markPaidFromCheckout = internalMutation({
+  args: {
+    stripeEventId: v.string(),
+    eventType: v.string(),
+    purchaseId: v.string(),
+    stripeCheckoutSessionId: v.string(),
+    amountTotal: v.union(v.number(), v.null()),
+    currency: v.union(v.string(), v.null()),
+    paymentStatus: v.string(),
+    stripePaymentIntentId: v.optional(v.string()),
+  },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const key = `${args.stripeEventId}:marketplace-purchase-paid`;
+    const seen = await ctx.db
+      .query("processedStripeEvents")
+      .withIndex("by_stripeEventId", q => q.eq("stripeEventId", key))
+      .unique();
+    if (seen) return { alreadyProcessed: true };
+
+    const recordEvent = () =>
+      ctx.db.insert("processedStripeEvents", {
+        stripeEventId: key,
+        eventType: args.eventType,
+        processedAt: Date.now(),
+      });
+
+    const id = ctx.db.normalizeId("purchases", args.purchaseId);
+    const p = id ? await ctx.db.get("purchases", id) : null;
+    if (!p) {
+      console.error(
+        `marketplace payment anomaly: unknown purchase ${args.purchaseId} for stripeEventId ${args.stripeEventId}`,
+      );
+      return { anomaly: "unknown purchase" };
+    }
+
+    if (args.paymentStatus !== "paid") {
+      console.error(
+        `marketplace payment anomaly: payment not settled (${args.paymentStatus}) for purchase ${p._id}, stripeEventId ${args.stripeEventId}`,
+      );
+      return { anomaly: "payment not settled" };
+    }
+
+    if (
+      args.amountTotal !== p.priceCents ||
+      args.currency?.toLowerCase() !== p.currency
+    ) {
+      console.error(
+        `marketplace payment anomaly: amount or currency mismatch for purchase ${p._id} (got ${args.amountTotal} ${args.currency}, expected ${p.priceCents} ${p.currency}), stripeEventId ${args.stripeEventId}`,
+      );
+      return { anomaly: "amount or currency mismatch" };
+    }
+
+    if (p.status === "paid") {
+      if (p.stripeCheckoutSessionId !== args.stripeCheckoutSessionId) {
+        console.error(
+          `marketplace payment anomaly: duplicate payment for already-paid purchase ${p._id} via session ${args.stripeCheckoutSessionId} (paid via ${p.stripeCheckoutSessionId}); handle manually in Stripe Dashboard`,
+        );
+      }
+      await recordEvent();
+      return { alreadyProcessed: true };
+    }
+
+    if (
+      p.stripeCheckoutSessionId &&
+      p.stripeCheckoutSessionId !== args.stripeCheckoutSessionId
+    ) {
+      console.warn(
+        `marketplace payment: session ${args.stripeCheckoutSessionId} differs from stored ${p.stripeCheckoutSessionId} for purchase ${p._id}; completing at snapshot amount`,
+      );
+    }
+
+    await ctx.db.patch("purchases", p._id, {
+      status: "paid",
+      paidAt: Date.now(),
+      stripePaymentIntentId: args.stripePaymentIntentId,
+      stripeCheckoutSessionId: args.stripeCheckoutSessionId,
+    });
+
+    const listing = await ctx.db.get("listings", p.listingId);
+    if (listing) {
+      await ctx.db.patch("listings", listing._id, {
+        salesCount: listing.salesCount + 1,
+      });
+      await syncListingTags(ctx, listing._id);
+    }
+
+    await recordEvent();
+    return { success: true };
   },
 });
 

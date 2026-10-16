@@ -2,7 +2,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { ConvexError } from "convex/values";
 import schema from "./schema";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 const modules = (
@@ -512,5 +512,174 @@ describe("reuse", () => {
     expect(second.snapshotVersion).toBe(2);
     const [row] = await purchaseRows(t);
     expect(row.stripeCheckoutSessionId).toBeUndefined();
+  });
+});
+
+async function preparePending(price = 1000) {
+  const ctxt = await setup({ price });
+  const res = await asUser(ctxt.t, "buyer").mutation(
+    api.purchases.preparePurchase,
+    { listingId: ctxt.listingId },
+  );
+  return { ...ctxt, purchaseId: res.purchaseId };
+}
+
+const paidArgs = (purchaseId: string, over: Record<string, unknown> = {}) => ({
+  stripeEventId: "evt_x",
+  eventType: "checkout.session.completed",
+  purchaseId,
+  stripeCheckoutSessionId: "cs_1",
+  amountTotal: 1000 as number | null,
+  currency: "eur" as string | null,
+  paymentStatus: "paid",
+  stripePaymentIntentId: "pi_1",
+  ...over,
+});
+
+const getListing = (t: T, id: Id<"listings">) =>
+  t.run(ctx => ctx.db.get("listings", id));
+
+describe("mark paid", () => {
+  test("pending -> paid with salesCount, tags and event row", async () => {
+    const { t, listingId, purchaseId } = await preparePending();
+    await t.run(async ctx => {
+      await ctx.db.patch("listings", listingId, { tags: ["alpha"] });
+      await ctx.db.insert("listingTags", {
+        listingId,
+        tag: "alpha",
+        status: "published",
+        priceCents: 1000,
+        salesCount: 0,
+        listingCreatedAt: 1,
+        searchText: "pack",
+      });
+    });
+    const res = await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId),
+    );
+    expect(res).toEqual({ success: true });
+    const [row] = await purchaseRows(t);
+    expect(row.status).toBe("paid");
+    expect(row.paidAt).toBeTypeOf("number");
+    expect(row.stripePaymentIntentId).toBe("pi_1");
+    expect((await getListing(t, listingId))?.salesCount).toBe(1);
+    const tags = await t.run(ctx => ctx.db.query("listingTags").take(10));
+    expect(tags.every(r => r.salesCount === 1)).toBe(true);
+    const ev = await t.run(ctx =>
+      ctx.db.query("processedStripeEvents").take(10),
+    );
+    expect(ev.map(e => e.stripeEventId)).toContain(
+      "evt_x:marketplace-purchase-paid",
+    );
+  });
+
+  test("amount mismatch stays pending", async () => {
+    const { t, listingId, purchaseId } = await preparePending();
+    const res = await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId, { amountTotal: 999 }),
+    );
+    expect(res).toEqual({ anomaly: "amount or currency mismatch" });
+    expect((await purchaseRows(t))[0].status).toBe("pending");
+    expect((await getListing(t, listingId))?.salesCount).toBe(0);
+  });
+
+  test("currency mismatch is an anomaly, uppercase is accepted", async () => {
+    const { t, purchaseId } = await preparePending();
+    expect(
+      await t.mutation(
+        internal.purchases.markPaidFromCheckout,
+        paidArgs(purchaseId, { currency: "usd" }),
+      ),
+    ).toEqual({ anomaly: "amount or currency mismatch" });
+    expect(
+      await t.mutation(
+        internal.purchases.markPaidFromCheckout,
+        paidArgs(purchaseId, { currency: "EUR" }),
+      ),
+    ).toEqual({ success: true });
+  });
+
+  test("unpaid payment_status stays pending", async () => {
+    const { t, purchaseId } = await preparePending();
+    const res = await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId, { paymentStatus: "unpaid" }),
+    );
+    expect(res).toEqual({ anomaly: "payment not settled" });
+    expect((await purchaseRows(t))[0].status).toBe("pending");
+  });
+
+  test("unknown purchase id writes nothing", async () => {
+    const { t } = await preparePending();
+    for (const id of ["not-an-id", "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"]) {
+      expect(
+        await t.mutation(internal.purchases.markPaidFromCheckout, paidArgs(id)),
+      ).toEqual({ anomaly: "unknown purchase" });
+    }
+    const ev = await t.run(ctx =>
+      ctx.db.query("processedStripeEvents").take(10),
+    );
+    expect(ev).toHaveLength(0);
+  });
+});
+
+describe("replay", () => {
+  test("same event twice increments once", async () => {
+    const { t, listingId, purchaseId } = await preparePending();
+    await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId),
+    );
+    const paidAt = (await purchaseRows(t))[0].paidAt;
+    const second = await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId),
+    );
+    expect(second).toEqual({ alreadyProcessed: true });
+    expect((await getListing(t, listingId))?.salesCount).toBe(1);
+    expect((await purchaseRows(t))[0].paidAt).toBe(paidAt);
+  });
+
+  test("different event for already-paid purchase does not re-increment", async () => {
+    const { t, listingId, purchaseId } = await preparePending();
+    await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId),
+    );
+    const res = await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId, {
+        stripeEventId: "evt_y",
+        stripeCheckoutSessionId: "cs_other",
+      }),
+    );
+    expect(res).toEqual({ alreadyProcessed: true });
+    expect((await getListing(t, listingId))?.salesCount).toBe(1);
+    const ev = await t.run(ctx =>
+      ctx.db.query("processedStripeEvents").take(10),
+    );
+    expect(ev.map(e => e.stripeEventId)).toContain(
+      "evt_y:marketplace-purchase-paid",
+    );
+  });
+});
+
+describe("snapshot honored", () => {
+  test("edited and unpublished listing still completes at snapshot", async () => {
+    const { t, listingId, purchaseId } = await preparePending(1000);
+    await t.run(ctx =>
+      ctx.db.patch("listings", listingId, {
+        priceCents: 2000,
+        status: "unpublished",
+      }),
+    );
+    const res = await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId),
+    );
+    expect(res).toEqual({ success: true });
+    expect((await purchaseRows(t))[0].status).toBe("paid");
   });
 });
