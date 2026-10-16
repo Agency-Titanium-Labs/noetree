@@ -529,20 +529,20 @@ Also test via `stripeWebhooks.test.ts`'s existing webhook entry point if it expo
 | A7  | `ctx.runMutation` sub-transactions roll back independently when the parent catches the error                                                                                                       | Alternatives         | Not relied upon; only listed as an unused alternative                                                                                                                                                                                                                           |
 | A8  | `deliveryError` stores a short machine code, not seller or buyer PII                                                                                                                               | Pitfall 5 / Security | Low                                                                                                                                                                                                                                                                             |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Oversized content (hard failure mode of D-12)**
+1. **Oversized content (hard failure mode of D-12)** — RESOLVED: 8 MiB byte budget in plan 10-02; failure becomes `deliveryStatus: "failed"`; chunked delivery deferred.
    - What we know: 100 notes of ordinary text are far inside limits; a pathological subtree (embedded base64 images in note `content`, up to 1 MiB per document) could exceed 16 MiB. `markPaidFromCheckout` throwing would roll back the paid flip and make Stripe retry forever.
    - What's unclear: whether real content ever approaches this; the editor's image storage was not audited (no `generateUploadUrl` use found in `convex/` or `components/`, suggesting images may inline).
    - Recommendation: implement the byte budget so the failure becomes `deliveryStatus: "failed"` (money recorded, no retry storm); the D-16 backfill cannot succeed for these either. Ask the user whether to add a chunked, scheduler-driven delivery path later (deferred, since D-12 locks in-transaction).
 
-2. **Root `index` copy**
+2. **Root `index` copy** — RESOLVED: D-20 (descendants only).
    - D-07 lists sibling `index` as copied; for the root, the seller's `index` is meaningless among the buyer's roots (roots sort by `index ?? _creationTime`, ascending). Recommend: copy `index` for descendants only, leave the root's undefined. Needs user confirmation (A6).
 
-3. **Buyer deletes their copy**
+3. **Buyer deletes their copy** — RESOLVED: D-21 (Open note hidden, no redelivery).
    - Owned state stays derived from the paid purchase; Open note is simply hidden when the copy no longer exists. No redelivery. Confirm this is acceptable (the planner can proceed with it by default).
 
-4. **Read-only buyer sees seller metadata via `getNoteShares`**
+4. **Read-only buyer sees seller metadata via `getNoteShares`** — RESOLVED: out of scope, flagged for product awareness.
    - Today any viewer of a shared note gets the owner's name/email and the manual share list. After this phase a paying buyer gets the same. Out of scope to change, but flag for product awareness; at minimum purchase shares are hidden.
 
 ## Environment Availability
