@@ -130,7 +130,7 @@ Plans:
 Plans:
 
 - [x] 10-01-PLAN.md — Schema delivery fields/indexes, shared test seeds, [BLOCKING] push
-- [ ] 10-02-PLAN.md — Delivery helper (plan-then-write copy, readonly grant, idempotency) — TDD
+- [x] 10-02-PLAN.md — Delivery helper (plan-then-write copy, readonly grant, idempotency) — TDD
 - [ ] 10-03-PLAN.md — Scope-aware getUserPermission + tree-query leak fixes, isPurchased flag
 - [ ] 10-04-PLAN.md — createListing re-list guard for purchased content
 - [ ] 10-05-PLAN.md — Purchase-share immutability, deleteNote guard, duplicateNote via helper
@@ -168,7 +168,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 7. Connect Onboarding & Seller Enablement       | v1.1      | 6/6            | Complete    | 2026-10-16 |
 | 8. Listings & Marketplace Browse/Search         | v1.1      | 9/9            | Complete    | 2026-10-16 |
 | 9. Marketplace Checkout & Webhook Fix           | v1.1      | 6/6            | Complete    | 2026-10-16 |
-| 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 1/8            | In Progress |            |
+| 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 2/8            | In Progress |            |
 | 11. Buyer & Seller History UI                   | v1.1      | 0/TBD          | Not started | -          |
 
 ---
