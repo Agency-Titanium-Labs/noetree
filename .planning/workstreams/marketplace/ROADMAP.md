@@ -111,7 +111,7 @@ Plans:
 - [x] 09-02-PLAN.md — convex/purchases.ts: preparePurchase guards/snapshot, attachCheckoutSession, getMyListingState, no-refund guard
 - [x] 09-03-PLAN.md — webhook metadata.type discrimination + markPaidFromCheckout (verify, idempotent, salesCount) + top-up metadata.type
 - [x] 09-04-PLAN.md — createMarketplaceCheckout server action (destination charge, session reuse)
-- [ ] 09-05-PLAN.md — BuyPanel/BuyButton on listing detail page, FR/EN copy, component tests
+- [x] 09-05-PLAN.md — BuyPanel/BuyButton on listing detail page, FR/EN copy, component tests
 - [ ] 09-06-PLAN.md — phase gate: docs drift fix (15% -> 20/10, BUY-04 superseded), full suite/build/push, live Stripe purchase verification
 
 ### Phase 10: Purchase Fulfillment (Copy & Access Grants)
@@ -156,7 +156,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 06.1. Close gap — initial AI credits grant      | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 7. Connect Onboarding & Seller Enablement       | v1.1      | 6/6            | Complete    | 2026-10-16 |
 | 8. Listings & Marketplace Browse/Search         | v1.1      | 9/9            | Complete    | 2026-10-16 |
-| 9. Marketplace Checkout & Webhook Fix           | v1.1      | 4/6            | In Progress |            |
+| 9. Marketplace Checkout & Webhook Fix           | v1.1      | 5/6            | In Progress |            |
 | 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 0/TBD          | Not started | -          |
 | 11. Buyer & Seller History UI                   | v1.1      | 0/TBD          | Not started | -          |
 
