@@ -38,7 +38,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - Mise en vente d'une note : prix libre, choix note seule ou note+sous-arbre, choix copie éditable ou accès lecture seule pour l'acheteur
 - Aperçu partiel (titre + description + extrait) avant achat
 - Achat via Stripe Checkout, payout automatique vendeur via Stripe Connect (onboarding KYC géré par Stripe)
-- Commission Noetree fixe : 15% prélevée à la source sur chaque vente
+- Commission Noetree différenciée : 20% (vendeur Free) / 10% (vendeur Premium) prélevée à la source sur chaque vente
 - Vente ouverte à tous (Free + Pro)
 - Notes achetées en mode copie comptent dans le quota 20 notes Free existant
 - Ventes finales, pas de remboursement (contenu numérique)

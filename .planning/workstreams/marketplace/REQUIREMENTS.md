@@ -31,10 +31,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Achat & Paiement (BUY)
 
-- [ ] **BUY-01**: User can purchase a listing via Stripe Checkout with a 15% commission taken at source
+- [ ] **BUY-01**: User can purchase a listing via Stripe Checkout with a commission taken at source (20% for Free-tier sellers, 10% for Premium sellers)
 - [ ] **BUY-02**: Self-purchase is prevented
 - [ ] **BUY-03**: Already-purchased listings show an "owned" indicator instead of Buy
-- [ ] **BUY-04**: For copy-mode listings, Free-tier 20-note quota is checked before Checkout is created
+- [x] **BUY-04**: ~~Free-tier 20-note quota check before Checkout~~ — superseded: the 20-note cap was removed in v1.2 (97b0637); no check built
 - [ ] **BUY-05**: Sales are final — no refund flow
 
 ### Livraison (DELIVER)
@@ -46,7 +46,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Historique (HIST)
 
 - [ ] **HIST-01**: Buyer can view a "My Purchases" page listing everything bought (copy and read-only mode)
-- [ ] **HIST-02**: Seller can view a basic earnings view per sale (gross, 15% commission, net) with running balance and payout status
+- [ ] **HIST-02**: Seller can view a basic earnings view per sale (gross, commission, net) with running balance and payout status
 
 ## v2 Requirements
 

@@ -10,7 +10,7 @@ Buyers purchase a published listing through Stripe Checkout (destination charge:
 
 Not in this phase: delivering content (copy / read-only grant — Phase 10), purchase history and earnings UI (Phase 11), refunds, multi-item cart, coupons.
 
-Covers requirements: BUY-01, BUY-02, BUY-03, BUY-04, BUY-05.
+Covers requirements: BUY-01, BUY-02, BUY-03, BUY-05 (BUY-04 superseded by v1.2 — see D-07).
 
 **Requirements drift to fix:** `REQUIREMENTS.md` BUY-01 and HIST-02 (and `PROJECT.md`) still say a flat 15% commission. ROADMAP.md Phase 9 (authoritative) says 20% Free seller / 10% Premium seller. Update REQUIREMENTS.md/PROJECT.md wording as part of this phase.
 
@@ -33,7 +33,7 @@ Covers requirements: BUY-01, BUY-02, BUY-03, BUY-04, BUY-05.
 
 ### Pre-checkout guards & blocked UX
 
-- **D-07:** Copy-mode listing + Free-tier buyer whose purchase (listing's stored note count) would exceed the 20-note quota: reject BEFORE any Stripe session with a ConvexError carrying needed/remaining counts. The detail page shows an inline message ("You have X slots left, this needs N") with a link to `/pricing` as an upgrade CTA. No pending purchase row is left behind.
+- **D-07 [informational]:** SUPERSEDED (2026-10-16, user decision after research): the Free-tier 20-note cap was removed in v1.2 (commit 97b0637), so NO pre-checkout quota check is built. BUY-04 is marked superseded in REQUIREMENTS.md. Copy-mode delivery (Phase 10) must not enforce a note limit either.
 - **D-08:** At Buy click, re-validate everything server-side: listing still `published`, seller still passes the Phase 7 gate (`isSellerActive` / `getConnectAccountStatus`), subtree count still ≤ 100 (Phase 8 D-09 said Phase 9/10 must re-validate), buyer ≠ seller, buyer doesn't already own it. Price and commission are always read fresh at that moment — never trusted from the client. ConvexError codes are mapped to friendly FR/EN i18n messages.
 - **D-09:** If the seller edits or unpublishes after the buyer opened Stripe Checkout but before payment, honor the pending purchase's snapshot: payment completes at the agreed price and Phase 10 delivers. Unpublish only blocks NEW checkouts (consistent with LIST-04). Open Stripe sessions are NOT expired on unpublish (no Stripe calls from listing mutations).
 
