@@ -81,7 +81,7 @@ Plans:
 
 - [x] 08-01-PLAN.md — listings/listingTags/tagStats schema, helpers (excerpt, tags, cap, snapshot, tag sync), deleteNote auto-unpublish (D-18)
 - [x] 08-02-PLAN.md — URL-state + price utils, Checkbox/Textarea/PriceLabel, /listings protection, FR/EN copy
-- [ ] 08-03-PLAN.md — seller API: createListing/updateListing/setListingStatus/listMine/getMineByNote/previewSubtreeCount
+- [x] 08-03-PLAN.md — seller API: createListing/updateListing/setListingStatus/listMine/getMineByNote/previewSubtreeCount
 - [ ] 08-04-PLAN.md — public API (convex/marketplace.ts): browse (search/tag/sort/pagination), getPublic, topTags
 - [ ] 08-05-PLAN.md — public (marketplace) layout + browse page (toolbar, grid, cards, Load more, URL state)
 - [ ] 08-06-PLAN.md — listing detail page (partial preview, disabled Buy slot)
@@ -145,7 +145,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 6. Settings Page                                | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant      | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 7. Connect Onboarding & Seller Enablement       | v1.1      | 6/6            | Complete    | 2026-10-16 |
-| 8. Listings & Marketplace Browse/Search         | v1.1      | 2/9            | In Progress |            |
+| 8. Listings & Marketplace Browse/Search         | v1.1      | 3/9            | In Progress |            |
 | 9. Marketplace Checkout & Webhook Fix           | v1.1      | 0/TBD          | Not started | -          |
 | 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 0/TBD          | Not started | -          |
 | 11. Buyer & Seller History UI                   | v1.1      | 0/TBD          | Not started | -          |
