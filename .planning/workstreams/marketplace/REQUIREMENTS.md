@@ -39,9 +39,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Livraison (DELIVER)
 
-- [ ] **DELIVER-01**: Copy-mode purchase duplicates the note (+subtree if applicable) into the buyer's tree at root level
-- [ ] **DELIVER-02**: Read-only-mode purchase grants the buyer live, permanent view access to the seller's note (+subtree), reflecting the seller's future edits
-- [ ] **DELIVER-03**: Delivery is idempotent against webhook retries (no duplicate copies/grants)
+- [x] **DELIVER-01**: Copy-mode purchase duplicates the note (+subtree if applicable) into the buyer's tree at root level
+- [x] **DELIVER-02**: Read-only-mode purchase grants the buyer live, permanent view access to the seller's note (+subtree), reflecting the seller's future edits
+- [x] **DELIVER-03**: Delivery is idempotent against webhook retries (no duplicate copies/grants)
 
 ### Historique (HIST)
 
@@ -99,9 +99,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BUY-03      | Phase 9  | Complete   |
 | BUY-04      | Phase 9  | Superseded |
 | BUY-05      | Phase 9  | Complete   |
-| DELIVER-01  | Phase 10 | Pending    |
-| DELIVER-02  | Phase 10 | Pending    |
-| DELIVER-03  | Phase 10 | Pending    |
+| DELIVER-01  | Phase 10 | Complete   |
+| DELIVER-02  | Phase 10 | Complete   |
+| DELIVER-03  | Phase 10 | Complete   |
 | HIST-01     | Phase 11 | Pending    |
 | HIST-02     | Phase 11 | Pending    |
 
