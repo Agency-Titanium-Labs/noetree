@@ -4,20 +4,20 @@ milestone: v1.1
 milestone_name: Marketplace de notes
 status: executing
 stopped_at: Phase 8 UI-SPEC approved
-last_updated: "2026-10-16T16:19:02.137Z"
+last_updated: "2026-10-16T16:30:26.163Z"
 last_activity: 2026-10-16
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 15
-  completed_plans: 7
+  completed_plans: 8
   percent: 20
 ---
 
 ## Current Position
 
 Phase: 8 (Listings & Marketplace Browse/Search) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Status: Ready to execute
 Last activity: 2026-10-16
 
@@ -58,6 +58,7 @@ _Updated after each plan completion_
 | Phase 01 P03 | 8 | 3 tasks | 3 files |
 | Phase 01 P04 | 5 | 2 tasks | 1 files |
 | Phase 06 P05 | N/A | 2 tasks | 0 files |
+| Phase 08 P02 | 15min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,7 @@ Research-driven decisions carried into v1.1 roadmap (see `.planning/research/SUM
 - "Read-only" grants reuse the existing `shares` table + `getUserPermission` resolution (extended with a `purchaseId` field), not a new parallel permission system.
 - "Copy" grants reuse (via extraction into a shared, owner-parameterized helper) the existing subtree-duplication logic in `notes.ts`, with new pre-flight Free-tier quota checks and purchase-scoped idempotency — both gaps that don't exist in the current same-owner-only code path.
 - The webhook metadata-type fix (discriminating marketplace purchases from AI-credit top-ups in the existing `checkout.session.completed` handler) is bundled into Phase 9, not deferred, because it modifies production code that must be regression-tested alongside the new branch.
+- [Phase 08]: Phase 8 sort literals newest|price_asc|price_desc|popular are single source of truth; default omitted from URL
 
 ### Pending Todos
 
@@ -103,7 +105,7 @@ v1.1 deferred to v2 (see REQUIREMENTS.md v2 Requirements): seller public profile
 
 ## Session Continuity
 
-Last session: 2026-10-16T16:19:02.127Z
+Last session: 2026-10-16T16:29:03.449Z
 Stopped at: Phase 8 UI-SPEC approved
 Resume file: None
 
