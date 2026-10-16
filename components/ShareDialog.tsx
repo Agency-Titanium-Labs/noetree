@@ -40,6 +40,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ShareLinkSection from "@/components/ShareLinkSection";
 import SharePublicSection from "@/components/SharePublicSection";
+import { getInitials } from "@/lib/initials";
 
 interface ShareDialogProps {
   noteId: Id<"notes">;
@@ -142,16 +143,6 @@ export default function ShareDialog({
     } catch {
       setErrorMsg(t("errorGeneric"));
     }
-  };
-
-  const getInitials = (name?: string) => {
-    if (!name) return "?";
-    return name
-      .split(" ")
-      .map(part => part[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase();
   };
 
   const peopleContent = (
