@@ -231,6 +231,21 @@ describe("createConnectOnboardingLink", () => {
     expect(mockAccountLinksCreate).not.toHaveBeenCalled();
   });
 
+  it("a null Convex token aborts with connectStatusLookupFailed and creates no Stripe account (WR-01)", async () => {
+    mockAuth.mockResolvedValue({
+      userId: "user_null_token",
+      getToken: vi.fn().mockResolvedValue(null),
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(createConnectOnboardingLink("en")).rejects.toThrow(
+      "connectStatusLookupFailed",
+    );
+    expect(mockConvexQuery).not.toHaveBeenCalled();
+    expect(mockAccountsCreate).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it("stripe.accounts.create failure surfaces as connectAccountCreationFailed, accountLinks.create never called", async () => {
     mockAuth.mockResolvedValue({
       userId: "user_create_fail_1",

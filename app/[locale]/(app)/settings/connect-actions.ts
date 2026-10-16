@@ -43,7 +43,10 @@ export async function createConnectOnboardingLink(
   >;
   try {
     const convexToken = await getToken({ template: "convex" });
-    if (convexToken) convex.setAuth(convexToken);
+    // WR-01: a null token must abort — continuing unauthenticated would
+    // read "no row" and go on to create an orphan Stripe account.
+    if (!convexToken) throw new Error("missing convex auth token");
+    convex.setAuth(convexToken);
     existing = await convex.query(api.connectAccounts.getMyConnectStatus, {});
   } catch (err) {
     // T-07-16: never log the token itself, only a static message + the
