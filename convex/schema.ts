@@ -33,6 +33,8 @@ export default defineSchema({
     parentNote: v.optional(v.id("notes")),
     index: v.optional(v.float64()),
     isPinned: v.optional(v.boolean()),
+    // Public flag lives on the ROOT of a public subtree only; undefined = private.
+    isPublic: v.optional(v.boolean()),
   })
     .index("by_owner", ["owner", "parentNote"])
     .index("by_parent", ["parentNote"]),
@@ -117,6 +119,22 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_user_note", ["userId", "noteId"])
     .index("by_email_note", ["email", "noteId"]),
+
+  // shareLinks invariants (Phase 13):
+  // - At most one row per noteId (D-01).
+  // - token is a 256-bit CSPRNG bearer secret generated in a Node action,
+  //   never a note _id (D-04).
+  // - Revoke hard-deletes the row (D-03).
+  // - A link grants access to that single note only, never descendants (D-02).
+  shareLinks: defineTable({
+    noteId: v.id("notes"),
+    token: v.string(),
+    role: v.union(v.literal("view"), v.literal("edit")),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_noteId", ["noteId"]),
 
   // Listings invariants (Phase 8):
   // - One listing row per note for life (D-17): unpublish flips status, rows
