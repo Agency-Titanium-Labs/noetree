@@ -1,7 +1,7 @@
 ---
 phase: 9
 slug: marketplace-checkout-webhook-fix
-status: approved-automated
+status: approved
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-10-16
@@ -70,4 +70,4 @@ BUY-04 is superseded (D-07, informational): no quota test.
 - [x] No watch-mode flags
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** automated gate approved 2026-10-16 (live Stripe verification pending, plan 09-06 Task 3)
+**Approval:** approved 2026-10-16 (automated + live, see 09-LIVE-VERIFICATION.md)
