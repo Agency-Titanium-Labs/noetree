@@ -26,3 +26,15 @@ Stripe mode: **test** (banner confirmed on every script run). Live cutover (Task
 
 - Clicking `Upgrade to Premium` end-to-end through the app's server action (signed-out click redirects to Clerk sign-in).
 - Settings page showing `Premium` + renewal date matching Stripe (Task 2 step 7).
+
+## Signed-in verification via Chrome MCP (2026-10-16, port 3001, isolated Convex dev deployment `confident-bloodhound-585`)
+
+- `Upgrade to Premium` (signed-in, Free user) -> real server action -> Stripe Checkout (test): Annual shows `Premium` / 59,00 € par an; Monthly shows `Premium` / 6,99 € par mois. PASS
+- Settings with an active subscription row (inserted via `internal.subscriptions.upsertSubscription`, period end 1794829647): `Premium` + `Renews on November 16, 2026` (EN) / `Renouvellement le 16 novembre 2026` (FR); date = currentPeriodEnd\*1000. PASS
+- Pricing page as Premium user: `Current plan` on the Premium card, `6.99€ / month`, Free card `Unlimited notes`. PASS
+- No console errors on pricing/settings.
+
+### Findings
+
+- Stripe Product description still reads `Pro subscription - 100 AI credits/month` (visible on Checkout under the `Premium` title). `setupPremiumPrices` renames the Product name only.
+- A worktree needs its own `.env` (Clerk keys) and its own Convex dev deployment; sharing `frugal-echidna-922` with the marketplace checkout makes `convex dev` overwrite each other's functions.
