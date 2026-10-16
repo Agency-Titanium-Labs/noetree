@@ -52,6 +52,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - ✓ User can cancel Pro subscription with confirmation, without immediate access loss; correctly downgrades to Free at period end — Phase 6 (SET-04, PAY-04)
 - ✓ User can view pricing page (Free vs Pro plans) — Phase 3 (PLAN-01)
 - ✓ User can subscribe to Pro plan via Stripe Checkout, with in-app confirmation after activation — Phase 3 (PAY-01, PAY-02)
+- ✓ Seller can complete Stripe Connect (Express) onboarding from Settings; capability status is webhook-driven and enforceable server-side via `isSellerActive` — Phase 7 (CONNECT-01, CONNECT-02, CONNECT-03)
 
 ### Active
 
@@ -117,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-07-12 — v1.1 milestone started (Marketplace de notes)_
+_Last updated: 2026-10-16 — Phase 7 (Connect onboarding & seller enablement) complete_
