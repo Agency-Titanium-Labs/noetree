@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import schema from "./schema";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { resolvePublicRoot } from "./helpers/sharing";
 
@@ -169,5 +169,240 @@ describe("shareLinks helpers - delete cleanup (SHARE-04)", () => {
     expect(copies[0].isPublic).toBeUndefined();
     expect(links.every(l => l.noteId === src)).toBe(true);
     expect(links).toHaveLength(1);
+  });
+});
+
+const tok = (c: string) => c.repeat(43);
+
+async function seedShare(
+  t: T,
+  noteId: Id<"notes">,
+  userId: Id<"users">,
+  role: "view" | "edit" | "admin",
+) {
+  await t.run(ctx =>
+    ctx.db.insert("shares", { noteId, userId, email: `${role}@x.io`, role }),
+  );
+}
+
+describe("shareLinks - create (SHARE-01)", () => {
+  test("create: owner insertLink replaces existing token, one row remains", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, identity } = await seedUser(t, "c1");
+    const note = await seedNote(t, userId);
+    const as = t.withIdentity(identity);
+    await as.mutation(internal.shareLinks.insertLink, {
+      noteId: note,
+      role: "edit",
+      token: tok("a"),
+    });
+    await as.mutation(internal.shareLinks.insertLink, {
+      noteId: note,
+      role: "edit",
+      token: tok("b"),
+    });
+    const rows = await t.run(ctx => ctx.db.query("shareLinks").collect());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].token).toBe(tok("b"));
+  });
+
+  test("create: admin allowed; edit/view shared users and anonymous rejected", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "c2o");
+    const admin = await seedUser(t, "c2a");
+    const editor = await seedUser(t, "c2e");
+    const viewer = await seedUser(t, "c2v");
+    const note = await seedNote(t, owner.userId);
+    await seedShare(t, note, admin.userId, "admin");
+    await seedShare(t, note, editor.userId, "edit");
+    await seedShare(t, note, viewer.userId, "view");
+    const args = { noteId: note, role: "view" as const, token: tok("c") };
+    await t
+      .withIdentity(admin.identity)
+      .mutation(internal.shareLinks.insertLink, args);
+    for (const u of [editor, viewer]) {
+      await expect(
+        t.withIdentity(u.identity).mutation(internal.shareLinks.insertLink, {
+          ...args,
+          token: tok("d"),
+        }),
+      ).rejects.toThrow(/NOT_ALLOWED/);
+    }
+    await expect(
+      t.mutation(internal.shareLinks.insertLink, { ...args, token: tok("e") }),
+    ).rejects.toThrow(/UNAUTHENTICATED/);
+  });
+
+  test("create: short token and duplicate token rejected", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, identity } = await seedUser(t, "c3");
+    const n1 = await seedNote(t, userId);
+    const n2 = await seedNote(t, userId);
+    const as = t.withIdentity(identity);
+    await expect(
+      as.mutation(internal.shareLinks.insertLink, {
+        noteId: n1,
+        role: "view",
+        token: "short",
+      }),
+    ).rejects.toThrow(/INVALID_TOKEN/);
+    await as.mutation(internal.shareLinks.insertLink, {
+      noteId: n1,
+      role: "view",
+      token: tok("f"),
+    });
+    await expect(
+      as.mutation(internal.shareLinks.insertLink, {
+        noteId: n2,
+        role: "view",
+        token: tok("f"),
+      }),
+    ).rejects.toThrow(/INVALID_TOKEN/);
+  });
+});
+
+describe("shareLinks - revoke (SHARE-04)", () => {
+  test("revoke: deletes row, idempotent, state null afterwards", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, identity } = await seedUser(t, "r1");
+    const note = await seedNote(t, userId);
+    await seedLink(t, note, userId, tok("g"));
+    const as = t.withIdentity(identity);
+    expect(
+      await as.query(api.shareLinks.getLinkState, { noteId: note }),
+    ).toEqual({ token: tok("g"), role: "view" });
+    await as.mutation(api.shareLinks.revokeLink, { noteId: note });
+    await as.mutation(api.shareLinks.revokeLink, { noteId: note });
+    expect(
+      await as.query(api.shareLinks.getLinkState, { noteId: note }),
+    ).toBeNull();
+  });
+
+  test("revoke: setLinkRole keeps token; missing link throws LINK_NOT_FOUND", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, identity } = await seedUser(t, "r2");
+    const note = await seedNote(t, userId);
+    const other = await seedNote(t, userId);
+    await seedLink(t, note, userId, tok("h"));
+    const as = t.withIdentity(identity);
+    await as.mutation(api.shareLinks.setLinkRole, {
+      noteId: note,
+      role: "edit",
+    });
+    expect(
+      await as.query(api.shareLinks.getLinkState, { noteId: note }),
+    ).toEqual({ token: tok("h"), role: "edit" });
+    await expect(
+      as.mutation(api.shareLinks.setLinkRole, { noteId: other, role: "edit" }),
+    ).rejects.toThrow(/LINK_NOT_FOUND/);
+  });
+
+  test("revoke: getLinkState null for non-manager and anonymous", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "r3o");
+    const stranger = await seedUser(t, "r3s");
+    const note = await seedNote(t, owner.userId);
+    await seedLink(t, note, owner.userId, tok("i"));
+    expect(
+      await t
+        .withIdentity(stranger.identity)
+        .query(api.shareLinks.getLinkState, { noteId: note }),
+    ).toBeNull();
+    expect(
+      await t.query(api.shareLinks.getLinkState, { noteId: note }),
+    ).toBeNull();
+  });
+});
+
+describe("shareLinks - public toggle (SHARE-05)", () => {
+  test("public: setPublic touches only target note; edit user rejected", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "p1o");
+    const editor = await seedUser(t, "p1e");
+    const root = await seedNote(t, owner.userId);
+    const child = await seedNote(t, owner.userId, { parentNote: root });
+    await seedShare(t, root, editor.userId, "edit");
+    const as = t.withIdentity(owner.identity);
+    await as.mutation(api.shareLinks.setPublic, {
+      noteId: root,
+      isPublic: true,
+    });
+    const after = await t.run(async ctx => ({
+      root: await ctx.db.get("notes", root),
+      child: await ctx.db.get("notes", child),
+    }));
+    expect(after.root?.isPublic).toBe(true);
+    expect(after.child?.isPublic).toBeUndefined();
+    await expect(
+      t
+        .withIdentity(editor.identity)
+        .mutation(api.shareLinks.setPublic, { noteId: root, isPublic: false }),
+    ).rejects.toThrow(/NOT_ALLOWED/);
+    await as.mutation(api.shareLinks.setPublic, {
+      noteId: root,
+      isPublic: false,
+    });
+    const cleared = await t.run(ctx => ctx.db.get("notes", root));
+    expect(cleared?.isPublic).toBe(false);
+  });
+
+  test("public: getPublicState direct, inherited, none, null for non-managers", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "p2o");
+    const stranger = await seedUser(t, "p2s");
+    const root = await seedNote(t, owner.userId, { isPublic: true });
+    const child = await seedNote(t, owner.userId, { parentNote: root });
+    const priv = await seedNote(t, owner.userId);
+    const as = t.withIdentity(owner.identity);
+    expect(
+      await as.query(api.shareLinks.getPublicState, { noteId: root }),
+    ).toEqual({ isPublic: true, inherited: false });
+    expect(
+      await as.query(api.shareLinks.getPublicState, { noteId: child }),
+    ).toEqual({ isPublic: false, inherited: true });
+    expect(
+      await as.query(api.shareLinks.getPublicState, { noteId: priv }),
+    ).toEqual({ isPublic: false, inherited: false });
+    expect(
+      await t
+        .withIdentity(stranger.identity)
+        .query(api.shareLinks.getPublicState, { noteId: root }),
+    ).toBeNull();
+  });
+});
+
+describe("shareLinks - tier parity (SHARE-06)", () => {
+  test("tier: free and premium users can both create links and publish", async () => {
+    const t = convexTest(schema, modules);
+    const free = await seedUser(t, "free");
+    const premium = await seedUser(t, "premium");
+    await t.run(ctx =>
+      ctx.db.insert("subscriptions", {
+        clerkUserId: "user_premium",
+        stripeCustomerId: "cus_x",
+        stripeSubscriptionId: "sub_x",
+        status: "active",
+        currentPeriodEnd: Date.now() + 1e9,
+        cancelAtPeriodEnd: false,
+      }),
+    );
+    for (const [u, c] of [
+      [free, "j"],
+      [premium, "k"],
+    ] as const) {
+      const note = await seedNote(t, u.userId);
+      const as = t.withIdentity(u.identity);
+      await as.mutation(internal.shareLinks.insertLink, {
+        noteId: note,
+        role: "edit",
+        token: tok(c),
+      });
+      await as.mutation(api.shareLinks.setPublic, {
+        noteId: note,
+        isPublic: true,
+      });
+      const n = await t.run(ctx => ctx.db.get("notes", note));
+      expect(n?.isPublic).toBe(true);
+    }
   });
 });
