@@ -9,10 +9,10 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Plan Restructure
 
-- [ ] **PLAN-06**: Free tier has no note-count limit — notes are unlimited on every plan
-- [ ] **PLAN-07**: The paid plan is renamed from "Pro" to "Premium" everywhere it's shown (pricing page, Settings, Stripe Checkout, webhook-derived plan labels)
-- [ ] **PLAN-08**: User can subscribe to Premium at 6.99€/month or 59€/year (annual option available at checkout)
-- [ ] **PLAN-09**: Existing active Pro subscribers are migrated to the new Premium price without an unexpected billing gap or a duplicate subscription being created
+- [x] **PLAN-06**: Free tier has no note-count limit — notes are unlimited on every plan
+- [x] **PLAN-07**: The paid plan is renamed from "Pro" to "Premium" everywhere it's shown (pricing page, Settings, Stripe Checkout, webhook-derived plan labels)
+- [x] **PLAN-08**: User can subscribe to Premium at 6.99€/month or 59€/year (annual option available at checkout)
+- [x] **PLAN-09**: Existing active Pro subscribers are migrated to the new Premium price without an unexpected billing gap or a duplicate subscription being created
 
 ### Sharing & Access Rights
 
@@ -92,35 +92,35 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-| Requirement | Phase                                         | Status  |
-| ----------- | --------------------------------------------- | ------- |
-| PLAN-06     | Phase 12 — Plan Restructure & Tier Foundation | Pending |
-| PLAN-07     | Phase 12 — Plan Restructure & Tier Foundation | Pending |
-| PLAN-08     | Phase 12 — Plan Restructure & Tier Foundation | Pending |
-| PLAN-09     | Phase 12 — Plan Restructure & Tier Foundation | Pending |
-| SHARE-01    | Phase 13 — Sharing — Links & Public Notes     | Pending |
-| SHARE-02    | Phase 13 — Sharing — Links & Public Notes     | Pending |
-| SHARE-03    | Phase 13 — Sharing — Links & Public Notes     | Pending |
-| SHARE-04    | Phase 13 — Sharing — Links & Public Notes     | Pending |
-| SHARE-05    | Phase 13 — Sharing — Links & Public Notes     | Pending |
-| SHARE-06    | Phase 13 — Sharing — Links & Public Notes     | Pending |
-| COMMENT-01  | Phase 14 — Comments & Notifications           | Pending |
-| COMMENT-02  | Phase 14 — Comments & Notifications           | Pending |
-| COMMENT-03  | Phase 14 — Comments & Notifications           | Pending |
-| COMMENT-04  | Phase 14 — Comments & Notifications           | Pending |
-| NOTIF-01    | Phase 14 — Comments & Notifications           | Pending |
-| NOTIF-02    | Phase 14 — Comments & Notifications           | Pending |
-| HIST-01     | Phase 15 — Version History & Restoration      | Pending |
-| HIST-02     | Phase 15 — Version History & Restoration      | Pending |
-| HIST-03     | Phase 15 — Version History & Restoration      | Pending |
-| HIST-04     | Phase 15 — Version History & Restoration      | Pending |
-| HIST-05     | Phase 15 — Version History & Restoration      | Pending |
-| CRED-05     | Phase 16 — AI Credit System Revision          | Pending |
-| CRED-06     | Phase 16 — AI Credit System Revision          | Pending |
-| CRED-07     | Phase 16 — AI Credit System Revision          | Pending |
-| CRED-08     | Phase 16 — AI Credit System Revision          | Pending |
-| CRED-09     | Phase 16 — AI Credit System Revision          | Pending |
-| CRED-10     | Phase 16 — AI Credit System Revision          | Pending |
+| Requirement | Phase                                         | Status   |
+| ----------- | --------------------------------------------- | -------- |
+| PLAN-06     | Phase 12 — Plan Restructure & Tier Foundation | Complete |
+| PLAN-07     | Phase 12 — Plan Restructure & Tier Foundation | Complete |
+| PLAN-08     | Phase 12 — Plan Restructure & Tier Foundation | Complete |
+| PLAN-09     | Phase 12 — Plan Restructure & Tier Foundation | Complete |
+| SHARE-01    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
+| SHARE-02    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
+| SHARE-03    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
+| SHARE-04    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
+| SHARE-05    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
+| SHARE-06    | Phase 13 — Sharing — Links & Public Notes     | Pending  |
+| COMMENT-01  | Phase 14 — Comments & Notifications           | Pending  |
+| COMMENT-02  | Phase 14 — Comments & Notifications           | Pending  |
+| COMMENT-03  | Phase 14 — Comments & Notifications           | Pending  |
+| COMMENT-04  | Phase 14 — Comments & Notifications           | Pending  |
+| NOTIF-01    | Phase 14 — Comments & Notifications           | Pending  |
+| NOTIF-02    | Phase 14 — Comments & Notifications           | Pending  |
+| HIST-01     | Phase 15 — Version History & Restoration      | Pending  |
+| HIST-02     | Phase 15 — Version History & Restoration      | Pending  |
+| HIST-03     | Phase 15 — Version History & Restoration      | Pending  |
+| HIST-04     | Phase 15 — Version History & Restoration      | Pending  |
+| HIST-05     | Phase 15 — Version History & Restoration      | Pending  |
+| CRED-05     | Phase 16 — AI Credit System Revision          | Pending  |
+| CRED-06     | Phase 16 — AI Credit System Revision          | Pending  |
+| CRED-07     | Phase 16 — AI Credit System Revision          | Pending  |
+| CRED-08     | Phase 16 — AI Credit System Revision          | Pending  |
+| CRED-09     | Phase 16 — AI Credit System Revision          | Pending  |
+| CRED-10     | Phase 16 — AI Credit System Revision          | Pending  |
 
 **Coverage:**
 

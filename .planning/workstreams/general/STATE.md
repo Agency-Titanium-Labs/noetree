@@ -2,24 +2,24 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: executing
-stopped_at: Phase 12 waves 1-3 complete (12-01..12-05 merged, 125/125 tests passing); Wave 4 (12-06) blocked on operator Stripe checkpoint Task 1
-last_updated: "2026-08-25T18:07:35.114Z"
+status: ready_to_plan
+stopped_at: Phase 12 complete (6/6) — ready to discuss Phase 13
+last_updated: 2026-10-16T15:49:24.867Z
 last_activity: 2026-08-25 -- Phase 12 execution started
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
 ## Current Position
 
-Phase: 12 (Plan Restructure & Tier Foundation) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 12
-Last activity: 2026-08-25 -- Phase 12 execution started
+Phase: 13
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-16
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -28,13 +28,13 @@ Progress: [░░░░░░░░░░] 0%
 See: .planning/PROJECT.md (updated 2026-08-25)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
-**Current focus:** Phase 12 — Plan Restructure & Tier Foundation
+**Current focus:** Phase 13 — sharing — links & public notes
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 21 (from v1.0; v1.2 has not started execution)
+- Total plans completed: 27 (from v1.0; v1.2 has not started execution)
 - Average duration: —
 - Total execution time: 0 hours (v1.2)
 
@@ -42,7 +42,7 @@ See: .planning/PROJECT.md (updated 2026-08-25)
 
 | Phase | Plans | Total | Avg/Plan |
 | ----- | ----- | ----- | -------- |
-| 12    | TBD   | -     | -        |
+| 12    | 6     | -     | -        |
 | 13    | TBD   | -     | -        |
 | 14    | TBD   | -     | -        |
 | 15    | TBD   | -     | -        |

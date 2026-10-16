@@ -32,7 +32,7 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Milestone Goal:** Passer à un modèle freemium sans limite de notes, avec de nouvelles fonctionnalités sociales (partage, commentaires, historique de versions) et un système de crédits IA revu.
 
-- [ ] **Phase 12: Plan Restructure & Tier Foundation** - Free tier note cap removed, Pro renamed to Premium with new pricing, existing subscribers migrated without billing disruption
+- [x] **Phase 12: Plan Restructure & Tier Foundation** - Free tier note cap removed, Pro renamed to Premium with new pricing, existing subscribers migrated without billing disruption (completed 2026-10-16)
 - [ ] **Phase 13: Sharing — Links & Public Notes** - Users can share notes via unique view/edit links or make notes fully public, free and unlimited on every plan
 - [ ] **Phase 14: Comments & Notifications** - Users can comment on notes they have access to and get notified in-app when someone comments on their notes
 - [ ] **Phase 15: Version History & Restoration** - Notes are automatically snapshotted and users can preview/restore past versions, with tiered retention by plan
@@ -72,7 +72,7 @@ Plans:
 
 **Wave 4** _(blocked on Wave 3 completion)_
 
-- [ ] 12-06-PLAN.md — Operator-gated Stripe cutover: test-mode verification then live migration and archive (wave 4)
+- [x] 12-06-PLAN.md — Operator-gated Stripe cutover: test-mode verification then live migration and archive (wave 4)
 
 ### Phase 13: Sharing — Links & Public Notes
 
@@ -151,7 +151,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 5. AI Credits System                           | v1.0      | 5/5            | Complete    | 2026-07-10 |
 | 6. Settings Page                               | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
-| 12. Plan Restructure & Tier Foundation         | v1.2      | 5/6            | In Progress |            |
+| 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
 | 13. Sharing — Links & Public Notes             | v1.2      | 0/TBD          | Not started | -          |
 | 14. Comments & Notifications                   | v1.2      | 0/TBD          | Not started | -          |
 | 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |
