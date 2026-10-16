@@ -99,7 +99,7 @@ Plans:
 1. User can purchase a listing via Stripe Checkout, with commission taken at source (destination charge: `application_fee_amount` + `transfer_data.destination`) computed from the seller's subscription tier at the time of purchase — 20% if the seller is on the Free plan, 10% if the seller is on Premium — and the seller receiving the net amount via Connect payout
 2. A seller cannot purchase their own listing (self-purchase blocked server-side)
 3. An already-purchased listing shows an "owned" indicator instead of a Buy control
-4. For copy-mode listings, the Free-tier 20-note quota is checked before a Checkout session is created, not after payment
+4. For copy-mode listings, the Free-tier 20-note quota is checked before a Checkout session is created, not after payment — SUPERSEDED (D-07): the 20-note cap was removed in v1.2 (97b0637); no quota check is built
 5. No refund path exists in the UI or backend — sales are final, consistent with the existing metadata-type discriminator added to the shared webhook handler
 
 **Plans**: 6 plans
@@ -121,7 +121,7 @@ Plans:
 **Requirements**: DELIVER-01, DELIVER-02, DELIVER-03
 **Success Criteria** (what must be TRUE):
 
-1. Copy-mode purchase duplicates the note (and subtree, if applicable) into the buyer's tree at root level, respecting the Free-tier quota pre-flight check from Phase 9
+1. Copy-mode purchase duplicates the note (and subtree, if applicable) into the buyer's tree at root level, respecting the Free-tier quota pre-flight check from Phase 9 (quota pre-flight superseded — no note limit, per Phase 9 D-07)
 2. Read-only-mode purchase grants the buyer permanent, live view access to the seller's note (+subtree) that reflects the seller's future edits, via the existing `shares`/`getUserPermission` path (no parallel access mechanism)
 3. Replaying the same purchase webhook event does not create duplicate copies or duplicate access grants (purchase-scoped idempotency key, verified by a replay-the-webhook-twice test)
 

@@ -40,7 +40,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - Achat via Stripe Checkout, payout automatique vendeur via Stripe Connect (onboarding KYC géré par Stripe)
 - Commission Noetree différenciée : 20% (vendeur Free) / 10% (vendeur Premium) prélevée à la source sur chaque vente
 - Vente ouverte à tous (Free + Pro)
-- Notes achetées en mode copie comptent dans le quota 20 notes Free existant
+- ~~Notes achetées en mode copie comptent dans le quota 20 notes Free existant~~ — superseded : plafond 20 notes supprimé en v1.2 (commit 97b0637) ; aucune vérification de quota au checkout ni à la livraison (D-07)
 - Ventes finales, pas de remboursement (contenu numérique)
 - Pas de modération de contenu ce milestone (déféré à plus tard)
 
@@ -84,7 +84,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - [ ] Mise en vente d'une note (prix, portée note/sous-arbre, mode copie/lecture seule)
 - [ ] Aperçu partiel avant achat
 - [ ] Achat via Stripe Checkout + payout vendeur via Stripe Connect
-- [ ] Commission Noetree (15%) prélevée à la source
+- [ ] Commission Noetree différenciée (20% vendeur Free / 10% vendeur Premium) prélevée à la source
 
 ### Out of Scope
 

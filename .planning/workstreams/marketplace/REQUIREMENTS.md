@@ -79,31 +79,31 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase    | Status   |
-| ----------- | -------- | -------- |
-| CONNECT-01  | Phase 7  | Complete |
-| CONNECT-02  | Phase 7  | Complete |
-| CONNECT-03  | Phase 7  | Complete |
-| LIST-01     | Phase 8  | Complete |
-| LIST-02     | Phase 8  | Complete |
-| LIST-03     | Phase 8  | Complete |
-| LIST-04     | Phase 8  | Complete |
-| BROWSE-01   | Phase 8  | Complete |
-| BROWSE-02   | Phase 8  | Complete |
-| BROWSE-03   | Phase 8  | Complete |
-| BROWSE-04   | Phase 8  | Complete |
-| BROWSE-05   | Phase 8  | Complete |
-| BROWSE-06   | Phase 8  | Complete |
-| BUY-01      | Phase 9  | Pending  |
-| BUY-02      | Phase 9  | Pending  |
-| BUY-03      | Phase 9  | Pending  |
-| BUY-04      | Phase 9  | Pending  |
-| BUY-05      | Phase 9  | Pending  |
-| DELIVER-01  | Phase 10 | Pending  |
-| DELIVER-02  | Phase 10 | Pending  |
-| DELIVER-03  | Phase 10 | Pending  |
-| HIST-01     | Phase 11 | Pending  |
-| HIST-02     | Phase 11 | Pending  |
+| Requirement | Phase    | Status     |
+| ----------- | -------- | ---------- |
+| CONNECT-01  | Phase 7  | Complete   |
+| CONNECT-02  | Phase 7  | Complete   |
+| CONNECT-03  | Phase 7  | Complete   |
+| LIST-01     | Phase 8  | Complete   |
+| LIST-02     | Phase 8  | Complete   |
+| LIST-03     | Phase 8  | Complete   |
+| LIST-04     | Phase 8  | Complete   |
+| BROWSE-01   | Phase 8  | Complete   |
+| BROWSE-02   | Phase 8  | Complete   |
+| BROWSE-03   | Phase 8  | Complete   |
+| BROWSE-04   | Phase 8  | Complete   |
+| BROWSE-05   | Phase 8  | Complete   |
+| BROWSE-06   | Phase 8  | Complete   |
+| BUY-01      | Phase 9  | Pending    |
+| BUY-02      | Phase 9  | Pending    |
+| BUY-03      | Phase 9  | Pending    |
+| BUY-04      | Phase 9  | Superseded |
+| BUY-05      | Phase 9  | Pending    |
+| DELIVER-01  | Phase 10 | Pending    |
+| DELIVER-02  | Phase 10 | Pending    |
+| DELIVER-03  | Phase 10 | Pending    |
+| HIST-01     | Phase 11 | Pending    |
+| HIST-02     | Phase 11 | Pending    |
 
 **Coverage:**
 
@@ -114,4 +114,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 ---
 
 _Requirements defined: 2026-07-12_
-_Last updated: 2026-07-12 after ROADMAP.md creation (v1.1, Phases 7-11)_
+_Last updated: 2026-10-16 after Phase 9 drift fix (BUY-04 superseded, commission 20%/10%)_
