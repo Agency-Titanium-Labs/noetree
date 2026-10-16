@@ -137,7 +137,7 @@ Plans:
 
 - [x] 14-01-PLAN.md — Schema (comments, notifications), single comment access resolver, author projection, Wave 0 tests (wave 1)
 - [ ] 14-04-PLAN.md — sonner (legitimacy-gated) + app-wide Toaster, Popover primitive (wave 1)
-- [ ] 14-05-PLAN.md — Shared getInitials/relative-time utils, ShareDialog refactor, en/fr Comments + Notifications copy (wave 1)
+- [x] 14-05-PLAN.md — Shared getInitials/relative-time utils, ShareDialog refactor, en/fr Comments + Notifications copy (wave 1)
 
 **Wave 2**
 
@@ -200,7 +200,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
 | 13. Sharing — Links & Public Notes             | v1.2      | 6/7            | In Progress |            |
-| 14. Comments & Notifications                   | v1.2      | 1/8            | In Progress |            |
+| 14. Comments & Notifications                   | v1.2      | 2/8            | In Progress |            |
 | 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |
 | 16. AI Credit System Revision                  | v1.2      | 0/TBD          | Not started | -          |
 
