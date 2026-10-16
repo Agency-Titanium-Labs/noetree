@@ -91,12 +91,26 @@ Plans:
 
 Plans:
 
+**Wave 1**
+
 - [ ] 13-01-PLAN.md — Schema (shareLinks, isPublic), permission/sharing helpers, delete cleanup, Wave 0 tests
-- [ ] 13-02-PLAN.md — Convex API: link management, anonymous reads, sign-in-gated edit, Node token action, tests
 - [ ] 13-03-PLAN.md — i18n (en/fr) copy and shadcn tabs/switch/alert
+
+**Wave 2** _(blocked on Wave 1 completion)_
+
+- [ ] 13-02-PLAN.md — Convex API: link management, anonymous reads, sign-in-gated edit, Node token action, tests
+
+**Wave 3** _(blocked on Wave 2 completion)_
+
 - [ ] 13-04-PLAN.md — (share) route group shell and /s/[token] visitor page
 - [ ] 13-05-PLAN.md — ShareDialog Link and Public tabs
+
+**Wave 4** _(blocked on Wave 3 completion)_
+
 - [ ] 13-06-PLAN.md — /p/[noteId] public note page with sub-note list
+
+**Wave 5** _(blocked on Wave 4 completion)_
+
 - [ ] 13-07-PLAN.md — Phase gates and manual browser verification
 
   **UI hint**: yes
