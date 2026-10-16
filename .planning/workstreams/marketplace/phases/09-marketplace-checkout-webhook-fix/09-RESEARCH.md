@@ -583,7 +583,7 @@ Keep `<SignInButton mode="modal">`; add `forceRedirectUrl` pointing at the curre
 | A5  | Session `expires_at` of ~1 hour is a good default (allowed 30 min - 24 h)                                                      | Pattern 1     | None functionally; discretionary                                                                         |
 | A6  | Only an `active` subscription status counts as Premium for the seller (matches `getUserTier`); `past_due` seller pays 20%      | Pattern 3     | If product wants grace for past_due, commission tier differs                                             |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **BUY-04 / D-07: the Free-tier 20-note cap no longer exists.**
    - What we know: v1.2 Phase 12 removed it (`97b0637`, "feat(12-01): delete server-side note cap from createNote"); `PROJECT.md` "Out of Scope" says "Free tier limité à 20 notes — invalidé pour v1.2"; but PROJECT.md active scope and REQUIREMENTS BUY-04 / CONTEXT D-07 still require a pre-checkout 20-note check, and the milestone branches have been merged (`42a67ce`). No code anywhere else enforces 20 notes, so a Free user with 25 notes could create unlimited notes but could not buy a copy listing.
