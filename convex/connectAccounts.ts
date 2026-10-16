@@ -168,6 +168,8 @@ export const upsertFromStripeAccount = internalMutation({
     chargesEnabled: v.boolean(),
     payoutsEnabled: v.boolean(),
     detailsSubmitted: v.boolean(),
+    // event.created (unix seconds). Used to drop out-of-order deliveries.
+    eventCreated: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Idempotency bookend (mirrors subscriptions.upsertSubscription).
@@ -217,12 +219,31 @@ export const upsertFromStripeAccount = internalMutation({
         );
         return { anomaly: "stripeAccountId owner mismatch" };
       }
+      // CR-03: Stripe does not guarantee delivery order and dedup is by event
+      // id only, so a delayed older account.updated must never overwrite
+      // newer capability state. Record the event as processed (it will never
+      // become applicable) but leave the row untouched.
+      if (
+        args.eventCreated !== undefined &&
+        existing.lastEventCreated !== undefined &&
+        args.eventCreated < existing.lastEventCreated
+      ) {
+        await ctx.db.insert("processedStripeEvents", {
+          stripeEventId: args.stripeEventId,
+          eventType: args.eventType,
+          processedAt: Date.now(),
+        });
+        return { stale: true };
+      }
       // Never patch clerkUserId or stripeAccountId — only capability state.
       await ctx.db.patch(existing._id, {
         chargesEnabled: args.chargesEnabled,
         payoutsEnabled: args.payoutsEnabled,
         detailsSubmitted: args.detailsSubmitted,
         status,
+        ...(args.eventCreated !== undefined
+          ? { lastEventCreated: args.eventCreated }
+          : {}),
       });
     } else if (args.clerkUserId) {
       // CR-01: never insert a second row for a user who already has one under
@@ -250,6 +271,7 @@ export const upsertFromStripeAccount = internalMutation({
         payoutsEnabled: args.payoutsEnabled,
         detailsSubmitted: args.detailsSubmitted,
         status,
+        lastEventCreated: args.eventCreated,
       });
     } else {
       // Never throw here: a thrown error becomes a 500 to Stripe and
@@ -327,6 +349,10 @@ export const processConnectWebhookEvent = action({
             chargesEnabled,
             payoutsEnabled,
             detailsSubmitted,
+            eventCreated:
+              typeof args.event.created === "number"
+                ? args.event.created
+                : undefined,
           },
         );
       }

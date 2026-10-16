@@ -71,6 +71,10 @@ export default defineSchema({
     chargesEnabled: v.boolean(),
     payoutsEnabled: v.boolean(),
     detailsSubmitted: v.boolean(),
+    // Stripe event.created (unix seconds) of the newest account.updated
+    // applied to this row; older events are ignored (out-of-order delivery).
+    // Optional so rows written before this field existed stay valid.
+    lastEventCreated: v.optional(v.number()),
   })
     .index("by_clerkUserId", ["clerkUserId"])
     .index("by_stripeAccountId", ["stripeAccountId"]),

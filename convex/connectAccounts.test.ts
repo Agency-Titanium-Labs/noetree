@@ -515,6 +515,98 @@ describe("connectAccounts", () => {
       ).resolves.not.toBeNull();
     });
 
+    test("ignores an out-of-order older event and keeps the newer capability state (CR-03)", async () => {
+      const t = convexTest(schema, modules);
+      const base = {
+        eventType: "account.updated",
+        stripeAccountId: "acct_order",
+        clerkUserId: "user_order",
+        detailsSubmitted: true,
+      };
+
+      const newer = await t.mutation(
+        internal.connectAccounts.upsertFromStripeAccount,
+        {
+          ...base,
+          stripeEventId: "evt_order_new",
+          eventCreated: 2000,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+        },
+      );
+      expect(newer).toEqual({ success: true });
+
+      const older = await t.mutation(
+        internal.connectAccounts.upsertFromStripeAccount,
+        {
+          ...base,
+          stripeEventId: "evt_order_old",
+          eventCreated: 1000,
+          chargesEnabled: true,
+          payoutsEnabled: true,
+        },
+      );
+      expect(older).toEqual({ stale: true });
+
+      const row = await t.run(async ctx =>
+        ctx.db
+          .query("connectAccounts")
+          .withIndex("by_stripeAccountId", q =>
+            q.eq("stripeAccountId", "acct_order"),
+          )
+          .unique(),
+      );
+      expect(row?.chargesEnabled).toBe(false);
+      expect(row?.status).toBe("restricted");
+      expect(row?.lastEventCreated).toBe(2000);
+
+      // The stale event is still recorded so a redelivery is deduped.
+      const replay = await t.mutation(
+        internal.connectAccounts.upsertFromStripeAccount,
+        {
+          ...base,
+          stripeEventId: "evt_order_old",
+          eventCreated: 1000,
+          chargesEnabled: true,
+          payoutsEnabled: true,
+        },
+      );
+      expect(replay).toEqual({ alreadyProcessed: true });
+    });
+
+    test("applies a newer event over an older one and a legacy row without lastEventCreated (CR-03)", async () => {
+      const t = convexTest(schema, modules);
+      await t.mutation(internal.connectAccounts.insertPendingAccount, {
+        clerkUserId: "user_legacy",
+        stripeAccountId: "acct_legacy",
+      });
+
+      const result = await t.mutation(
+        internal.connectAccounts.upsertFromStripeAccount,
+        {
+          stripeEventId: "evt_legacy",
+          eventType: "account.updated",
+          stripeAccountId: "acct_legacy",
+          clerkUserId: "user_legacy",
+          eventCreated: 500,
+          chargesEnabled: true,
+          payoutsEnabled: true,
+          detailsSubmitted: true,
+        },
+      );
+      expect(result).toEqual({ success: true });
+      const row = await t.run(async ctx =>
+        ctx.db
+          .query("connectAccounts")
+          .withIndex("by_stripeAccountId", q =>
+            q.eq("stripeAccountId", "acct_legacy"),
+          )
+          .unique(),
+      );
+      expect(row?.status).toBe("active");
+      expect(row?.lastEventCreated).toBe(500);
+    });
+
     test("returns an anomaly without throwing and writes zero rows when no existing row and no clerkUserId metadata", async () => {
       const t = convexTest(schema, modules);
 
