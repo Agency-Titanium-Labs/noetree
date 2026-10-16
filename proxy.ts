@@ -7,6 +7,8 @@ const intlMiddleware = createMiddleware(routing);
 const isProtectedRoute = createRouteMatcher([
   "/notes(.*)",
   "/:locale/notes(.*)",
+  "/listings(.*)",
+  "/:locale/listings(.*)",
 ]);
 const isPublicRoute = createRouteMatcher(["/api/webhooks/(.*)"]);
 
