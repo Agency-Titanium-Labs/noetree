@@ -141,7 +141,7 @@ Plans:
 
 **Wave 2**
 
-- [ ] 14-02-PLAN.md — comments.ts list/count/add with per-recipient notification fan-out, resolve, delete tombstones, deleteNote cascade (wave 2)
+- [x] 14-02-PLAN.md — comments.ts list/count/add with per-recipient notification fan-out, resolve, delete tombstones, deleteNote cascade (wave 2)
 - [ ] 14-03-PLAN.md — notifications.ts unreadCount/list/markRead/markAllRead + nested-note navigation test (wave 2)
 
 **Wave 3**
@@ -200,7 +200,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
 | 13. Sharing — Links & Public Notes             | v1.2      | 6/7            | In Progress |            |
-| 14. Comments & Notifications                   | v1.2      | 3/8            | In Progress |            |
+| 14. Comments & Notifications                   | v1.2      | 4/8            | In Progress |            |
 | 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |
 | 16. AI Credit System Revision                  | v1.2      | 0/TBD          | Not started | -          |
 

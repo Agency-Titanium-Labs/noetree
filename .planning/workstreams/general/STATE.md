@@ -4,24 +4,24 @@ milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
 status: executing
 stopped_at: Phase 14 UI-SPEC approved
-last_updated: "2026-10-16T22:03:14.999Z"
+last_updated: "2026-10-16T22:33:22.762Z"
 last_activity: 2026-10-16
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 21
-  completed_plans: 16
+  completed_plans: 17
   percent: 40
 ---
 
 ## Current Position
 
 Phase: 14 (comments-notifications) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
 Last activity: 2026-10-16
 
-Progress: [████████░░] 76%
+Progress: [████████░░] 81%
 
 ## Project Reference
 
@@ -55,6 +55,7 @@ See: .planning/PROJECT.md (updated 2026-08-25)
 
 _Updated after each plan completion_
 | Phase 14 P04 | 15min | 2 tasks | 5 files |
+| Phase 14 P02 | 20min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ Decisions relevant to v1.2 planning (from research, to be confirmed during phase
 - Comments are note-level only (no text-selection anchoring) for this milestone — per COMMENT scope and REQUIREMENTS.md v2 deferral of COMMENT-05.
 - Notifications are in-app only, no email digest this milestone — per NOTIF scope and REQUIREMENTS.md v2 deferral of NOTIF-03.
 - Version restore never deletes/hides comments as a side effect — per COMMENT-04.
+- [Phase 14]: [14-02] D-12 trade-off: link-only/lost-access root authors get no reply notification; owner always notified
 
 ### Pending Todos
 
@@ -93,7 +95,7 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-10-16T22:02:26.754Z
+Last session: 2026-10-16T22:32:38.326Z
 Stopped at: Phase 14 UI-SPEC approved
 Resume file: None
 
