@@ -32,7 +32,7 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 **Milestone Goal:** Permettre aux utilisateurs de vendre et acheter des notes entre eux via Stripe Connect, avec commission Noetree différenciée (20% vendeur Free, 10% vendeur Premium).
 
 - [x] **Phase 7: Connect Onboarding & Seller Enablement** - Sellers complete Stripe Connect (Express) onboarding; server enforces payout-readiness (completed 2026-10-16)
-- [ ] **Phase 8: Listings & Marketplace Browse/Search** - Sellers list notes for sale; buyers discover them via a public browse/search page
+- [x] **Phase 8: Listings & Marketplace Browse/Search** - Sellers list notes for sale; buyers discover them via a public browse/search page (completed 2026-10-16)
 - [ ] **Phase 9: Marketplace Checkout & Webhook Fix** - Buyers purchase listings via Stripe Checkout with tiered commission (20%/10%) split at source
 - [ ] **Phase 10: Purchase Fulfillment (Copy & Access Grants)** - Completed purchases reliably deliver content to buyers exactly once
 - [ ] **Phase 11: Buyer & Seller History UI** - Buyers and sellers can review purchase/sales history
@@ -80,14 +80,14 @@ Plans:
 Plans:
 
 - [x] 08-01-PLAN.md — listings/listingTags/tagStats schema, helpers (excerpt, tags, cap, snapshot, tag sync), deleteNote auto-unpublish (D-18)
-- [ ] 08-02-PLAN.md — URL-state + price utils, Checkbox/Textarea/PriceLabel, /listings protection, FR/EN copy
-- [ ] 08-03-PLAN.md — seller API: createListing/updateListing/setListingStatus/listMine/getMineByNote/previewSubtreeCount
-- [ ] 08-04-PLAN.md — public API (convex/marketplace.ts): browse (search/tag/sort/pagination), getPublic, topTags
-- [ ] 08-05-PLAN.md — public (marketplace) layout + browse page (toolbar, grid, cards, Load more, URL state)
-- [ ] 08-06-PLAN.md — listing detail page (partial preview, disabled Buy slot)
-- [ ] 08-07-PLAN.md — ListingFormDialog (create/edit) + NoteCard/NoteContent entry points
-- [ ] 08-08-PLAN.md — My listings page, sidebar + Settings links
-- [ ] 08-09-PLAN.md — phase gate: full suite, schema push, build, human verification
+- [x] 08-02-PLAN.md — URL-state + price utils, Checkbox/Textarea/PriceLabel, /listings protection, FR/EN copy
+- [x] 08-03-PLAN.md — seller API: createListing/updateListing/setListingStatus/listMine/getMineByNote/previewSubtreeCount
+- [x] 08-04-PLAN.md — public API (convex/marketplace.ts): browse (search/tag/sort/pagination), getPublic, topTags
+- [x] 08-05-PLAN.md — public (marketplace) layout + browse page (toolbar, grid, cards, Load more, URL state)
+- [x] 08-06-PLAN.md — listing detail page (partial preview, disabled Buy slot)
+- [x] 08-07-PLAN.md — ListingFormDialog (create/edit) + NoteCard/NoteContent entry points
+- [x] 08-08-PLAN.md — My listings page, sidebar + Settings links
+- [x] 08-09-PLAN.md — phase gate: full suite, schema push, build, human verification
 
 ### Phase 9: Marketplace Checkout & Webhook Fix
 
@@ -145,7 +145,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 6. Settings Page                                | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant      | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 7. Connect Onboarding & Seller Enablement       | v1.1      | 6/6            | Complete    | 2026-10-16 |
-| 8. Listings & Marketplace Browse/Search         | v1.1      | 1/9            | In Progress |            |
+| 8. Listings & Marketplace Browse/Search         | v1.1      | 9/9            | Complete    | 2026-10-16 |
 | 9. Marketplace Checkout & Webhook Fix           | v1.1      | 0/TBD          | Not started | -          |
 | 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 0/TBD          | Not started | -          |
 | 11. Buyer & Seller History UI                   | v1.1      | 0/TBD          | Not started | -          |

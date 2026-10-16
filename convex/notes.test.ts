@@ -1,4 +1,4 @@
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, expect, test } from "vitest";
 import schema from "./schema";
 import { api } from "./_generated/api";
@@ -203,7 +203,7 @@ describe("notes.deleteNote — auto-unpublish listing (D-18)", () => {
   }
 
   async function readState(
-    t: ReturnType<typeof convexTest>,
+    t: TestConvex<typeof schema>,
     listingId: Id<"listings">,
   ) {
     return await t.run(async ctx => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ConvexError } from "convex/values";
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import schema from "../schema";
 import { Doc, Id } from "../_generated/dataModel";
 import {
@@ -187,7 +187,7 @@ const modules = (
   }
 ).glob("../**/*.*s");
 
-type T = ReturnType<typeof convexTest>;
+type T = TestConvex<typeof schema>;
 
 async function seedUser(t: T, token = "https://clerk.dev|seller") {
   return await t.run(async ctx => {

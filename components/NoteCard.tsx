@@ -31,12 +31,14 @@ import {
   Edit,
   LogOut,
   Users,
+  Store,
 } from "lucide-react";
 import { NoteTree, useTreeContext } from "@/providers/TreeProvider";
 import { useEditorContext } from "@/providers/EditorProvider";
 import ConditionChecker from "./helpers/ConditionChecker";
 import { useTranslations } from "next-intl";
 import ShareDialog from "@/components/ShareDialog";
+import ListingFormDialog from "@/components/ListingFormDialog";
 
 interface NoteCardProps {
   note: NoteTree;
@@ -66,6 +68,7 @@ export function NoteCard({
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isListingOpen, setIsListingOpen] = useState(false);
   const [editedTitle, setEditedTitle] = useState(note.title);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -102,6 +105,16 @@ export function NoteCard({
           setIsShareOpen(true);
         },
         show: note.role === "owner" || note.role === "admin",
+      },
+      {
+        id: "listForSale",
+        label: t("contextMenu.listForSale"),
+        icon: <Store />,
+        onClick: (e: React.MouseEvent) => {
+          e.stopPropagation();
+          setIsListingOpen(true);
+        },
+        show: note.role === "owner" && !isTemp,
       },
       {
         id: "duplicate",
@@ -141,6 +154,7 @@ export function NoteCard({
     note._id,
     isRoot,
     note.isShared,
+    isTemp,
     onAddChild,
     onDuplicateNote,
     onDelete,
@@ -342,6 +356,14 @@ export function NoteCard({
           noteId={note._id}
           open={isShareOpen}
           onOpenChange={setIsShareOpen}
+        />
+      )}
+      {!isTemp && isListingOpen && (
+        <ListingFormDialog
+          noteId={note._id}
+          noteTitle={note.title}
+          open={isListingOpen}
+          onOpenChange={setIsListingOpen}
         />
       )}
     </div>

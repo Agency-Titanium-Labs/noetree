@@ -6,6 +6,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@/convex/_generated/api";
+import { Link } from "@/i18n/routing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +91,9 @@ export default function SettingsSellerCard() {
               <div className="space-y-2">
                 <Badge variant="default">{t("sellerStatusActive")}</Badge>
                 <p className="text-base">{t("sellerActiveBody")}</p>
+                <Button asChild variant="ghost">
+                  <Link href="/listings">{t("manageListings")}</Link>
+                </Button>
               </div>
             )}
 
