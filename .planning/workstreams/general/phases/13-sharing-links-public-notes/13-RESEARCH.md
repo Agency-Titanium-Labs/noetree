@@ -378,12 +378,12 @@ Note: the Node action `createLink` cannot run under convex-test (no `"use node"`
 | A5  | Public toggle permission: owner/admin                                                                                       | Pitfall 8 | Low-medium; user preference                                                                                                                        |
 | A6  | Action-to-internal-mutation call propagates the caller's auth identity (standard Convex behavior)                           | Pattern 2 | If not, insertLink can't authorize; verify with a manual test                                                                                      |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Public toggle role:** owner-only vs owner/admin? Recommend owner/admin; confirm.
-2. **Edit-link title editing:** only content editable by default; allow title too? Recommend content only this phase (smaller surface), UI shows title read-only.
-3. **Moving notes into public subtree:** add confirm UI? (Pitfall 5) — optional.
-4. **Public page children when a child has its own active edit link:** irrelevant — no interaction; public read only.
+1. **Public toggle role:** owner-only vs owner/admin? RESOLVED: owner/admin (plan 13-02 `setPublic`).
+2. **Edit-link title editing:** only content editable by default; allow title too? RESOLVED: content only; UI shows title read-only.
+3. **Moving notes into public subtree:** RESOLVED: no confirm UI this phase; the Public tab cascade-warning alert covers it.
+4. **Public page children when a child has its own active edit link:** RESOLVED: irrelevant — no interaction; public read only.
 
 ## Environment Availability
 
