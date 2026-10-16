@@ -48,6 +48,9 @@ Covers requirements: DELIVER-01, DELIVER-02, DELIVER-03.
 - **D-18:** On the listing detail page the Phase 9 Owned panel gains an "Open note" action once delivery succeeds: copy mode → the copied root note; read-only mode → the seller's note through the shares path. The Phase 9 `?purchase=success` banner flips to Owned via the live Convex reactive query as before. `deliveryStatus: "failed"` shows a "delivery problem — contact support" notice instead of the open link. FR/EN copy in `messages/en.json` / `fr.json`.
 - **D-19:** The read-only buyer's content appears in their existing "shared with me" sidebar tree via the standard shares query (the share row must set `userId`, not only `email`, so the by-user lookup finds it).
 
+- **D-20 [auto-resolved from research]:** Copy the sibling `index` for descendants only; the copy root's `index` is left unset (a seller's root index is meaningless among the buyer's roots).
+- **D-21 [auto-resolved from research]:** D-09 re-list guard also walks ancestors: a note that is a descendant of a note carrying `purchaseId` cannot be listed either. Tree queries (`getTreesByMe`, `getTreeById`) must not leak children of `scope: "note"` shares; deliver uses a read-only planning pass (source exists, seller-owned, `noteCount` cap, ~8 MiB content budget) before any write so failures become `deliveryStatus: "failed"` instead of a thrown error; non-seller-owned descendants are skipped. If the buyer later deletes their copy, "Open note" is simply hidden (no redelivery).
+
 ### Claude's Discretion
 
 - File/module placement of the shared copy helper and the deliver function, exact field names beyond those listed, ConvexError code names, the by-purchaseId index names on `notes`/`shares`, how "first `noteCount` notes in tree order" is walked, and the exact UI copy and button styling of the Open note action and failure notice.
