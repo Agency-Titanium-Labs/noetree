@@ -1,13 +1,19 @@
 "use client";
 
 import { Button } from "../ui/button";
-import { Link as LinkIcon, Image as ImageIcon, Check } from "lucide-react";
+import {
+  Link as LinkIcon,
+  Image as ImageIcon,
+  Check,
+  Sparkles,
+} from "lucide-react";
 import { Separator } from "../ui/separator";
+import { Badge } from "../ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
-  TooltipTrigger
+  TooltipTrigger,
 } from "../ui/tooltip";
 import { ToolbarGroup } from "./ToolbarGroup";
 import {
@@ -15,7 +21,7 @@ import {
   headingItems,
   historyItems,
   listItems,
-  specialItems
+  specialItems,
 } from "./toolbarItems";
 import {
   Dialog,
@@ -23,14 +29,22 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { useState } from "react";
 import { useEditorContext } from "@/providers/EditorProvider";
+import { useTranslations } from "next-intl";
+import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ConvexError } from "convex/values";
+import { api } from "@/convex/_generated/api";
+import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
 
 export default function EditorToolbar() {
+  const t = useTranslations("Editor");
+  const tCredits = useTranslations("AiCredits");
   const { editor } = useEditorContext();
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
@@ -38,6 +52,29 @@ export default function EditorToolbar() {
   const [linkText, setLinkText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
+  const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
+
+  // D-09: balance defaults to 0 when the user has no aiCredits row yet.
+  const { data: credits } = useQuery(
+    convexQuery(api.aiCredits.getMyCredits, {}),
+  );
+  const balance = credits?.balance ?? 0;
+
+  // T-05-02: the client never gates the click on balance — runAiAction
+  // enforces the balance check server-side and throws INSUFFICIENT_CREDITS,
+  // which opens the blocking dialog below.
+  const runAiActionMutate = useConvexMutation(api.aiCredits.runAiAction);
+  const runAiAction = useMutation({
+    mutationFn: runAiActionMutate,
+    onError: err => {
+      if (err instanceof ConvexError && err.data === "INSUFFICIENT_CREDITS") {
+        setCreditsDialogOpen(true);
+      }
+    },
+  });
+  const handleAiAction = () => runAiAction.mutate({});
+
+  if (!editor || !editor.isEditable) return null;
 
   const openLinkDialog = () => {
     if (!editor) return;
@@ -47,12 +84,12 @@ export default function EditorToolbar() {
       const attrs = editor.getAttributes("link");
       setLinkUrl(attrs.href || "");
       setLinkText(
-        editor.state.selection.content().content.firstChild?.text || ""
+        editor.state.selection.content().content.firstChild?.text || "",
       );
     } else {
       setLinkUrl("");
       setLinkText(
-        editor.state.selection.content().content.firstChild?.text || ""
+        editor.state.selection.content().content.firstChild?.text || "",
       );
     }
 
@@ -104,7 +141,7 @@ export default function EditorToolbar() {
       .focus()
       .setImage({
         src: imageUrl,
-        alt: imageAlt || "Image"
+        alt: imageAlt || "Image",
       })
       .run();
 
@@ -112,7 +149,7 @@ export default function EditorToolbar() {
   };
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider delayDuration={1000}>
       <div className="flex flex-wrap gap-1">
         <ToolbarGroup items={historyItems} />
 
@@ -139,27 +176,42 @@ export default function EditorToolbar() {
         <ToolbarButton
           onClick={openLinkDialog}
           active={editor?.isActive("link")}
-          tooltip="Insert Link (Ctrl+K)"
+          tooltip={t("tooltips.link")}
           icon={<LinkIcon className="h-4 w-4" />}
         />
         <ToolbarButton
           onClick={openImageDialog}
-          tooltip="Insert Image"
+          tooltip={t("tooltips.image")}
           icon={<ImageIcon className="h-4 w-4" />}
         />
+
+        <Separator orientation="vertical" className="h-auto!" />
+
+        {/* AI action + credits balance */}
+        <ToolbarButton
+          onClick={handleAiAction}
+          tooltip={t("tooltips.aiAction")}
+          icon={<Sparkles className="h-4 w-4" />}
+        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="secondary">{balance}</Badge>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {tCredits("badgeTooltip", { count: balance })}
+          </TooltipContent>
+        </Tooltip>
 
         {/* Link Dialog */}
         <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Insert Link</DialogTitle>
-              <DialogDescription>
-                Enter the URL and optional link text
-              </DialogDescription>
+              <DialogTitle>{t("dialogs.linkTitle")}</DialogTitle>
+              <DialogDescription>{t("dialogs.linkDesc")}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label htmlFor="url">URL</Label>
+                <Label htmlFor="url">{t("dialogs.url")}</Label>
                 <Input
                   id="url"
                   placeholder="https://example.com"
@@ -168,10 +220,10 @@ export default function EditorToolbar() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="linkText">Link Text</Label>
+                <Label htmlFor="linkText">{t("dialogs.linkText")}</Label>
                 <Input
                   id="linkText"
-                  placeholder="Optional text to display"
+                  placeholder={t("dialogs.linkTextPlaceholder")}
                   value={linkText}
                   onChange={e => setLinkText(e.target.value)}
                 />
@@ -183,11 +235,11 @@ export default function EditorToolbar() {
                 variant="outline"
                 onClick={() => setLinkDialogOpen(false)}
               >
-                Cancel
+                {t("dialogs.cancel")}
               </Button>
               <Button type="button" onClick={insertLink} className="gap-1">
                 <Check className="h-4 w-4" />
-                Insert Link
+                {t("dialogs.insertLink")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -197,14 +249,12 @@ export default function EditorToolbar() {
         <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Insert Image</DialogTitle>
-              <DialogDescription>
-                Enter the image URL and optional alt text
-              </DialogDescription>
+              <DialogTitle>{t("dialogs.imageTitle")}</DialogTitle>
+              <DialogDescription>{t("dialogs.imageDesc")}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label htmlFor="imageUrl">Image URL</Label>
+                <Label htmlFor="imageUrl">{t("dialogs.imageUrl")}</Label>
                 <Input
                   id="imageUrl"
                   placeholder="https://example.com/image.jpg"
@@ -213,10 +263,10 @@ export default function EditorToolbar() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="imageAlt">Alt Text</Label>
+                <Label htmlFor="imageAlt">{t("dialogs.imageAlt")}</Label>
                 <Input
                   id="imageAlt"
-                  placeholder="Image description for accessibility"
+                  placeholder={t("dialogs.imageAltPlaceholder")}
                   value={imageAlt}
                   onChange={e => setImageAlt(e.target.value)}
                 />
@@ -228,15 +278,21 @@ export default function EditorToolbar() {
                 variant="outline"
                 onClick={() => setImageDialogOpen(false)}
               >
-                Cancel
+                {t("dialogs.cancel")}
               </Button>
               <Button type="button" onClick={insertImage} className="gap-1">
                 <Check className="h-4 w-4" />
-                Insert Image
+                {t("dialogs.insertImage")}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Credits Exhausted Dialog */}
+        <CreditsExhaustedDialog
+          open={creditsDialogOpen}
+          onOpenChange={setCreditsDialogOpen}
+        />
       </div>
     </TooltipProvider>
   );
@@ -257,7 +313,7 @@ const ToolbarButton = ({
   active,
   disabled,
   tooltip,
-  icon
+  icon,
 }: ToolbarButtonProps) => (
   <Tooltip>
     <TooltipTrigger asChild>

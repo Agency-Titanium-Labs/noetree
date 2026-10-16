@@ -10,27 +10,25 @@ import React, {
   useCallback,
   useContext,
   useEffect,
-  useState
+  useRef,
+  useState,
 } from "react";
-import { fetchNoteContent, saveNoteContent } from "@/lib/api/notes";
 import { useDebouncedCallback } from "use-debounce";
+import { useTreeContext } from "./TreeProvider";
+import { useTranslations } from "next-intl";
+
+type saveStatusType = "idle" | "unsaved" | "saving" | "success" | "error";
 
 interface EditorContextType {
   editor: Editor | null;
-  isLoading: boolean;
-  isSaving: boolean;
-  saveStatus: "idle" | "success" | "error";
-  hasUnsavedChanges: boolean;
-  loadNoteContent: (noteId: number) => Promise<void>;
+  saveStatus: saveStatusType;
+  getCurrentContent: () => string | null;
 }
 
 const EditorContext = createContext<EditorContextType>({
   editor: null,
-  isLoading: false,
-  isSaving: false,
   saveStatus: "idle",
-  hasUnsavedChanges: false,
-  loadNoteContent: async () => {}
+  getCurrentContent: () => null,
 });
 
 export const useEditorContext = (): EditorContextType => {
@@ -45,102 +43,174 @@ interface EditorProviderProps {
 }
 
 export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">(
-    "idle"
-  );
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
-  const [currentNoteId, setCurrentNoteId] = useState<number | null>(null);
+  const t = useTranslations("Editor");
+  const { selectedNote, onUpdateNoteContent } = useTreeContext();
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({
-        placeholder: "Write something…"
-      }),
-      Link,
-      Image
-    ],
-    editorProps: {
-      attributes: {
-        class: "flex-1 overflow-y-auto border rounded-md p-4"
-      }
+  const [saveStatus, setSaveStatus] = useState<saveStatusType>("idle");
+  const lastNoteIdRef = useRef<string | undefined>(undefined);
+
+  let initialContent: Content = "";
+  try {
+    if (selectedNote?.content && typeof selectedNote.content === "string") {
+      initialContent = JSON.parse(selectedNote.content) as Content;
+    } else if (selectedNote?.content) {
+      initialContent = selectedNote.content;
     }
-  });
+  } catch (error) {
+    console.warn("Failed to parse note content, using empty content:", error);
+  }
 
-  //timout if no editor
-  useEffect(() => {
-    if (!editor) return;
-    const timeout = setTimeout(() => {}, 1000);
-    return () => clearTimeout(timeout);
-  }, [editor]);
-
-  const loadNoteContent = useCallback(
-    async (noteId: number) => {
-      if (!editor) return;
-
-      setIsLoading(true);
-      setSaveStatus("idle");
-      setHasUnsavedChanges(false);
-      setCurrentNoteId(noteId);
-
-      try {
-        const content = await fetchNoteContent(noteId);
-        if (editor) {
-          editor.commands.setContent(content);
-        }
-      } catch (error) {
-        console.error("Failed to load note content", error);
-        if (editor) {
-          editor.commands.setContent("");
-        }
-        setSaveStatus("error");
-      } finally {
-        setIsLoading(false);
-      }
+  const editor = useEditor(
+    {
+      content: initialContent,
+      extensions: [
+        StarterKit,
+        Placeholder.configure({
+          placeholder: t("placeholder"),
+        }),
+        Link,
+        Image,
+      ],
+      editorProps: {
+        attributes: {
+          class: "flex-1 overflow-y-auto border rounded-md p-4",
+        },
+      },
+      immediatelyRender: false,
     },
-    [editor]
+    [selectedNote?._id, t],
   );
 
-  const debouncedSave = useDebouncedCallback(
-    async (noteId: number, content: Content) => {
-      if (!hasUnsavedChanges || !noteId) return;
+  const saveContent = useCallback(
+    async (content: Content) => {
+      if (!selectedNote) return;
+      if (selectedNote.role === "view") return; // Do not save if view-only
 
       try {
-        setIsSaving(true);
-        await saveNoteContent(noteId, JSON.stringify(content));
-        setSaveStatus("success");
-        setHasUnsavedChanges(false);
+        setSaveStatus("saving");
 
-        // Reset success status after 3 seconds
+        onUpdateNoteContent(JSON.stringify(content));
+
+        setSaveStatus("success");
+
         setTimeout(() => {
-          setSaveStatus("idle");
-        }, 3000);
+          setSaveStatus(currentStatus =>
+            currentStatus === "success" ? "idle" : currentStatus,
+          );
+        }, 2000);
       } catch (error) {
         console.error("Failed to save note content", error);
         setSaveStatus("error");
-      } finally {
-        setIsSaving(false);
       }
     },
-    1000
+    [selectedNote, onUpdateNoteContent],
   );
 
-  editor?.on("update", ({ editor }) => {
-    if (!currentNoteId) return;
-    setHasUnsavedChanges(true);
+  const debouncedSave = useDebouncedCallback(saveContent, 3000);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
+        event.preventDefault();
+        if (selectedNote?.role === "view") return; // Do not save if view-only
+        if (editor && !editor.isDestroyed && saveStatus === "unsaved") {
+          debouncedSave.cancel();
+          saveContent(editor.getJSON());
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [editor, saveStatus, debouncedSave, saveContent, selectedNote?.role]);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    debouncedSave.cancel();
+
+    const isNoteChanged = lastNoteIdRef.current !== selectedNote?._id;
+    lastNoteIdRef.current = selectedNote?._id;
+
+    if (isNoteChanged) {
+      setSaveStatus("idle");
+    }
+
+    if (!selectedNote) {
+      if (editor.getText() !== "") {
+        editor.commands.setContent("");
+      }
+      return;
+    }
+
+    let content = "";
+    try {
+      if (selectedNote.content && typeof selectedNote.content === "string") {
+        if (selectedNote.content.trim() === "") {
+          content = "";
+        } else {
+          content = JSON.parse(selectedNote.content);
+        }
+      } else if (selectedNote.content) {
+        content = selectedNote.content;
+      }
+    } catch (error) {
+      console.warn("Failed to parse note content, using empty content:", error);
+      content = "";
+    }
+
+    const currentJSON = JSON.stringify(editor.getJSON());
+    const incomingJSON =
+      typeof content === "string" ? content : JSON.stringify(content);
+
+    if (currentJSON === incomingJSON) return;
+
+    editor.commands.setContent(content, { emitUpdate: false });
+
     setSaveStatus("idle");
-    debouncedSave(currentNoteId, editor.getJSON());
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, selectedNote?._id, selectedNote?.content, debouncedSave]);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || !selectedNote) return;
+
+    const updateListener = ({ editor }: { editor: Editor }) => {
+      if (!editor.isEditable || selectedNote.role === "view") return; // Do not save if view-only
+      setSaveStatus("unsaved");
+      debouncedSave(editor.getJSON());
+    };
+
+    editor.on("update", updateListener);
+
+    return () => {
+      if (editor) {
+        editor.off("update", updateListener);
+      }
+    };
+  }, [editor, selectedNote, debouncedSave]);
+
+  // Dynamically set editor editable status based on note role / permissions
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const isEditable = selectedNote
+      ? selectedNote.role !== "view" // owner, admin, and edit are editable; view is not
+      : false;
+    if (editor.isEditable !== isEditable) {
+      editor.setEditable(isEditable);
+    }
+  }, [editor, selectedNote, selectedNote?.role]);
+
+  const getCurrentContent = () => {
+    if (!editor || editor.isDestroyed) return null;
+    return JSON.stringify(editor.getJSON());
+  };
 
   const contextValue = {
     editor,
-    isLoading,
-    isSaving,
     saveStatus,
-    hasUnsavedChanges,
-    loadNoteContent
+    getCurrentContent,
   };
 
   return (

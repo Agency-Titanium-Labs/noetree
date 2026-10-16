@@ -12,7 +12,7 @@ interface ConditionCheckerProps {
  */
 export default function ConditionChecker({
   condition,
-  children
+  children,
 }: ConditionCheckerProps) {
   if (condition) return children;
   return null;

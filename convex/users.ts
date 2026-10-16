@@ -1,5 +1,6 @@
-import { mutation } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { getUser } from "./helpers/helper";
 
 export const store = mutation({
   args: {},
@@ -17,7 +18,7 @@ export const store = mutation({
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", q =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
     if (user !== null) {
@@ -26,7 +27,9 @@ export const store = mutation({
       await ctx.db.patch(user._id, {
         name: identity.name,
         tokenIdentifier: identity.tokenIdentifier,
-        email: identity.preferredUsername,
+        email: (identity.email || identity.preferredUsername)
+          ?.trim()
+          .toLowerCase(),
         picture:
           typeof typeof identity.picture !== "undefined"
             ? JSON.stringify(identity.picture)
@@ -46,8 +49,24 @@ export const store = mutation({
         phone_number_verified:
           typeof identity.phone_number_verified !== "undefined"
             ? Boolean(identity.phone_number_verified)
-            : false
+            : false,
       });
+
+      // Link any email-only shares to this user
+      const email = (identity.email || identity.preferredUsername)
+        ?.trim()
+        .toLowerCase();
+      if (email) {
+        const emailShares = await ctx.db
+          .query("shares")
+          .withIndex("by_email", q => q.eq("email", email))
+          .collect();
+        for (const share of emailShares) {
+          if (!share.userId) {
+            await ctx.db.patch(share._id, { userId: user._id });
+          }
+        }
+      }
 
       return user._id;
     }
@@ -55,11 +74,13 @@ export const store = mutation({
       "jd73rghdc6jjjxhm0e6gd8gys57bx472" as Id<"roles">;
 
     // If it's a new identity, create a new `User`.
-    return await ctx.db.insert("users", {
+    const newUserId = await ctx.db.insert("users", {
       name: identity.name,
       tokenIdentifier: identity.tokenIdentifier,
       role: roleId,
-      email: identity.preferredUsername,
+      email: (identity.email || identity.preferredUsername)
+        ?.trim()
+        .toLowerCase(),
       picture:
         typeof typeof identity.picture !== "undefined"
           ? JSON.stringify(identity.picture)
@@ -79,7 +100,32 @@ export const store = mutation({
       phone_number_verified:
         typeof identity.phone_number_verified !== "undefined"
           ? Boolean(identity.phone_number_verified)
-          : false
+          : false,
     });
-  }
+
+    // Link any email-only shares to this user
+    const email = (identity.email || identity.preferredUsername)
+      ?.trim()
+      .toLowerCase();
+    if (email) {
+      const emailShares = await ctx.db
+        .query("shares")
+        .withIndex("by_email", q => q.eq("email", email))
+        .collect();
+      for (const share of emailShares) {
+        if (!share.userId) {
+          await ctx.db.patch(share._id, { userId: newUserId });
+        }
+      }
+    }
+
+    return newUserId;
+  },
+});
+
+export const me = query({
+  args: {},
+  handler: async ctx => {
+    return await getUser(ctx);
+  },
 });
