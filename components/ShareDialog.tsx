@@ -37,6 +37,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ShareLinkSection from "@/components/ShareLinkSection";
+import SharePublicSection from "@/components/SharePublicSection";
 
 interface ShareDialogProps {
   noteId: Id<"notes">;
@@ -151,6 +154,162 @@ export default function ShareDialog({
       .toUpperCase();
   };
 
+  const peopleContent = (
+    <>
+      {canManage && (
+        <form onSubmit={handleInvite}>
+          <Field data-invalid={errorMsg ? "true" : undefined}>
+            <FieldLabel htmlFor="email">{t("inputLabel")}</FieldLabel>
+            <ButtonGroup>
+              <Input
+                id="email"
+                type="email"
+                placeholder={t("inputPlaceholder")}
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                disabled={isSubmitting}
+              />
+              <Select
+                value={inviteRole}
+                onValueChange={val =>
+                  setInviteRole(val as "view" | "edit" | "admin")
+                }
+                disabled={isSubmitting}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value="view">{t("roleView")}</SelectItem>
+                  <SelectItem value="edit">{t("roleEdit")}</SelectItem>
+                  <SelectItem value="admin">{t("roleAdmin")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button type="submit" disabled={isSubmitting || !email.trim()}>
+                <UserPlus />
+                {t("invite")}
+              </Button>
+            </ButtonGroup>
+
+            {errorMsg && <FieldError>{errorMsg}</FieldError>}
+
+            {successMsg && (
+              <p className="text-sm font-medium text-green-600 mt-1 animate-fadeIn">
+                {successMsg}
+              </p>
+            )}
+          </Field>
+        </form>
+      )}
+
+      <Separator />
+
+      <FieldSet>
+        <FieldLegend variant="label">{t("sharedWith")}</FieldLegend>
+        <FieldContent>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">{t("loading")}</p>
+          ) : !shares || shares.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic py-2">
+              {t("noShares")}
+            </p>
+          ) : (
+            <div className="max-h-60 overflow-y-auto space-y-3 pr-1">
+              {shares.map(shareUser => {
+                const isSelf = shareUser.email
+                  ? shareUser.email.trim().toLowerCase() === currentUserEmail
+                  : false;
+                const canRemoveUser = canManage || isSelf;
+
+                return (
+                  <div
+                    key={shareUser._id}
+                    className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar>
+                        <AvatarImage
+                          src={
+                            shareUser.picture
+                              ? JSON.parse(shareUser.picture)
+                              : undefined
+                          }
+                          alt={shareUser.name ?? "Avatar"}
+                        />
+                        <AvatarFallback>
+                          {getInitials(shareUser.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {shareUser.name || shareUser.email}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {shareUser.name ? shareUser.email : t("pending")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {canManage && shareUser.role !== "owner" ? (
+                        <Select
+                          value={shareUser.role}
+                          onValueChange={val =>
+                            handleRoleChange(
+                              shareUser.shareId!,
+                              val as "view" | "edit" | "admin",
+                            )
+                          }
+                        >
+                          <SelectTrigger size="sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent position="popper">
+                            <SelectItem value="view">
+                              {t("roleView")}
+                            </SelectItem>
+                            <SelectItem value="edit">
+                              {t("roleEdit")}
+                            </SelectItem>
+                            <SelectItem value="admin">
+                              {t("roleAdmin")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                          {shareUser.role === "owner"
+                            ? t("roleOwner")
+                            : shareUser.role === "admin"
+                              ? t("roleAdmin")
+                              : shareUser.role === "edit"
+                                ? t("roleEdit")
+                                : t("roleView")}
+                        </span>
+                      )}
+
+                      {canRemoveUser && shareUser.role !== "owner" && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => handleRemove(shareUser.shareId!)}
+                          title={t("remove")}
+                          className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                        >
+                          <Trash2 />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </FieldContent>
+      </FieldSet>
+    </>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -159,157 +318,26 @@ export default function ShareDialog({
           <DialogDescription>{t("desc")}</DialogDescription>
         </DialogHeader>
 
-        {canManage && (
-          <form onSubmit={handleInvite}>
-            <Field data-invalid={errorMsg ? "true" : undefined}>
-              <FieldLabel htmlFor="email">{t("inputLabel")}</FieldLabel>
-              <ButtonGroup>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder={t("inputPlaceholder")}
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  disabled={isSubmitting}
-                />
-                <Select
-                  value={inviteRole}
-                  onValueChange={val =>
-                    setInviteRole(val as "view" | "edit" | "admin")
-                  }
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper">
-                    <SelectItem value="view">{t("roleView")}</SelectItem>
-                    <SelectItem value="edit">{t("roleEdit")}</SelectItem>
-                    <SelectItem value="admin">{t("roleAdmin")}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button type="submit" disabled={isSubmitting || !email.trim()}>
-                  <UserPlus />
-                  {t("invite")}
-                </Button>
-              </ButtonGroup>
-
-              {errorMsg && <FieldError>{errorMsg}</FieldError>}
-
-              {successMsg && (
-                <p className="text-sm font-medium text-green-600 mt-1 animate-fadeIn">
-                  {successMsg}
-                </p>
-              )}
-            </Field>
-          </form>
+        {canManage ? (
+          <Tabs defaultValue="people" className="gap-4">
+            <TabsList className="w-full">
+              <TabsTrigger value="people">{t("tabPeople")}</TabsTrigger>
+              <TabsTrigger value="link">{t("tabLink")}</TabsTrigger>
+              <TabsTrigger value="public">{t("tabPublic")}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="people" className="flex flex-col gap-4">
+              {peopleContent}
+            </TabsContent>
+            <TabsContent value="link">
+              <ShareLinkSection noteId={noteId} />
+            </TabsContent>
+            <TabsContent value="public">
+              <SharePublicSection noteId={noteId} />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          peopleContent
         )}
-
-        <Separator />
-
-        <FieldSet>
-          <FieldLegend variant="label">{t("sharedWith")}</FieldLegend>
-          <FieldContent>
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground">{t("loading")}</p>
-            ) : !shares || shares.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic py-2">
-                {t("noShares")}
-              </p>
-            ) : (
-              <div className="max-h-60 overflow-y-auto space-y-3 pr-1">
-                {shares.map(shareUser => {
-                  const isSelf = shareUser.email
-                    ? shareUser.email.trim().toLowerCase() === currentUserEmail
-                    : false;
-                  const canRemoveUser = canManage || isSelf;
-
-                  return (
-                    <div
-                      key={shareUser._id}
-                      className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Avatar>
-                          <AvatarImage
-                            src={
-                              shareUser.picture
-                                ? JSON.parse(shareUser.picture)
-                                : undefined
-                            }
-                            alt={shareUser.name ?? "Avatar"}
-                          />
-                          <AvatarFallback>
-                            {getInitials(shareUser.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {shareUser.name || shareUser.email}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {shareUser.name ? shareUser.email : t("pending")}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {canManage && shareUser.role !== "owner" ? (
-                          <Select
-                            value={shareUser.role}
-                            onValueChange={val =>
-                              handleRoleChange(
-                                shareUser.shareId!,
-                                val as "view" | "edit" | "admin",
-                              )
-                            }
-                          >
-                            <SelectTrigger size="sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent position="popper">
-                              <SelectItem value="view">
-                                {t("roleView")}
-                              </SelectItem>
-                              <SelectItem value="edit">
-                                {t("roleEdit")}
-                              </SelectItem>
-                              <SelectItem value="admin">
-                                {t("roleAdmin")}
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
-                            {shareUser.role === "owner"
-                              ? t("roleOwner")
-                              : shareUser.role === "admin"
-                                ? t("roleAdmin")
-                                : shareUser.role === "edit"
-                                  ? t("roleEdit")
-                                  : t("roleView")}
-                          </span>
-                        )}
-
-                        {canRemoveUser && shareUser.role !== "owner" && (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => handleRemove(shareUser.shareId!)}
-                            title={t("remove")}
-                            className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
-                          >
-                            <Trash2 />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </FieldContent>
-        </FieldSet>
       </DialogContent>
     </Dialog>
   );
