@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: ready_to_plan
-stopped_at: Phase 12 complete (6/6) — ready to discuss Phase 13
-last_updated: 2026-10-16T15:49:24.867Z
-last_activity: 2026-08-25 -- Phase 12 execution started
+status: planning
+stopped_at: Phase 13 context gathered
+last_updated: "2026-10-16T16:12:22.926Z"
+last_activity: 2026-10-16
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
   completed_plans: 6
-  percent: 0
+  percent: 20
 ---
 
 ## Current Position
@@ -92,9 +92,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-08-25T18:07:35.099Z
-Stopped at: Phase 12 waves 1-3 complete (12-01..12-05 merged, 125/125 tests passing); Wave 4 (12-06) blocked on operator Stripe checkpoint Task 1
-Resume file: .planning/phases/12-plan-restructure-tier-foundation/12-06-PLAN.md
+Last session: 2026-10-16T16:12:22.917Z
+Stopped at: Phase 13 context gathered
+Resume file: .planning/workstreams/general/phases/13-sharing-links-public-notes/13-CONTEXT.md
 
 ## Operator Next Steps
 
