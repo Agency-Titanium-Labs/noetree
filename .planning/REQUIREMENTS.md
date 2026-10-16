@@ -9,9 +9,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Onboarding vendeur (CONNECT)
 
-- [ ] **CONNECT-01**: User can start Stripe Connect (Express) onboarding when creating their first listing
-- [ ] **CONNECT-02**: Seller sees onboarding/payout status (pending, active, restricted) in Settings
-- [ ] **CONNECT-03**: Listing creation and checkout are blocked server-side until charges_enabled/payouts_enabled
+- [x] **CONNECT-01**: User can start Stripe Connect (Express) onboarding when creating their first listing
+- [x] **CONNECT-02**: Seller sees onboarding/payout status (pending, active, restricted) in Settings
+- [x] **CONNECT-03**: Listing creation and checkout are blocked server-side until charges_enabled/payouts_enabled
 
 ### Listings (LIST)
 
@@ -79,31 +79,31 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase    | Status  |
-| ----------- | -------- | ------- |
-| CONNECT-01  | Phase 7  | Pending |
-| CONNECT-02  | Phase 7  | Pending |
-| CONNECT-03  | Phase 7  | Pending |
-| LIST-01     | Phase 8  | Pending |
-| LIST-02     | Phase 8  | Pending |
-| LIST-03     | Phase 8  | Pending |
-| LIST-04     | Phase 8  | Pending |
-| BROWSE-01   | Phase 8  | Pending |
-| BROWSE-02   | Phase 8  | Pending |
-| BROWSE-03   | Phase 8  | Pending |
-| BROWSE-04   | Phase 8  | Pending |
-| BROWSE-05   | Phase 8  | Pending |
-| BROWSE-06   | Phase 8  | Pending |
-| BUY-01      | Phase 9  | Pending |
-| BUY-02      | Phase 9  | Pending |
-| BUY-03      | Phase 9  | Pending |
-| BUY-04      | Phase 9  | Pending |
-| BUY-05      | Phase 9  | Pending |
-| DELIVER-01  | Phase 10 | Pending |
-| DELIVER-02  | Phase 10 | Pending |
-| DELIVER-03  | Phase 10 | Pending |
-| HIST-01     | Phase 11 | Pending |
-| HIST-02     | Phase 11 | Pending |
+| Requirement | Phase    | Status   |
+| ----------- | -------- | -------- |
+| CONNECT-01  | Phase 7  | Complete |
+| CONNECT-02  | Phase 7  | Complete |
+| CONNECT-03  | Phase 7  | Complete |
+| LIST-01     | Phase 8  | Pending  |
+| LIST-02     | Phase 8  | Pending  |
+| LIST-03     | Phase 8  | Pending  |
+| LIST-04     | Phase 8  | Pending  |
+| BROWSE-01   | Phase 8  | Pending  |
+| BROWSE-02   | Phase 8  | Pending  |
+| BROWSE-03   | Phase 8  | Pending  |
+| BROWSE-04   | Phase 8  | Pending  |
+| BROWSE-05   | Phase 8  | Pending  |
+| BROWSE-06   | Phase 8  | Pending  |
+| BUY-01      | Phase 9  | Pending  |
+| BUY-02      | Phase 9  | Pending  |
+| BUY-03      | Phase 9  | Pending  |
+| BUY-04      | Phase 9  | Pending  |
+| BUY-05      | Phase 9  | Pending  |
+| DELIVER-01  | Phase 10 | Pending  |
+| DELIVER-02  | Phase 10 | Pending  |
+| DELIVER-03  | Phase 10 | Pending  |
+| HIST-01     | Phase 11 | Pending  |
+| HIST-02     | Phase 11 | Pending  |
 
 **Coverage:**
 
