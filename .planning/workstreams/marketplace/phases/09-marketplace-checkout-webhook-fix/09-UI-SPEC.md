@@ -1,9 +1,10 @@
 ---
 phase: 9
 slug: marketplace-checkout-webhook-fix
-status: draft
+status: approved
 shadcn_initialized: true
 preset: new-york / neutral / cssVariables (existing components.json)
+reviewed_at: 2026-10-16
 created: 2026-10-16
 ---
 
