@@ -128,8 +128,30 @@ Plans:
 4. Restoring a note to a past version never deletes or hides any existing comment as a side effect
 5. Note owner receives an in-app notification the moment a comment is added to their note
 6. User sees a bell icon with an unread-count indicator that updates reactively as new notifications arrive, without a page refresh
-   **Plans**: TBD
+   **Plans**: 8 plans (4 waves)
    **UI hint**: yes
+
+Plans:
+
+**Wave 1**
+
+- [ ] 14-01-PLAN.md — Schema (comments, notifications), single comment access resolver, author projection, Wave 0 tests (wave 1)
+- [ ] 14-04-PLAN.md — sonner (legitimacy-gated) + app-wide Toaster, Popover primitive (wave 1)
+- [ ] 14-05-PLAN.md — Shared getInitials/relative-time utils, ShareDialog refactor, en/fr Comments + Notifications copy (wave 1)
+
+**Wave 2**
+
+- [ ] 14-02-PLAN.md — comments.ts list/count/add with per-recipient notification fan-out, resolve, delete tombstones, deleteNote cascade (wave 2)
+- [ ] 14-03-PLAN.md — notifications.ts unreadCount/list/markRead/markAllRead + nested-note navigation test (wave 2)
+
+**Wave 3**
+
+- [ ] 14-06-PLAN.md — CommentsPanel Sheet, CommentThread, CommentComposer, CommentsButton + component tests (wave 3)
+- [ ] 14-07-PLAN.md — NotificationBell popover + Header mount + component tests (wave 3)
+
+**Wave 4**
+
+- [ ] 14-08-PLAN.md — Place comments in NoteContent and visitor pages, ?comments=1 deep link (incl. same-page re-open), end-to-end human verification (wave 4)
 
 ### Phase 15: Version History & Restoration
 
