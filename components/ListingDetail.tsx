@@ -1,29 +1,22 @@
 "use client";
 
-import { SignInButton, useUser } from "@clerk/nextjs";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import BuyPanel from "@/components/BuyPanel";
 import PriceLabel from "@/components/PriceLabel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { api } from "@/convex/_generated/api";
 import { Link, useRouter } from "@/i18n/routing";
 
 export default function ListingDetail({ listingId }: { listingId: string }) {
   const t = useTranslations("Marketplace");
   const router = useRouter();
-  const { isSignedIn } = useUser();
 
   const { data, isPending } = useQuery(
     convexQuery(api.marketplace.getPublic, { listingId }),
@@ -145,24 +138,7 @@ export default function ListingDetail({ listingId }: { listingId: string }) {
             className="text-xl font-semibold text-primary sm:text-[28px]"
           />
           <p className="text-sm text-muted-foreground">{accessExplanation}</p>
-          {isSignedIn ? (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="block w-full">
-                    <Button disabled className="w-full">
-                      {t("buyNow")}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{t("buyDisabledTooltip")}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          ) : (
-            <SignInButton mode="modal">
-              <Button className="w-full">{t("signInToBuy")}</Button>
-            </SignInButton>
-          )}
+          <BuyPanel listingId={listingId} priceCents={data.priceCents} />
         </CardContent>
       </Card>
     </div>
