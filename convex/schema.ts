@@ -35,9 +35,12 @@ export default defineSchema({
     isPinned: v.optional(v.boolean()),
     // Public flag lives on the ROOT of a public subtree only; undefined = private.
     isPublic: v.optional(v.boolean()),
+    // D-08: set on a purchase copy root so it can be found by its purchase.
+    purchaseId: v.optional(v.id("purchases")),
   })
     .index("by_owner", ["owner", "parentNote"])
-    .index("by_parent", ["parentNote"]),
+    .index("by_parent", ["parentNote"])
+    .index("by_purchaseId", ["purchaseId"]),
 
   subscriptions: defineTable({
     clerkUserId: v.string(),
@@ -113,12 +116,18 @@ export default defineSchema({
     role: v.optional(
       v.union(v.literal("view"), v.literal("edit"), v.literal("admin")),
     ),
+    // D-01: purchase-granted shares carry the purchase and its scope.
+    // undefined purchaseId = manual share (existing rows stay valid).
+    purchaseId: v.optional(v.id("purchases")),
+    scope: v.optional(v.union(v.literal("note"), v.literal("subtree"))),
   })
     .index("by_user", ["userId"])
     .index("by_note", ["noteId"])
     .index("by_email", ["email"])
     .index("by_user_note", ["userId", "noteId"])
-    .index("by_email_note", ["email", "noteId"]),
+    .index("by_email_note", ["email", "noteId"])
+    .index("by_purchaseId", ["purchaseId"])
+    .index("by_note_and_purchaseId", ["noteId", "purchaseId"]),
 
   // shareLinks invariants (Phase 13):
   // - At most one row per noteId (D-01).
@@ -248,10 +257,20 @@ export default defineSchema({
     stripeCheckoutSessionId: v.optional(v.string()),
     stripePaymentIntentId: v.optional(v.string()),
     paidAt: v.optional(v.number()),
+    // Phase 10 delivery bookkeeping (D-13). All optional: rows written before
+    // this field existed stay valid.
+    deliveredAt: v.optional(v.number()),
+    deliveryStatus: v.optional(
+      v.union(v.literal("delivered"), v.literal("failed")),
+    ),
+    deliveredNoteId: v.optional(v.id("notes")),
+    deliveryError: v.optional(v.string()),
   })
     .index("by_buyerId_and_listingId", ["buyerId", "listingId"])
     .index("by_stripeCheckoutSessionId", ["stripeCheckoutSessionId"])
     .index("by_listingId", ["listingId"])
     .index("by_sellerId", ["sellerId"])
-    .index("by_buyerId", ["buyerId"]),
+    .index("by_buyerId", ["buyerId"])
+    // D-13/D-16: backfill of paid purchases not yet delivered.
+    .index("by_status_and_deliveryStatus", ["status", "deliveryStatus"]),
 });
