@@ -1,7 +1,8 @@
 ---
 phase: 8
 slug: listings-marketplace-browse-search
-status: draft
+status: approved
+reviewed_at: 2026-10-16
 shadcn_initialized: true
 preset: new-york / neutral / cssVariables (existing components.json)
 created: 2026-10-16
