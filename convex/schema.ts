@@ -211,4 +211,47 @@ export default defineSchema({
   })
     .index("by_tag", ["tag"])
     .index("by_count", ["count"]),
+
+  // Marketplace purchases (Phase 9).
+  // Invariants:
+  // - One row per (buyer, listing), enforced inside preparePurchase's transaction.
+  // - status goes pending -> paid only via the signature-verified Stripe webhook.
+  // - The webhook never recomputes the fee (D-11): it reads this snapshot.
+  // - The webhook never reads listing.status (D-09, LIST-04).
+  // - _id is the Phase 10 delivery idempotency key (D-04).
+  // - No refund status exists (D-14, sales are final). No quota fields (D-07 superseded).
+  purchases: defineTable({
+    buyerId: v.id("users"),
+    buyerClerkUserId: v.string(),
+    listingId: v.id("listings"),
+    noteId: v.id("notes"),
+    sellerId: v.id("users"),
+    sellerClerkUserId: v.string(),
+    status: v.union(v.literal("pending"), v.literal("paid")),
+    // Snapshot taken at prepare time
+    title: v.string(),
+    priceCents: v.number(),
+    currency: v.literal("eur"),
+    sellerTier: v.union(v.literal("free"), v.literal("premium")),
+    commissionRateBps: v.number(),
+    commissionCents: v.number(),
+    sellerNetCents: v.number(),
+    scope: v.union(v.literal("note"), v.literal("subtree")),
+    accessMode: v.union(v.literal("copy"), v.literal("readonly")),
+    noteCount: v.number(),
+    destinationAccountId: v.string(),
+    // Incremented each time the snapshot is (re)taken; part of the Stripe idempotency key.
+    snapshotVersion: v.number(),
+    // ms; drives a deterministic Stripe expires_at.
+    snapshotAt: v.number(),
+    // Stripe linkage
+    stripeCheckoutSessionId: v.optional(v.string()),
+    stripePaymentIntentId: v.optional(v.string()),
+    paidAt: v.optional(v.number()),
+  })
+    .index("by_buyerId_and_listingId", ["buyerId", "listingId"])
+    .index("by_stripeCheckoutSessionId", ["stripeCheckoutSessionId"])
+    .index("by_listingId", ["listingId"])
+    .index("by_sellerId", ["sellerId"])
+    .index("by_buyerId", ["buyerId"]),
 });
