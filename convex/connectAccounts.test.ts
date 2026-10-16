@@ -295,7 +295,10 @@ describe("connectAccounts", () => {
         { clerkUserId: "user_existing", stripeAccountId: "acct_different" },
       );
 
-      expect(result).toEqual({ alreadyExists: true });
+      expect(result).toEqual({
+        alreadyExists: true,
+        stripeAccountId: "acct_original",
+      });
 
       const row = await t.run(async ctx => {
         return await ctx.db
@@ -470,6 +473,46 @@ describe("connectAccounts", () => {
       expect(row).not.toBeNull();
       expect(row?.clerkUserId).toBe("user_insert_race");
       expect(row?.status).toBe("restricted");
+    });
+
+    test("does not insert a second row for a user who already has a different Stripe account (CR-01), and leaves the first row intact", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.mutation(internal.connectAccounts.insertPendingAccount, {
+        clerkUserId: "user_dup",
+        stripeAccountId: "acct_first",
+      });
+
+      const result = await t.mutation(
+        internal.connectAccounts.upsertFromStripeAccount,
+        {
+          stripeEventId: "evt_dup",
+          eventType: "account.updated",
+          stripeAccountId: "acct_second",
+          clerkUserId: "user_dup",
+          chargesEnabled: true,
+          payoutsEnabled: true,
+          detailsSubmitted: true,
+        },
+      );
+      expect(result).toHaveProperty("anomaly");
+
+      const rows = await t.run(async ctx =>
+        ctx.db
+          .query("connectAccounts")
+          .withIndex("by_clerkUserId", q => q.eq("clerkUserId", "user_dup"))
+          .collect(),
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].stripeAccountId).toBe("acct_first");
+      expect(rows[0].chargesEnabled).toBe(false);
+
+      // The .unique() lookup the seller card / gates rely on must not throw.
+      await expect(
+        t
+          .withIdentity({ subject: "user_dup" })
+          .query(api.connectAccounts.getMyConnectStatus, {}),
+      ).resolves.not.toBeNull();
     });
 
     test("returns an anomaly without throwing and writes zero rows when no existing row and no clerkUserId metadata", async () => {

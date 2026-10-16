@@ -59,14 +59,19 @@ export async function createConnectOnboardingLink(
   if (!stripeAccountId) {
     let account: Stripe.Response<Stripe.Account>;
     try {
-      account = await stripe.accounts.create({
-        type: "express",
-        // T-07-13: userId comes only from auth() above, never from an
-        // argument — that metadata is later trusted by
-        // upsertFromStripeAccount's insert path, so a client-supplied value
-        // would be an account-linking primitive.
-        metadata: { clerkUserId: userId },
-      });
+      account = await stripe.accounts.create(
+        {
+          type: "express",
+          // T-07-13: userId comes only from auth() above, never from an
+          // argument — that metadata is later trusted by
+          // upsertFromStripeAccount's insert path, so a client-supplied value
+          // would be an account-linking primitive.
+          metadata: { clerkUserId: userId },
+        },
+        // CR-01: a double submit / second tab within Stripe's idempotency
+        // window gets back the SAME account instead of minting a duplicate.
+        { idempotencyKey: `connect-account-create-${userId}` },
+      );
     } catch (err) {
       console.error(
         "createConnectOnboardingLink: stripe.accounts.create failed",
@@ -83,14 +88,23 @@ export async function createConnectOnboardingLink(
       // flag (07-RESEARCH.md Assumption A1 / Pitfall 1).
       // CR-02: guarded by INTERNAL_WEBHOOK_SECRET; userId is the Clerk id
       // verified by auth() above, never user-supplied.
-      await convex.action(api.connectAccounts.recordPendingAccount, {
-        secret: process.env.INTERNAL_WEBHOOK_SECRET!,
-        clerkUserId: userId,
-        stripeAccountId,
-      });
+      const recorded = await convex.action(
+        api.connectAccounts.recordPendingAccount,
+        {
+          secret: process.env.INTERNAL_WEBHOOK_SECRET!,
+          clerkUserId: userId,
+          stripeAccountId,
+        },
+      );
+      // CR-01: a concurrent request already recorded an account for this
+      // user; reuse that one rather than the just-created duplicate.
+      if (recorded?.alreadyExists && recorded.stripeAccountId) {
+        const linkedAccountId: string = recorded.stripeAccountId;
+        stripeAccountId = linkedAccountId;
+      }
     } catch (err) {
       console.error(
-        "createConnectOnboardingLink: recordPendingAccount mutation failed",
+        "createConnectOnboardingLink: recordPendingAccount action failed",
         err,
       );
       throw new Error("connectAccountRecordFailed");

@@ -94,7 +94,12 @@ export const insertPendingAccount = internalMutation({
       .withIndex("by_clerkUserId", q => q.eq("clerkUserId", args.clerkUserId))
       .unique();
     if (existingForUser) {
-      return { alreadyExists: true };
+      // Return the row's account id so the caller reuses it instead of a
+      // freshly created (now orphaned) duplicate (CR-01).
+      return {
+        alreadyExists: true,
+        stripeAccountId: existingForUser.stripeAccountId,
+      };
     }
 
     const existingForAccountId = await ctx.db
@@ -220,6 +225,22 @@ export const upsertFromStripeAccount = internalMutation({
         status,
       });
     } else if (args.clerkUserId) {
+      // CR-01: never insert a second row for a user who already has one under
+      // a different Stripe account (double submit / two tabs) — by_clerkUserId
+      // is read with .unique(), so a duplicate would make every later lookup
+      // (seller card, isSellerActive) throw.
+      const existingForUser = await ctx.db
+        .query("connectAccounts")
+        .withIndex("by_clerkUserId", q =>
+          q.eq("clerkUserId", args.clerkUserId!),
+        )
+        .unique();
+      if (existingForUser) {
+        console.error(
+          `upsertFromStripeAccount anomaly: user ${args.clerkUserId} already linked to ${existingForUser.stripeAccountId}, refusing second account ${args.stripeAccountId}`,
+        );
+        return { anomaly: "clerkUserId already linked to a different account" };
+      }
       // Pitfall 4: the very first account.updated event can beat the server
       // action's own recordPendingAccount write.
       await ctx.db.insert("connectAccounts", {

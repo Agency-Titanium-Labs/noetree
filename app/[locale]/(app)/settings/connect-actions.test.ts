@@ -91,10 +91,13 @@ describe("createConnectOnboardingLink", () => {
     );
 
     expect(mockAccountsCreate).toHaveBeenCalledTimes(1);
-    expect(mockAccountsCreate).toHaveBeenCalledWith({
-      type: "express",
-      metadata: { clerkUserId: "user_new_1" },
-    });
+    expect(mockAccountsCreate).toHaveBeenCalledWith(
+      {
+        type: "express",
+        metadata: { clerkUserId: "user_new_1" },
+      },
+      { idempotencyKey: "connect-account-create-user_new_1" },
+    );
     expect(mockConvexAction).toHaveBeenCalledTimes(1);
     expect(mockConvexAction).toHaveBeenCalledWith(expect.anything(), {
       secret: "shared-secret",
@@ -104,6 +107,30 @@ describe("createConnectOnboardingLink", () => {
     expect(mockAccountLinksCreate).toHaveBeenCalledTimes(1);
     expect(mockAccountLinksCreate).toHaveBeenCalledWith(
       expect.objectContaining({ account: "acct_new_1" }),
+    );
+  });
+
+  it("lost race: when recordPendingAccount reports alreadyExists, the existing account id is reused for the link (CR-01)", async () => {
+    mockAuth.mockResolvedValue({
+      userId: "user_race_1",
+      getToken: vi.fn().mockResolvedValue("mock_convex_token"),
+    });
+    mockConvexQuery.mockResolvedValue(null);
+    mockAccountsCreate.mockResolvedValue({ id: "acct_duplicate" });
+    mockConvexAction.mockResolvedValue({
+      alreadyExists: true,
+      stripeAccountId: "acct_first",
+    });
+    mockAccountLinksCreate.mockResolvedValue({
+      url: "https://connect.stripe.com/setup/acct_first",
+    });
+
+    await expect(createConnectOnboardingLink("en")).rejects.toThrow(
+      "NEXT_REDIRECT:https://connect.stripe.com/setup/acct_first",
+    );
+
+    expect(mockAccountLinksCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ account: "acct_first" }),
     );
   });
 
