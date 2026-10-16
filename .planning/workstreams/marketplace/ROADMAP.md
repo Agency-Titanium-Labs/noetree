@@ -125,7 +125,18 @@ Plans:
 2. Read-only-mode purchase grants the buyer permanent, live view access to the seller's note (+subtree) that reflects the seller's future edits, via the existing `shares`/`getUserPermission` path (no parallel access mechanism)
 3. Replaying the same purchase webhook event does not create duplicate copies or duplicate access grants (purchase-scoped idempotency key, verified by a replay-the-webhook-twice test)
 
-**Plans**: TBD
+**Plans**: 8 plans
+
+Plans:
+
+- [ ] 10-01-PLAN.md — Schema delivery fields/indexes, shared test seeds, [BLOCKING] push
+- [ ] 10-02-PLAN.md — Delivery helper (plan-then-write copy, readonly grant, idempotency) — TDD
+- [ ] 10-03-PLAN.md — Scope-aware getUserPermission + tree-query leak fixes, isPurchased flag
+- [ ] 10-04-PLAN.md — createListing re-list guard for purchased content
+- [ ] 10-05-PLAN.md — Purchase-share immutability, deleteNote guard, duplicateNote via helper
+- [ ] 10-06-PLAN.md — markPaidFromCheckout delivery hook, deliverPending backfill, getMyListingState, replay test
+- [ ] 10-07-PLAN.md — BuyPanel Open note / failure / pending, hide Leave, FR/EN error copy
+- [ ] 10-08-PLAN.md — Phase gate, backfill run, live Stripe verification (checkpoint)
 
 ### Phase 11: Buyer & Seller History UI
 
