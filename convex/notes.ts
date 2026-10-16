@@ -2,6 +2,7 @@ import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { getUser, isProUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
+import { unpublishListingForNote } from "./helpers/listings";
 
 const FREE_NOTE_LIMIT = 20;
 
@@ -696,6 +697,9 @@ export const deleteNote = mutation({
       for (const share of shares) {
         await ctx.db.delete(share._id);
       }
+
+      // D-18: auto-unpublish (never delete) the listing for every deleted note — same transaction; purchases keep pointing at the row (D-16)
+      await unpublishListingForNote(ctx, noteId);
     };
 
     if (rootNote.parentNote) {

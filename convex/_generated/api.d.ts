@@ -11,6 +11,7 @@
 import type * as aiCredits from "../aiCredits.js";
 import type * as connectAccounts from "../connectAccounts.js";
 import type * as helpers_helper from "../helpers/helper.js";
+import type * as helpers_listings from "../helpers/listings.js";
 import type * as notes from "../notes.js";
 import type * as stripeWebhooks from "../stripeWebhooks.js";
 import type * as subscriptions from "../subscriptions.js";
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   aiCredits: typeof aiCredits;
   connectAccounts: typeof connectAccounts;
   "helpers/helper": typeof helpers_helper;
+  "helpers/listings": typeof helpers_listings;
   notes: typeof notes;
   stripeWebhooks: typeof stripeWebhooks;
   subscriptions: typeof subscriptions;
