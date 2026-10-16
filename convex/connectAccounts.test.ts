@@ -878,6 +878,45 @@ describe("connectAccounts", () => {
       expect(rowCount).toBe(0);
     });
 
+    test("correct secret, malformed event.id / non-string metadata do not throw (WR-02)", async () => {
+      const t = convexTest(schema, modules);
+      process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+
+      const badId = await t.action(
+        api.connectAccounts.processConnectWebhookEvent,
+        {
+          secret: TEST_SECRET,
+          event: {
+            id: 123,
+            type: "account.updated",
+            account: "acct_bad_id",
+            data: { object: { metadata: { clerkUserId: "user_x" } } },
+          },
+        },
+      );
+      expect(badId).toHaveProperty("anomaly");
+
+      const badMeta = await t.action(
+        api.connectAccounts.processConnectWebhookEvent,
+        {
+          secret: TEST_SECRET,
+          event: {
+            id: "evt_bad_meta",
+            type: "account.updated",
+            account: "acct_bad_meta",
+            data: { object: { metadata: { clerkUserId: { nested: true } } } },
+          },
+        },
+      );
+      expect(badMeta).toHaveProperty("anomaly");
+
+      const rowCount = await t.run(async ctx => {
+        const rows = await ctx.db.query("connectAccounts").collect();
+        return rows.length;
+      });
+      expect(rowCount).toBe(0);
+    });
+
     test("correct secret, account.updated with missing event.account returns an anomaly sentinel without throwing or calling the mutation", async () => {
       const t = convexTest(schema, modules);
       process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;

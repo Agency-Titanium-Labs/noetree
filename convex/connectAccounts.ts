@@ -323,8 +323,18 @@ export const processConnectWebhookEvent = action({
         // events (never on platform events) — this is a routing signal only,
         // never an authenticity signal (authenticity comes exclusively from
         // signature verification in the route, before this action is called).
-        const stripeAccountId = args.event.account;
-        if (!stripeAccountId) {
+        const stripeAccountId: unknown = args.event.account;
+        // WR-02: args.event is v.any(); a malformed id/account would fail the
+        // internalMutation's validators, surface as a 500 and make Stripe
+        // retry a request that can never succeed. Validate types up front
+        // and return an anomaly sentinel (200) instead.
+        if (typeof args.event.id !== "string" || !args.event.id) {
+          console.error(
+            "processConnectWebhookEvent anomaly: malformed event.id",
+          );
+          return { anomaly: "malformed event.id" };
+        }
+        if (typeof stripeAccountId !== "string" || !stripeAccountId) {
           console.error(
             `processConnectWebhookEvent anomaly: missing event.account for stripeEventId ${args.event.id}`,
           );
@@ -332,7 +342,11 @@ export const processConnectWebhookEvent = action({
         }
 
         const account = args.event.data.object;
-        const clerkUserId = account?.metadata?.clerkUserId;
+        const rawClerkUserId: unknown = account?.metadata?.clerkUserId;
+        const clerkUserId =
+          typeof rawClerkUserId === "string" && rawClerkUserId
+            ? rawClerkUserId
+            : undefined;
         // Coerce with === true so a missing/undefined field becomes `false`
         // rather than failing the internalMutation's v.boolean() validator.
         const chargesEnabled = account?.charges_enabled === true;
