@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Marketplace de notes
-status: executing
-stopped_at: Phase 9 UI-SPEC approved
-last_updated: "2026-10-16T20:21:46.242Z"
+status: ready_to_plan
+stopped_at: Phase 9 complete (6/6) — ready to discuss Phase 10
+last_updated: 2026-10-16T20:52:33.942Z
 last_activity: 2026-10-16
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 21
-  completed_plans: 20
+  completed_plans: 21
   percent: 40
 ---
 
 ## Current Position
 
-Phase: 9 (marketplace-checkout-webhook-fix) — EXECUTING
-Plan: 6 of 6
-Status: Ready to execute
+Phase: 10
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-10-16
 
 ## Project Reference
@@ -26,13 +26,13 @@ Last activity: 2026-10-16
 See: .planning/PROJECT.md (updated 2026-10-16)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente.
-**Current focus:** Phase 9 — marketplace-checkout-webhook-fix
+**Current focus:** Phase 10 — purchase fulfillment (copy & access grants)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 27
+- Total plans completed: 33
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -46,6 +46,7 @@ See: .planning/PROJECT.md (updated 2026-10-16)
 | 06    | 5     | -     | -        |
 | 06.1  | 1     | -     | -        |
 | 7     | 6     | -     | -        |
+| 9     | 6     | -     | -        |
 
 **Recent Trend:**
 

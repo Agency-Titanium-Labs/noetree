@@ -33,7 +33,7 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 
 - [x] **Phase 7: Connect Onboarding & Seller Enablement** - Sellers complete Stripe Connect (Express) onboarding; server enforces payout-readiness (completed 2026-10-16)
 - [x] **Phase 8: Listings & Marketplace Browse/Search** - Sellers list notes for sale; buyers discover them via a public browse/search page (completed 2026-10-16)
-- [ ] **Phase 9: Marketplace Checkout & Webhook Fix** - Buyers purchase listings via Stripe Checkout with tiered commission (20%/10%) split at source
+- [x] **Phase 9: Marketplace Checkout & Webhook Fix** - Buyers purchase listings via Stripe Checkout with tiered commission (20%/10%) split at source (completed 2026-10-16)
 - [ ] **Phase 10: Purchase Fulfillment (Copy & Access Grants)** - Completed purchases reliably deliver content to buyers exactly once
 - [ ] **Phase 11: Buyer & Seller History UI** - Buyers and sellers can review purchase/sales history
 
@@ -112,7 +112,7 @@ Plans:
 - [x] 09-03-PLAN.md — webhook metadata.type discrimination + markPaidFromCheckout (verify, idempotent, salesCount) + top-up metadata.type
 - [x] 09-04-PLAN.md — createMarketplaceCheckout server action (destination charge, session reuse)
 - [x] 09-05-PLAN.md — BuyPanel/BuyButton on listing detail page, FR/EN copy, component tests
-- [ ] 09-06-PLAN.md — phase gate: docs drift fix (15% -> 20/10, BUY-04 superseded), full suite/build/push, live Stripe purchase verification
+- [x] 09-06-PLAN.md — phase gate: docs drift fix (15% -> 20/10, BUY-04 superseded), full suite/build/push, live Stripe purchase verification
 
 ### Phase 10: Purchase Fulfillment (Copy & Access Grants)
 
@@ -156,7 +156,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 06.1. Close gap — initial AI credits grant      | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 7. Connect Onboarding & Seller Enablement       | v1.1      | 6/6            | Complete    | 2026-10-16 |
 | 8. Listings & Marketplace Browse/Search         | v1.1      | 9/9            | Complete    | 2026-10-16 |
-| 9. Marketplace Checkout & Webhook Fix           | v1.1      | 5/6            | In Progress |            |
+| 9. Marketplace Checkout & Webhook Fix           | v1.1      | 6/6            | Complete    | 2026-10-16 |
 | 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 0/TBD          | Not started | -          |
 | 11. Buyer & Seller History UI                   | v1.1      | 0/TBD          | Not started | -          |
 
