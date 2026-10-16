@@ -87,8 +87,19 @@ Plans:
 4. User can revoke a share link, and the link stops working immediately for anyone who has it
 5. User can toggle a note fully public, and that public visibility cascades to the note's descendant notes
 6. Sharing (links and public notes) works identically, with no restriction or paywall, on both Free and Premium plans
-   **Plans**: TBD
-   **UI hint**: yes
+   **Plans**: 7 plans
+
+Plans:
+
+- [ ] 13-01-PLAN.md — Schema (shareLinks, isPublic), permission/sharing helpers, delete cleanup, Wave 0 tests
+- [ ] 13-02-PLAN.md — Convex API: link management, anonymous reads, sign-in-gated edit, Node token action, tests
+- [ ] 13-03-PLAN.md — i18n (en/fr) copy and shadcn tabs/switch/alert
+- [ ] 13-04-PLAN.md — (share) route group shell and /s/[token] visitor page
+- [ ] 13-05-PLAN.md — ShareDialog Link and Public tabs
+- [ ] 13-06-PLAN.md — /p/[noteId] public note page with sub-note list
+- [ ] 13-07-PLAN.md — Phase gates and manual browser verification
+
+  **UI hint**: yes
 
 ### Phase 14: Comments & Notifications
 
