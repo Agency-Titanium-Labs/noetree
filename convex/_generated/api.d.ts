@@ -9,6 +9,7 @@
  */
 
 import type * as aiCredits from "../aiCredits.js";
+import type * as comments from "../comments.js";
 import type * as connectAccounts from "../connectAccounts.js";
 import type * as helpers_commentAccess from "../helpers/commentAccess.js";
 import type * as helpers_commission from "../helpers/commission.js";
@@ -34,6 +35,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   aiCredits: typeof aiCredits;
+  comments: typeof comments;
   connectAccounts: typeof connectAccounts;
   "helpers/commentAccess": typeof helpers_commentAccess;
   "helpers/commission": typeof helpers_commission;

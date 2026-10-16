@@ -1,4 +1,5 @@
 import { ConvexError, Infer, v } from "convex/values";
+import { internal } from "../_generated/api";
 import { Doc, Id } from "../_generated/dataModel";
 import { MutationCtx, QueryCtx } from "../_generated/server";
 import { getUserPermission } from "./permissions";
@@ -94,6 +95,33 @@ export function projectAuthor(user: Doc<"users"> | null): {
     name: user?.name ?? null,
     avatarUrl: parseAvatarUrl(user?.picture),
   };
+}
+
+const CASCADE_BATCH = 100;
+
+/**
+ * Deletes comments and notifications for a note in bounded batches and
+ * self-reschedules when a batch was full (D-10).
+ */
+export async function deleteCommentsForNote(
+  ctx: MutationCtx,
+  noteId: Id<"notes">,
+): Promise<void> {
+  const comments = await ctx.db
+    .query("comments")
+    .withIndex("by_noteId", q => q.eq("noteId", noteId))
+    .take(CASCADE_BATCH);
+  for (const c of comments) await ctx.db.delete("comments", c._id);
+
+  const notifs = await ctx.db
+    .query("notifications")
+    .withIndex("by_noteId", q => q.eq("noteId", noteId))
+    .take(CASCADE_BATCH);
+  for (const n of notifs) await ctx.db.delete("notifications", n._id);
+
+  if (comments.length === CASCADE_BATCH || notifs.length === CASCADE_BATCH) {
+    await ctx.scheduler.runAfter(0, internal.comments.purgeNote, { noteId });
+  }
 }
 
 /**
