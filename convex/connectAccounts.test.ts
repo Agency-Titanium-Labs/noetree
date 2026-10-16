@@ -207,16 +207,22 @@ describe("connectAccounts", () => {
   });
 
   describe("recordPendingAccount", () => {
-    test("unauthenticated caller throws and writes no row", async () => {
+    test("action with a wrong secret throws Unauthorized and writes no row", async () => {
       const t = convexTest(schema, modules);
+      process.env.INTERNAL_WEBHOOK_SECRET = "test-internal-secret";
 
-      // No withIdentity() — an unauthenticated client must never be able to
-      // create a connectAccounts row for anyone.
-      await expect(
-        t.mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_unauth",
-        }),
-      ).rejects.toThrow();
+      let caught: unknown;
+      try {
+        await t.action(api.connectAccounts.recordPendingAccount, {
+          secret: "wrong-secret",
+          clerkUserId: "user_attacker",
+          stripeAccountId: "acct_victim",
+        });
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(ConvexError);
+      expect((caught as ConvexError<string>).data).toMatch(/^Unauthorized/);
 
       const rowCount = await t.run(async ctx => {
         const rows = await ctx.db.query("connectAccounts").collect();
@@ -225,14 +231,38 @@ describe("connectAccounts", () => {
       expect(rowCount).toBe(0);
     });
 
+    test("action with the correct secret inserts a pending row for the supplied verified clerkUserId", async () => {
+      const t = convexTest(schema, modules);
+      process.env.INTERNAL_WEBHOOK_SECRET = "test-internal-secret";
+
+      const result = await t.action(api.connectAccounts.recordPendingAccount, {
+        secret: "test-internal-secret",
+        clerkUserId: "user_server",
+        stripeAccountId: "acct_server",
+      });
+      expect(result).toEqual({ created: true });
+    });
+
+    test("an unset server-side secret never authenticates (even an empty string)", async () => {
+      const t = convexTest(schema, modules);
+      delete process.env.INTERNAL_WEBHOOK_SECRET;
+
+      await expect(
+        t.action(api.connectAccounts.recordPendingAccount, {
+          secret: "",
+          clerkUserId: "user_x",
+          stripeAccountId: "acct_x",
+        }),
+      ).rejects.toThrow();
+    });
+
     test("signed-in caller with no existing row inserts a pending row and returns created:true", async () => {
       const t = convexTest(schema, modules);
 
-      const result = await t
-        .withIdentity({ subject: "user_new" })
-        .mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_new",
-        });
+      const result = await t.mutation(
+        internal.connectAccounts.insertPendingAccount,
+        { clerkUserId: "user_new", stripeAccountId: "acct_new" },
+      );
 
       expect(result).toEqual({ created: true });
 
@@ -255,17 +285,15 @@ describe("connectAccounts", () => {
     test("signed-in caller who already has a row returns alreadyExists:true and leaves stripeAccountId unchanged", async () => {
       const t = convexTest(schema, modules);
 
-      await t
-        .withIdentity({ subject: "user_existing" })
-        .mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_original",
-        });
+      await t.mutation(internal.connectAccounts.insertPendingAccount, {
+        clerkUserId: "user_existing",
+        stripeAccountId: "acct_original",
+      });
 
-      const result = await t
-        .withIdentity({ subject: "user_existing" })
-        .mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_different",
-        });
+      const result = await t.mutation(
+        internal.connectAccounts.insertPendingAccount,
+        { clerkUserId: "user_existing", stripeAccountId: "acct_different" },
+      );
 
       expect(result).toEqual({ alreadyExists: true });
 
@@ -284,19 +312,17 @@ describe("connectAccounts", () => {
     test("caller passing a stripeAccountId already linked to another user throws CONNECT_ACCOUNT_ALREADY_LINKED and writes no row", async () => {
       const t = convexTest(schema, modules);
 
-      await t
-        .withIdentity({ subject: "user_a" })
-        .mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_shared",
-        });
+      await t.mutation(internal.connectAccounts.insertPendingAccount, {
+        clerkUserId: "user_a",
+        stripeAccountId: "acct_shared",
+      });
 
       let caught: unknown;
       try {
-        await t
-          .withIdentity({ subject: "user_b" })
-          .mutation(api.connectAccounts.recordPendingAccount, {
-            stripeAccountId: "acct_shared",
-          });
+        await t.mutation(internal.connectAccounts.insertPendingAccount, {
+          clerkUserId: "user_b",
+          stripeAccountId: "acct_shared",
+        });
       } catch (err) {
         caught = err;
       }
@@ -318,11 +344,10 @@ describe("connectAccounts", () => {
     test("isSellerActive is still false for the caller after recordPendingAccount", async () => {
       const t = convexTest(schema, modules);
 
-      await t
-        .withIdentity({ subject: "user_pending_gate" })
-        .mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_pending_gate",
-        });
+      await t.mutation(internal.connectAccounts.insertPendingAccount, {
+        clerkUserId: "user_pending_gate",
+        stripeAccountId: "acct_pending_gate",
+      });
 
       const active = await t.query(internal.connectAccounts.isSellerActive, {
         clerkUserId: "user_pending_gate",
@@ -379,11 +404,10 @@ describe("connectAccounts", () => {
     test("patches an existing pending row to active without creating a second connectAccounts row", async () => {
       const t = convexTest(schema, modules);
 
-      await t
-        .withIdentity({ subject: "user_patch" })
-        .mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_patch",
-        });
+      await t.mutation(internal.connectAccounts.insertPendingAccount, {
+        clerkUserId: "user_patch",
+        stripeAccountId: "acct_patch",
+      });
 
       const result = await t.mutation(
         internal.connectAccounts.upsertFromStripeAccount,
@@ -476,11 +500,10 @@ describe("connectAccounts", () => {
     test("returns an anomaly without throwing when event metadata clerkUserId disagrees with the matched row's owner, and leaves the victim row unchanged", async () => {
       const t = convexTest(schema, modules);
 
-      await t
-        .withIdentity({ subject: "user_a" })
-        .mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_x",
-        });
+      await t.mutation(internal.connectAccounts.insertPendingAccount, {
+        clerkUserId: "user_a",
+        stripeAccountId: "acct_x",
+      });
 
       const result = await t.mutation(
         internal.connectAccounts.upsertFromStripeAccount,
@@ -512,11 +535,10 @@ describe("connectAccounts", () => {
     test("regresses an active row to restricted when capability flags flip false, and isSellerActive becomes false", async () => {
       const t = convexTest(schema, modules);
 
-      await t
-        .withIdentity({ subject: "user_regress" })
-        .mutation(api.connectAccounts.recordPendingAccount, {
-          stripeAccountId: "acct_regress",
-        });
+      await t.mutation(internal.connectAccounts.insertPendingAccount, {
+        clerkUserId: "user_regress",
+        stripeAccountId: "acct_regress",
+      });
 
       await t.mutation(internal.connectAccounts.upsertFromStripeAccount, {
         stripeEventId: "evt_regress_1",

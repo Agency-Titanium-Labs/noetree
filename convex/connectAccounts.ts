@@ -1,7 +1,6 @@
 import {
   query,
   internalQuery,
-  mutation,
   internalMutation,
   action,
 } from "./_generated/server";
@@ -69,38 +68,32 @@ export const isSellerActive = internalQuery({
   },
 });
 
-// Security: clerkUserId is derived exclusively from ctx.auth.getUserIdentity()
-// (never a client-supplied argument), so a caller can only ever create/read
-// their OWN row. Two account-takeover primitives are explicitly closed here:
-//   1. A caller with an existing row can never re-point it at a different
-//      stripeAccountId (would let a client silently swap in a different
-//      Stripe account after the fact) — existing callers get
-//      { alreadyExists: true } and nothing is patched.
-//   2. A caller cannot claim a stripeAccountId already linked to a different
-//      user — throws ConvexError("CONNECT_ACCOUNT_ALREADY_LINKED").
+// Security (CR-02): internal-only. Previously a public mutation that trusted a
+// client-supplied stripeAccountId, which let any signed-in user squat or
+// pre-claim an arbitrary Stripe account id. It is now reachable ONLY through
+// recordPendingAccount (the secret-guarded action below), which the Next.js
+// server action calls with a Clerk user id it verified server-side via auth().
+//
+// Two account-takeover primitives are closed here:
+//   1. A user with an existing row can never be re-pointed at a different
+//      stripeAccountId — existing callers get { alreadyExists: true } and
+//      nothing is patched.
+//   2. A stripeAccountId already linked to a different user cannot be claimed
+//      — throws ConvexError("CONNECT_ACCOUNT_ALREADY_LINKED").
 //
 // This mutation stores an INERT account id only — status "pending" and all
 // three capability booleans false. It must NEVER write a capability flag as
 // true; all capability state originates exclusively from
 // upsertFromStripeAccount, the webhook-driven internal mutation below
-// (07-RESEARCH.md Pitfall 1 / ARCHITECTURE.md Anti-Pattern 2). The row is
-// written here (rather than waiting for the first account.updated webhook)
-// so a second "Become a seller" click can detect the existing pending
-// account and skip calling stripe.accounts.create again — without it, every
-// repeat click would orphan a duplicate Express account.
-export const recordPendingAccount = mutation({
-  args: { stripeAccountId: v.string() },
+// (07-RESEARCH.md Pitfall 1 / ARCHITECTURE.md Anti-Pattern 2).
+export const insertPendingAccount = internalMutation({
+  args: { clerkUserId: v.string(), stripeAccountId: v.string() },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new ConvexError("UNAUTHENTICATED");
-    }
-
-    const existingForCaller = await ctx.db
+    const existingForUser = await ctx.db
       .query("connectAccounts")
-      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", args.clerkUserId))
       .unique();
-    if (existingForCaller) {
+    if (existingForUser) {
       return { alreadyExists: true };
     }
 
@@ -115,7 +108,7 @@ export const recordPendingAccount = mutation({
     }
 
     await ctx.db.insert("connectAccounts", {
-      clerkUserId: identity.subject,
+      clerkUserId: args.clerkUserId,
       stripeAccountId: args.stripeAccountId,
       status: "pending",
       chargesEnabled: false,
@@ -124,6 +117,32 @@ export const recordPendingAccount = mutation({
     });
 
     return { created: true };
+  },
+});
+
+// Server-to-server entry point for insertPendingAccount (CR-02). Public in the
+// Convex sense (the Next.js server action reaches it over ConvexHttpClient) but
+// gated by INTERNAL_WEBHOOK_SECRET, so end users — who never hold the secret —
+// cannot call it with arbitrary ids. clerkUserId here is trusted only because
+// the sole caller (createConnectOnboardingLink) derives it from Clerk auth().
+export const recordPendingAccount = action({
+  args: {
+    secret: v.string(),
+    clerkUserId: v.string(),
+    stripeAccountId: v.string(),
+  },
+  returns: v.any(),
+  handler: async (ctx, args): Promise<any> => {
+    if (!isValidInternalSecret(args.secret)) {
+      throw new ConvexError("Unauthorized: invalid INTERNAL_WEBHOOK_SECRET");
+    }
+    return await ctx.runMutation(
+      internal.connectAccounts.insertPendingAccount,
+      {
+        clerkUserId: args.clerkUserId,
+        stripeAccountId: args.stripeAccountId,
+      },
+    );
   },
 });
 

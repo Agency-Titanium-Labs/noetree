@@ -81,7 +81,11 @@ export async function createConnectOnboardingLink(
       // "pending", all capability flags false) so a second click cannot
       // orphan a duplicate Express account — it never writes a capability
       // flag (07-RESEARCH.md Assumption A1 / Pitfall 1).
-      await convex.mutation(api.connectAccounts.recordPendingAccount, {
+      // CR-02: guarded by INTERNAL_WEBHOOK_SECRET; userId is the Clerk id
+      // verified by auth() above, never user-supplied.
+      await convex.action(api.connectAccounts.recordPendingAccount, {
+        secret: process.env.INTERNAL_WEBHOOK_SECRET!,
+        clerkUserId: userId,
         stripeAccountId,
       });
     } catch (err) {

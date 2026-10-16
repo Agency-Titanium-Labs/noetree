@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 const mockAccountsCreate = vi.fn();
 const mockAccountLinksCreate = vi.fn();
 const mockConvexQuery = vi.fn();
-const mockConvexMutation = vi.fn();
+const mockConvexAction = vi.fn();
 const mockSetAuth = vi.fn();
 const mockAuth = vi.fn();
 const mockRedirectNav = vi.fn((url: string) => {
@@ -23,7 +23,7 @@ vi.mock("convex/browser", () => ({
   ConvexHttpClient: vi.fn().mockImplementation(function ConvexHttpClientMock() {
     return {
       query: mockConvexQuery,
-      mutation: mockConvexMutation,
+      action: mockConvexAction,
       setAuth: mockSetAuth,
     };
   }),
@@ -47,6 +47,7 @@ beforeAll(async () => {
   process.env.STRIPE_SECRET_KEY = "sk_test_123";
   process.env.NEXT_PUBLIC_CONVEX_URL = "https://example.convex.cloud";
   process.env.APP_URL = "https://noetree.app";
+  process.env.INTERNAL_WEBHOOK_SECRET = "shared-secret";
 
   ({ createConnectOnboardingLink } = await import("./connect-actions"));
 });
@@ -56,7 +57,7 @@ describe("createConnectOnboardingLink", () => {
     mockAccountsCreate.mockReset();
     mockAccountLinksCreate.mockReset();
     mockConvexQuery.mockReset();
-    mockConvexMutation.mockReset();
+    mockConvexAction.mockReset();
     mockAuth.mockReset();
     mockSetAuth.mockReset();
     mockRedirectNav.mockClear();
@@ -70,7 +71,7 @@ describe("createConnectOnboardingLink", () => {
     );
     expect(mockAccountsCreate).not.toHaveBeenCalled();
     expect(mockAccountLinksCreate).not.toHaveBeenCalled();
-    expect(mockConvexMutation).not.toHaveBeenCalled();
+    expect(mockConvexAction).not.toHaveBeenCalled();
   });
 
   it("first-time seller creates a Stripe Express account, records it, and mints a fresh link", async () => {
@@ -80,7 +81,7 @@ describe("createConnectOnboardingLink", () => {
     });
     mockConvexQuery.mockResolvedValue(null);
     mockAccountsCreate.mockResolvedValue({ id: "acct_new_1" });
-    mockConvexMutation.mockResolvedValue({ created: true });
+    mockConvexAction.mockResolvedValue({ created: true });
     mockAccountLinksCreate.mockResolvedValue({
       url: "https://connect.stripe.com/setup/acct_new_1",
     });
@@ -94,8 +95,10 @@ describe("createConnectOnboardingLink", () => {
       type: "express",
       metadata: { clerkUserId: "user_new_1" },
     });
-    expect(mockConvexMutation).toHaveBeenCalledTimes(1);
-    expect(mockConvexMutation).toHaveBeenCalledWith(expect.anything(), {
+    expect(mockConvexAction).toHaveBeenCalledTimes(1);
+    expect(mockConvexAction).toHaveBeenCalledWith(expect.anything(), {
+      secret: "shared-secret",
+      clerkUserId: "user_new_1",
       stripeAccountId: "acct_new_1",
     });
     expect(mockAccountLinksCreate).toHaveBeenCalledTimes(1);
@@ -119,7 +122,7 @@ describe("createConnectOnboardingLink", () => {
     );
 
     expect(mockAccountsCreate).not.toHaveBeenCalled();
-    expect(mockConvexMutation).not.toHaveBeenCalled();
+    expect(mockConvexAction).not.toHaveBeenCalled();
     expect(mockAccountLinksCreate).toHaveBeenCalledTimes(1);
     expect(mockAccountLinksCreate).toHaveBeenCalledWith(
       expect.objectContaining({ account: "acct_existing" }),
@@ -212,7 +215,7 @@ describe("createConnectOnboardingLink", () => {
     await expect(createConnectOnboardingLink("en")).rejects.toThrow(
       "connectAccountCreationFailed",
     );
-    expect(mockConvexMutation).not.toHaveBeenCalled();
+    expect(mockConvexAction).not.toHaveBeenCalled();
     expect(mockAccountLinksCreate).not.toHaveBeenCalled();
   });
 
@@ -223,7 +226,7 @@ describe("createConnectOnboardingLink", () => {
     });
     mockConvexQuery.mockResolvedValue(null);
     mockAccountsCreate.mockResolvedValue({ id: "acct_record_fail_1" });
-    mockConvexMutation.mockRejectedValueOnce(new Error("convex down"));
+    mockConvexAction.mockRejectedValueOnce(new Error("convex down"));
 
     await expect(createConnectOnboardingLink("en")).rejects.toThrow(
       "connectAccountRecordFailed",
