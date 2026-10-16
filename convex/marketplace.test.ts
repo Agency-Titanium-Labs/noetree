@@ -310,3 +310,92 @@ describe("tag", () => {
     ).toHaveLength(0);
   });
 });
+
+describe("getPublic", () => {
+  test("returns projected snapshot for a published listing", async () => {
+    const t = convexTest(schema, modules);
+    const s = await seedSeller(t, { key: "s1" });
+    const id = await seedListing(t, "s1", s, {
+      content: textContent("original excerpt text"),
+    });
+    const res = await t.query(api.marketplace.getPublic, { listingId: id });
+    expect(res).not.toBeNull();
+    expect(Object.keys(res!).sort()).toEqual(PUBLIC_KEYS);
+    expect(res!.excerpt).toBe("original excerpt text");
+    expect(res!.noteCount).toBe(1);
+  });
+
+  test("keeps the original excerpt after the note is edited (D-07)", async () => {
+    const t = convexTest(schema, modules);
+    const s = await seedSeller(t, { key: "s1" });
+    const noteId = await seedNote(t, s, textContent("original excerpt text"));
+    const id = await asUser(t, "s1").mutation(api.listings.createListing, {
+      noteId,
+      title: "T",
+      description: "D",
+      priceCents: 500,
+      scope: "note",
+      accessMode: "copy",
+      tags: [],
+      attested: true,
+    });
+    await t.run(async ctx => {
+      await ctx.db.patch("notes", noteId, {
+        content: textContent("completely different"),
+      });
+    });
+    const res = await t.query(api.marketplace.getPublic, { listingId: id });
+    expect(res!.excerpt).toBe("original excerpt text");
+  });
+
+  test("never exposes full note content", async () => {
+    const t = convexTest(schema, modules);
+    const s = await seedSeller(t, { key: "s1" });
+    const full = Array.from({ length: 2000 }, (_, i) =>
+      String.fromCharCode(97 + (i % 26)),
+    ).join("");
+    const marker = "ZQXJ" + full.slice(0, 46) + "ZQXJ";
+    const text = full.slice(0, 400) + marker + full.slice(450);
+    const id = await seedListing(t, "s1", s, { content: textContent(text) });
+    const res = await t.query(api.marketplace.getPublic, { listingId: id });
+    expect(JSON.stringify(res)).not.toContain(marker);
+  });
+
+  test("returns null for unpublished, malformed and foreign ids", async () => {
+    const t = convexTest(schema, modules);
+    const s = await seedSeller(t, { key: "s1" });
+    const id = await seedListing(t, "s1", s);
+    const noteId = await seedNote(t, s);
+    await patchListing(t, id, { status: "unpublished" });
+    for (const listingId of [id as string, "not-an-id", "", noteId as string]) {
+      expect(
+        await t.query(api.marketplace.getPublic, { listingId }),
+      ).toBeNull();
+    }
+  });
+});
+
+describe("topTags", () => {
+  test("orders by count desc, excludes unpublished-only tags, clamps limit", async () => {
+    const t = convexTest(schema, modules);
+    const s = await seedSeller(t, { key: "s1" });
+    await seedListing(t, "s1", s, { tags: ["math", "physics", "art"] });
+    await seedListing(t, "s1", s, { tags: ["math", "physics"] });
+    await seedListing(t, "s1", s, { tags: ["math"] });
+    const gone = await seedListing(t, "s1", s, { tags: ["ghost"] });
+    await patchListing(t, gone, { status: "unpublished" });
+
+    const res = await t.query(api.marketplace.topTags, {});
+    expect(res).toEqual([
+      { tag: "math", count: 3 },
+      { tag: "physics", count: 2 },
+      { tag: "art", count: 1 },
+    ]);
+    expect(await t.query(api.marketplace.topTags, { limit: 1 })).toHaveLength(
+      1,
+    );
+    expect(
+      (await t.query(api.marketplace.topTags, { limit: 999 })).length,
+    ).toBeLessThanOrEqual(20);
+  });
+});
