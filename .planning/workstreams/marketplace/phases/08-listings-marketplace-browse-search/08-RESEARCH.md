@@ -478,12 +478,16 @@ await unpublishListingForNote(ctx, noteId); // helpers/listings.ts: by_noteId .u
 | A7  | convex-test 0.0.54 evaluates `withSearchIndex` filters (code path "Search" exists) but relevance/prefix fidelity is not guaranteed | Validation        | Search tests may need loose assertions; fall back to manual verification of ranking                            |
 | A8  | TipTap node shapes beyond text/paragraph (mentions, custom nodes) contribute no text                                               | Pattern 3         | Excerpt slightly shorter                                                                                       |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Sort + search UX:** show "Relevance" while q active? Recommendation: yes; keep URL `sort` untouched.
+   RESOLVED: sort control shows "Relevance" and is disabled while q is set (plan 08-05).
 2. **Seller attribution:** card shows `sellerName` snapshot (users.name); if absent show a localized "Anonymous seller".
+   RESOLVED: ListingCard hides the "by" line when sellerName is empty (plan 08-05).
 3. **Currency display on cards:** EUR via `Intl.NumberFormat` using the active locale.
+   RESOLVED: adopted (PriceLabel, plan 08-02).
 4. **Detail page for the seller's own listing** — Phase 9 adds the self-purchase block; Phase 8 detail shows a disabled/placeholder "Buy" area (checkout is Phase 9). Plan should include a non-functional "Buy (coming soon)" slot or omit it; recommend omit CTA, keep layout slot.
+   RESOLVED: detail page renders a disabled Buy button per UI-SPEC (plan 08-06); checkout is Phase 9.
 
 ## Environment Availability
 
