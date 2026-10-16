@@ -98,7 +98,7 @@ Plans:
 
 **Wave 2** _(blocked on Wave 1 completion)_
 
-- [ ] 13-02-PLAN.md — Convex API: link management, anonymous reads, sign-in-gated edit, Node token action, tests
+- [x] 13-02-PLAN.md — Convex API: link management, anonymous reads, sign-in-gated edit, Node token action, tests
 
 **Wave 3** _(blocked on Wave 2 completion)_
 
@@ -177,7 +177,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 6. Settings Page                               | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
-| 13. Sharing — Links & Public Notes             | v1.2      | 2/7            | In Progress |            |
+| 13. Sharing — Links & Public Notes             | v1.2      | 3/7            | In Progress |            |
 | 14. Comments & Notifications                   | v1.2      | 0/TBD          | Not started | -          |
 | 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |
 | 16. AI Credit System Revision                  | v1.2      | 0/TBD          | Not started | -          |
