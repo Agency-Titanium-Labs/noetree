@@ -611,3 +611,237 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     expect(processedEvents.length).toBe(0);
   });
 });
+
+const seedMarketplaceCheckoutEvent = (
+  id: string,
+  purchaseId: string | undefined,
+  overrides: Record<string, unknown> = {},
+  metadataExtra: Record<string, unknown> = { type: "marketplace_purchase" },
+) => ({
+  id,
+  type: "checkout.session.completed",
+  data: {
+    object: {
+      id: "cs_mkt_1",
+      mode: "payment",
+      metadata: { ...(purchaseId ? { purchaseId } : {}), ...metadataExtra },
+      amount_total: 1000,
+      currency: "eur",
+      payment_status: "paid",
+      payment_intent: "pi_mkt_1",
+      ...overrides,
+    },
+  },
+});
+
+async function seedPendingPurchase(t: ReturnType<typeof convexTest>) {
+  return await t.run(async ctx => {
+    const roleId = await ctx.db.insert("roles", { role: "user" });
+    const sellerId = await ctx.db.insert("users", {
+      name: "seller",
+      tokenIdentifier: "https://clerk.dev|seller",
+      role: roleId,
+    });
+    const buyerId = await ctx.db.insert("users", {
+      name: "buyer",
+      tokenIdentifier: "https://clerk.dev|buyer",
+      role: roleId,
+    });
+    const noteId = await ctx.db.insert("notes", {
+      owner: sellerId,
+      title: "N",
+      content: "{}",
+    });
+    const listingId = await ctx.db.insert("listings", {
+      noteId,
+      sellerId,
+      sellerClerkUserId: "seller",
+      title: "Pack",
+      description: "d",
+      excerpt: "e",
+      noteCount: 1,
+      priceCents: 1000,
+      currency: "eur",
+      scope: "note",
+      accessMode: "copy",
+      tags: [],
+      status: "published",
+      salesCount: 0,
+      searchText: "pack",
+      attestedAt: 1,
+      updatedAt: 1,
+    });
+    const purchaseId = await ctx.db.insert("purchases", {
+      buyerId,
+      buyerClerkUserId: "buyer",
+      listingId,
+      status: "pending",
+      noteId,
+      sellerId,
+      sellerClerkUserId: "seller",
+      title: "Pack",
+      priceCents: 1000,
+      currency: "eur",
+      sellerTier: "free",
+      commissionRateBps: 2000,
+      commissionCents: 200,
+      sellerNetCents: 800,
+      scope: "note",
+      accessMode: "copy",
+      noteCount: 1,
+      destinationAccountId: "acct_seller",
+      snapshotAt: 1,
+      snapshotVersion: 1,
+    });
+    return { purchaseId, listingId };
+  });
+}
+
+describe("marketplace checkout.session.completed", () => {
+  beforeEach(() => {
+    process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+  });
+  const run = (t: ReturnType<typeof convexTest>, event: unknown) =>
+    t.action(api.stripeWebhooks.processWebhookEvent, {
+      secret: TEST_SECRET,
+      event,
+    });
+
+  it("marks the purchase paid without touching credits", async () => {
+    const t = convexTest(schema, modules);
+    const { purchaseId, listingId } = await seedPendingPurchase(t);
+    await run(t, seedMarketplaceCheckoutEvent("evt_m1", purchaseId));
+    const p = await t.run(ctx => ctx.db.get("purchases", purchaseId));
+    const l = await t.run(ctx => ctx.db.get("listings", listingId));
+    const credits = await t.run(ctx => ctx.db.query("aiCredits").take(5));
+    expect(p?.status).toBe("paid");
+    expect(l?.salesCount).toBe(1);
+    expect(credits).toHaveLength(0);
+  });
+
+  it("missing or non-string purchaseId is malformed", async () => {
+    const t = convexTest(schema, modules);
+    expect(
+      await run(t, seedMarketplaceCheckoutEvent("evt_m2", undefined)),
+    ).toEqual({
+      anomaly: "malformed marketplace session",
+    });
+    const ev = seedMarketplaceCheckoutEvent(
+      "evt_m3",
+      undefined,
+      {},
+      {
+        type: "marketplace_purchase",
+        purchaseId: 5,
+      },
+    );
+    expect(await run(t, ev)).toEqual({
+      anomaly: "malformed marketplace session",
+    });
+  });
+
+  it("missing amount_total yields a mismatch anomaly, no throw", async () => {
+    const t = convexTest(schema, modules);
+    const { purchaseId } = await seedPendingPurchase(t);
+    const res = await run(
+      t,
+      seedMarketplaceCheckoutEvent("evt_m4", purchaseId, {
+        amount_total: undefined,
+      }),
+    );
+    expect(res).toEqual({ anomaly: "amount or currency mismatch" });
+  });
+
+  it("unknown type is an anomaly and grants no credits", async () => {
+    const t = convexTest(schema, modules);
+    const res = await run(
+      t,
+      seedMarketplaceCheckoutEvent(
+        "evt_m5",
+        undefined,
+        {},
+        {
+          type: "something_else",
+          clerkUserId: "user_x",
+        },
+      ),
+    );
+    expect(res).toEqual({ anomaly: "unknown checkout type" });
+    expect(await t.run(ctx => ctx.db.query("aiCredits").take(5))).toHaveLength(
+      0,
+    );
+  });
+
+  it("purchaseId without a type never grants credits", async () => {
+    const t = convexTest(schema, modules);
+    const res = await run(
+      t,
+      seedMarketplaceCheckoutEvent(
+        "evt_m6",
+        "abc",
+        {},
+        { clerkUserId: "user_x" },
+      ),
+    );
+    expect(res).toEqual({ anomaly: "unknown checkout type" });
+    expect(await t.run(ctx => ctx.db.query("aiCredits").take(5))).toHaveLength(
+      0,
+    );
+  });
+});
+
+describe("top-up type regression", () => {
+  beforeEach(() => {
+    process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+  });
+
+  it("legacy untyped top-up still credits 50", async () => {
+    const t = convexTest(schema, modules);
+    await t.action(api.stripeWebhooks.processWebhookEvent, {
+      secret: TEST_SECRET,
+      event: seedTopupCheckoutEvent("evt_legacy", "user_legacy", "pi_l"),
+    });
+    const rows = await t.run(ctx => ctx.db.query("aiCredits").take(5));
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(rows[0])).toContain("50");
+  });
+
+  it("ai_credit_topup typed top-up credits 50", async () => {
+    const t = convexTest(schema, modules);
+    const event = seedTopupCheckoutEvent("evt_typed", "user_typed", "pi_t");
+    (event.data.object.metadata as Record<string, string>).type =
+      "ai_credit_topup";
+    await t.action(api.stripeWebhooks.processWebhookEvent, {
+      secret: TEST_SECRET,
+      event,
+    });
+    const rows = await t.run(ctx => ctx.db.query("aiCredits").take(5));
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("replay marketplace", () => {
+  beforeEach(() => {
+    process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+  });
+
+  it("same event twice yields one sale and one event row", async () => {
+    const t = convexTest(schema, modules);
+    const { purchaseId, listingId } = await seedPendingPurchase(t);
+    const event = seedMarketplaceCheckoutEvent("evt_r1", purchaseId);
+    for (let i = 0; i < 2; i++) {
+      await t.action(api.stripeWebhooks.processWebhookEvent, {
+        secret: TEST_SECRET,
+        event,
+      });
+    }
+    const l = await t.run(ctx => ctx.db.get("listings", listingId));
+    expect(l?.salesCount).toBe(1);
+    const evs = await t.run(ctx =>
+      ctx.db.query("processedStripeEvents").take(10),
+    );
+    expect(
+      evs.filter(e => e.stripeEventId === "evt_r1:marketplace-purchase-paid"),
+    ).toHaveLength(1);
+  });
+});

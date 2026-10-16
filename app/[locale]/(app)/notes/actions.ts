@@ -60,7 +60,7 @@ export async function createTopupCheckoutSession(): Promise<void> {
       line_items: [{ price: process.env.STRIPE_TOPUP_PRICE_ID!, quantity: 1 }],
       // D-15: clerkUserId sourced ONLY from auth() (T-05-01), never a
       // Server Action parameter.
-      metadata: { clerkUserId: userId },
+      metadata: { clerkUserId: userId, type: "ai_credit_topup" },
       // D-13: no dedicated success page for the top-up flow — redirect
       // back into the app; the balance badge updates reactively via
       // Convex's useQuery once the webhook credits the purchase.

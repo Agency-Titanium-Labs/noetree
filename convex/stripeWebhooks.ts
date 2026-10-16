@@ -43,7 +43,67 @@ export const processWebhookEvent = action({
         const session = args.event.data.object;
         const clerkUserId = session.metadata?.clerkUserId;
 
+        // D-10: discriminate payment sessions by metadata.type. This MUST
+        // precede the clerkUserId guard below: marketplace sessions carry no
+        // clerkUserId. Event fields are v.any(), so coerce everything before
+        // the validator-typed runMutation call.
+        const type: unknown = session.metadata?.type;
+        const purchaseId: unknown = session.metadata?.purchaseId;
+
+        if (type === "marketplace_purchase") {
+          if (
+            session.mode !== "payment" ||
+            typeof purchaseId !== "string" ||
+            purchaseId === "" ||
+            typeof session.id !== "string"
+          ) {
+            console.error(
+              `checkout.session.completed (marketplace) anomaly: malformed session for stripeEventId ${args.event.id}`,
+            );
+            return { anomaly: "malformed marketplace session" };
+          }
+          return await ctx.runMutation(
+            internal.purchases.markPaidFromCheckout,
+            {
+              stripeEventId: args.event.id,
+              eventType: args.event.type,
+              purchaseId,
+              stripeCheckoutSessionId: session.id,
+              amountTotal:
+                typeof session.amount_total === "number"
+                  ? session.amount_total
+                  : null,
+              currency:
+                typeof session.currency === "string" ? session.currency : null,
+              paymentStatus:
+                typeof session.payment_status === "string"
+                  ? session.payment_status
+                  : "unknown",
+              stripePaymentIntentId:
+                typeof session.payment_intent === "string"
+                  ? session.payment_intent
+                  : typeof session.payment_intent?.id === "string"
+                    ? session.payment_intent.id
+                    : undefined,
+            },
+          );
+        }
+
         if (session.mode === "payment") {
+          // Legacy fallback: sessions created before this phase have no
+          // metadata.type (Checkout sessions live at most 24 h). Anything
+          // that looks marketplace-ish (purchaseId) or has an unknown type
+          // must never grant credits.
+          const isTopup =
+            type === "ai_credit_topup" ||
+            (type === undefined && purchaseId === undefined);
+          if (!isTopup) {
+            console.error(
+              `checkout.session.completed (payment) anomaly: unknown checkout type for stripeEventId ${args.event.id}`,
+            );
+            return { anomaly: "unknown checkout type" };
+          }
+
           // Mirrors the D-12 missing-clerkUserId anomaly guard used by
           // upsertSubscription/deleteSubscription: addCredits' clerkUserId
           // arg is a required v.string() (per this plan's interface
