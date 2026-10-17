@@ -629,3 +629,136 @@ describe("previewSubtreeCount", () => {
     ).toBeNull();
   });
 });
+
+describe("purchased", () => {
+  async function seedCopy(t: T) {
+    const seller = await seedSeller(t, { key: "ps" });
+    const buyer = await seedSeller(t, { key: "pb" });
+    const rootId = await t.run(async ctx => {
+      const src = await ctx.db.insert("notes", {
+        owner: seller,
+        title: "src",
+        content: textContent("x"),
+      });
+      const listingId = await ctx.db.insert("listings", {
+        noteId: src,
+        sellerId: seller,
+        sellerClerkUserId: "ps",
+        sellerName: "ps",
+        title: "Pack",
+        description: "d",
+        priceCents: 100,
+        currency: "eur",
+        scope: "note",
+        accessMode: "copy",
+        tags: [],
+        status: "published",
+        salesCount: 0,
+        searchText: "",
+        excerpt: "",
+        noteCount: 1,
+        attestedAt: 1,
+        updatedAt: 1,
+      });
+      const purchaseId = await ctx.db.insert("purchases", {
+        buyerId: buyer,
+        buyerClerkUserId: "pb",
+        listingId,
+        noteId: src,
+        sellerId: seller,
+        sellerClerkUserId: "ps",
+        status: "paid",
+        title: "Pack",
+        priceCents: 100,
+        currency: "eur",
+        sellerTier: "free",
+        commissionRateBps: 1500,
+        commissionCents: 15,
+        sellerNetCents: 85,
+        scope: "note",
+        accessMode: "copy",
+        noteCount: 1,
+        destinationAccountId: "acct_ps",
+        snapshotVersion: 1,
+        snapshotAt: 1,
+        paidAt: 2,
+      });
+      const root = await ctx.db.insert("notes", {
+        owner: buyer,
+        title: "copy",
+        content: textContent("x"),
+        purchaseId,
+      });
+      await ctx.db.patch("purchases", purchaseId, { deliveredNoteId: root });
+      return root;
+    });
+    return { seller, buyer, rootId };
+  }
+
+  test("copy root is rejected", async () => {
+    const t = convexTest(schema, modules);
+    const { rootId } = await seedCopy(t);
+    await expectConvexError(
+      asUser(t, "pb").mutation(api.listings.createListing, {
+        noteId: rootId,
+        ...baseArgs,
+      }),
+      "LISTING_PURCHASED_CONTENT",
+    );
+  });
+
+  test("descendant of a copy root is rejected", async () => {
+    const t = convexTest(schema, modules);
+    const { buyer, rootId } = await seedCopy(t);
+    const child = await seedNote(t, buyer, { parent: rootId });
+    await expectConvexError(
+      asUser(t, "pb").mutation(api.listings.createListing, {
+        noteId: child,
+        ...baseArgs,
+      }),
+      "LISTING_PURCHASED_CONTENT",
+    );
+  });
+
+  test("note containing a moved copy root is rejected", async () => {
+    const t = convexTest(schema, modules);
+    const { buyer, rootId } = await seedCopy(t);
+    const p = await seedNote(t, buyer);
+    await t.run(async ctx => {
+      await ctx.db.patch("notes", rootId, { parentNote: p });
+      await ctx.db.patch("notes", p, { childNotes: [rootId] });
+    });
+    await expectConvexError(
+      asUser(t, "pb").mutation(api.listings.createListing, {
+        noteId: p,
+        ...baseArgs,
+      }),
+      "LISTING_PURCHASED_CONTENT",
+    );
+  });
+
+  test("a note owned by someone else still fails LISTING_NOT_OWNER", async () => {
+    const t = convexTest(schema, modules);
+    const { rootId } = await seedCopy(t);
+    const other = await seedSeller(t, { key: "po" });
+    expect(other).toBeTruthy();
+    await expectConvexError(
+      asUser(t, "po").mutation(api.listings.createListing, {
+        noteId: rootId,
+        ...baseArgs,
+      }),
+      "LISTING_NOT_OWNER",
+    );
+  });
+
+  test("a plain note of the same buyer can be listed", async () => {
+    const t = convexTest(schema, modules);
+    const { buyer } = await seedCopy(t);
+    const plain = await seedNote(t, buyer);
+    const id = await asUser(t, "pb").mutation(api.listings.createListing, {
+      noteId: plain,
+      ...baseArgs,
+    });
+    expect(id).toBeTruthy();
+  });
+});
