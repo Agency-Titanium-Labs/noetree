@@ -177,7 +177,7 @@ Plans:
 
 **Wave 2**
 
-- [ ] 15-03-PLAN.md — noteVersions list/get (tier-gated) + atomic non-destructive restore + deleteNote cascade (wave 2)
+- [x] 15-03-PLAN.md — noteVersions list/get (tier-gated) + atomic non-destructive restore + deleteNote cascade (wave 2)
 
 **Wave 3**
 
@@ -220,7 +220,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
 | 13. Sharing — Links & Public Notes             | v1.2      | 6/7            | In Progress |            |
 | 14. Comments & Notifications                   | v1.2      | 8/8            | Complete    | 2026-10-17 |
-| 15. Version History & Restoration              | v1.2      | 2/5 | In Progress|  |
+| 15. Version History & Restoration              | v1.2      | 3/5 | In Progress|  |
 | 16. AI Credit System Revision                  | v1.2      | 0/TBD          | Not started | -          |
 
 ---
