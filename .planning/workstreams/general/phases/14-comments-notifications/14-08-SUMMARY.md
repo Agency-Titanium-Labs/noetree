@@ -20,12 +20,13 @@ decisions:
   - "NoteContent selects the notification's note (route params.id) via onSelectNote when it differs from selectedNote, so the panel never opens on the wrong note"
 metrics:
   completed: 2026-10-17
-status: partial - human verification pending (Task 3)
+status: complete
+verification: user-approved, partially browser-verified
 ---
 
 # Phase 14 Plan 08: Wire comments into pages Summary
 
-STATUS: Tasks 1-2 complete. Task 3 (human end-to-end check) is PENDING; plan, requirements and ROADMAP are not marked complete.
+STATUS: Complete. Task 3 (human end-to-end check) approved by the user; verification is user-approved and only partially browser-verified (see below).
 
 ## Tasks
 
@@ -42,7 +43,7 @@ TreeProvider's `selectedNoteId` is local state seeded once from `params.id`; a s
 
 - `convex dev --once` failed typecheck at convex/comments.test.ts:364 (untyped `ctx.db` in `t.run`, from plan 14-02).
 - Fix: cast `ctx.db` to `DatabaseReader`. Tests still pass (convex/comments.test.ts, CommentsPanel, NotificationBell: 51/51).
-- Commit: see docs/fix commit below.
+- Commit: 833e04d.
 
 **2. Dev deployment side effect (informational)**
 
@@ -56,6 +57,8 @@ TreeProvider's `selectedNoteId` is local state seeded once from `params.id`; a s
 
 None.
 
-## Pending: human verification (Task 3)
+## Human verification (Task 3): user-approved, partially browser-verified
 
-Steps 1-7 including 3b (same-page notification click) in the plan; see checkpoint message.
+Chrome-driven check as contact@sevalys.com passed: add comment, reply, resolve/unresolve with the Show resolved stub, comments surviving a note edit and reload, deleting a root comment with a reply (shows the "Comment deleted" tombstone, reply kept) with its confirm dialog (Keep comment / Delete comment), no emails shown, and a logged-out /s/<token> page that is read-only with "Sign in to comment" and no bell.
+
+NOT verified in-browser: the two-account bell/notification flow (steps 2, 3, 3b, 4 notification parts; second-user sign-in was not completed), the /p/<id> public page, and the root-note-while-child-selected case. The user approved the checkpoint regardless.
