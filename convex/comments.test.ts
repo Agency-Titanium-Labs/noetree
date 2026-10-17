@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import { Id } from "./_generated/dataModel";
+import type { DatabaseReader } from "./_generated/server";
 import {
   getRecipientAccess,
   parseAvatarUrl,
@@ -359,7 +360,7 @@ async function commentCount(t: T, noteId: Id<"notes">) {
   return await t.run(
     async ctx =>
       (
-        await ctx.db
+        await (ctx.db as unknown as DatabaseReader)
           .query("comments")
           .withIndex("by_noteId", q => q.eq("noteId", noteId))
           .take(1000)
