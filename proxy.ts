@@ -9,6 +9,10 @@ const isProtectedRoute = createRouteMatcher([
   "/:locale/notes(.*)",
   "/listings(.*)",
   "/:locale/listings(.*)",
+  "/purchases(.*)",
+  "/:locale/purchases(.*)",
+  "/sales(.*)",
+  "/:locale/sales(.*)",
 ]);
 const isPublicRoute = createRouteMatcher(["/api/webhooks/(.*)"]);
 
