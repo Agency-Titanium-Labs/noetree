@@ -16,6 +16,7 @@ import type * as helpers_commission from "../helpers/commission.js";
 import type * as helpers_delivery from "../helpers/delivery.js";
 import type * as helpers_helper from "../helpers/helper.js";
 import type * as helpers_listings from "../helpers/listings.js";
+import type * as helpers_noteVersions from "../helpers/noteVersions.js";
 import type * as helpers_permissions from "../helpers/permissions.js";
 import type * as helpers_sharing from "../helpers/sharing.js";
 import type * as listings from "../listings.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "helpers/delivery": typeof helpers_delivery;
   "helpers/helper": typeof helpers_helper;
   "helpers/listings": typeof helpers_listings;
+  "helpers/noteVersions": typeof helpers_noteVersions;
   "helpers/permissions": typeof helpers_permissions;
   "helpers/sharing": typeof helpers_sharing;
   listings: typeof listings;
