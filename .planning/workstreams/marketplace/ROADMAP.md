@@ -34,7 +34,7 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 7: Connect Onboarding & Seller Enablement** - Sellers complete Stripe Connect (Express) onboarding; server enforces payout-readiness (completed 2026-10-16)
 - [x] **Phase 8: Listings & Marketplace Browse/Search** - Sellers list notes for sale; buyers discover them via a public browse/search page (completed 2026-10-16)
 - [x] **Phase 9: Marketplace Checkout & Webhook Fix** - Buyers purchase listings via Stripe Checkout with tiered commission (20%/10%) split at source (completed 2026-10-16)
-- [ ] **Phase 10: Purchase Fulfillment (Copy & Access Grants)** - Completed purchases reliably deliver content to buyers exactly once
+- [x] **Phase 10: Purchase Fulfillment (Copy & Access Grants)** - Completed purchases reliably deliver content to buyers exactly once (completed 2026-10-17)
 - [ ] **Phase 11: Buyer & Seller History UI** - Buyers and sellers can review purchase/sales history
 
 ## Phase Details
@@ -136,7 +136,7 @@ Plans:
 - [x] 10-05-PLAN.md — Purchase-share immutability, deleteNote guard, duplicateNote via helper
 - [x] 10-06-PLAN.md — markPaidFromCheckout delivery hook, deliverPending backfill, getMyListingState, replay test
 - [x] 10-07-PLAN.md — BuyPanel Open note / failure / pending, hide Leave, FR/EN error copy
-- [ ] 10-08-PLAN.md — Phase gate, backfill run, live Stripe verification (checkpoint)
+- [x] 10-08-PLAN.md — Phase gate, backfill run, live Stripe verification (checkpoint)
 
 ### Phase 11: Buyer & Seller History UI
 
@@ -168,7 +168,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 7. Connect Onboarding & Seller Enablement       | v1.1      | 6/6            | Complete    | 2026-10-16 |
 | 8. Listings & Marketplace Browse/Search         | v1.1      | 9/9            | Complete    | 2026-10-16 |
 | 9. Marketplace Checkout & Webhook Fix           | v1.1      | 6/6            | Complete    | 2026-10-16 |
-| 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 7/8            | In Progress |            |
+| 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 8/8            | Complete    | 2026-10-17 |
 | 11. Buyer & Seller History UI                   | v1.1      | 0/TBD          | Not started | -          |
 
 ---
