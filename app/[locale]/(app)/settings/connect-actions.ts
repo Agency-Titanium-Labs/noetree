@@ -140,3 +140,58 @@ export async function createConnectOnboardingLink(
   // otherwise swallow the navigation.
   redirect(accountLink.url);
 }
+
+// D-11: mints a fresh Stripe Express dashboard login link for the caller's
+// OWN connected account and redirects to it. T-11-06: takes no arguments; the
+// account id is read server-side via getMyConnectStatus with the caller's own
+// Convex token. T-11-07: Clerk auth() required, null token aborts. T-11-08:
+// redirect target comes only from Stripe's response. T-11-09: static log
+// messages, token never logged, URL never persisted. T-11-10: server
+// re-checks raw capability flags (Phase 7 D-06 authority).
+export async function createConnectLoginLink(): Promise<void> {
+  const { userId, getToken } = await auth();
+  if (!userId) {
+    throw new Error("UNAUTHENTICATED");
+  }
+
+  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+  let account: Awaited<
+    ReturnType<
+      typeof convex.query<typeof api.connectAccounts.getMyConnectStatus>
+    >
+  >;
+  try {
+    const convexToken = await getToken({ template: "convex" });
+    if (!convexToken) throw new Error("missing convex auth token");
+    convex.setAuth(convexToken);
+    account = await convex.query(api.connectAccounts.getMyConnectStatus, {});
+  } catch (err) {
+    console.error(
+      "createConnectLoginLink: connect status lookup/auth handshake failed",
+      err,
+    );
+    throw new Error("connectStatusLookupFailed");
+  }
+
+  if (
+    !account ||
+    account.chargesEnabled !== true ||
+    account.payoutsEnabled !== true
+  ) {
+    throw new Error("connectNotActive");
+  }
+
+  let link: Stripe.Response<Stripe.LoginLink>;
+  try {
+    link = await stripe.accounts.createLoginLink(account.stripeAccountId);
+  } catch (err) {
+    console.error(
+      "createConnectLoginLink: stripe.accounts.createLoginLink failed",
+      err,
+    );
+    throw new Error("connectLoginLinkFailed");
+  }
+
+  // redirect() signals by throwing; it must stay outside every try block.
+  redirect(link.url);
+}

@@ -42,7 +42,7 @@ describe("relative time", () => {
 });
 
 describe("i18n parity", () => {
-  for (const ns of ["Comments", "Notifications"] as const) {
+  for (const ns of ["Comments", "Notifications", "Sidebar", "Purchases", "Sales"] as const) {
     it(`${ns} keys match between en and fr`, () => {
       expect(Object.keys(fr[ns])).toEqual(Object.keys(en[ns]));
       for (const m of [en, fr]) {
@@ -58,5 +58,17 @@ describe("i18n parity", () => {
     expect(fr.Comments.postCta).toBe("Publier le commentaire");
     expect(en.Notifications.textReply).toContain("{actor}");
     expect(en.Notifications.textReply).toContain("{title}");
+  });
+  it("phase 11 copy", () => {
+    expect(en.Sales.totalEarned).toBe("Total earned");
+    expect(fr.Sales.totalEarned).toBe("Total gagné");
+    expect(en.Sidebar.purchases).toBe("Purchases");
+    const forbidden =
+      /balance|available|refund|receipt|invoice|solde|disponible|rembours|reçu|facture/i;
+    for (const ns of [en.Sales, en.Purchases, fr.Sales, fr.Purchases]) {
+      for (const value of Object.values(ns)) {
+        expect(value as string).not.toMatch(forbidden);
+      }
+    }
   });
 });

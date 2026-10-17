@@ -45,8 +45,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Historique (HIST)
 
-- [ ] **HIST-01**: Buyer can view a "My Purchases" page listing everything bought (copy and read-only mode)
-- [ ] **HIST-02**: Seller can view a basic earnings view per sale (gross, commission, net) with running balance and payout status
+- [x] **HIST-01**: Buyer can view a "My Purchases" page listing everything bought (copy and read-only mode)
+- [x] **HIST-02**: Seller can view a basic earnings view per sale (gross, commission, net) with running balance and payout status
 
 ## v2 Requirements
 
@@ -102,8 +102,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DELIVER-01  | Phase 10 | Complete   |
 | DELIVER-02  | Phase 10 | Complete   |
 | DELIVER-03  | Phase 10 | Complete   |
-| HIST-01     | Phase 11 | Pending    |
-| HIST-02     | Phase 11 | Pending    |
+| HIST-01     | Phase 11 | Complete   |
+| HIST-02     | Phase 11 | Complete   |
 
 **Coverage:**
 

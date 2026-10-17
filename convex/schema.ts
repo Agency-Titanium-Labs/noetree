@@ -307,5 +307,26 @@ export default defineSchema({
     .index("by_sellerId", ["sellerId"])
     .index("by_buyerId", ["buyerId"])
     // D-13/D-16: backfill of paid purchases not yet delivered.
-    .index("by_status_and_deliveryStatus", ["status", "deliveryStatus"]),
+    .index("by_status_and_deliveryStatus", ["status", "deliveryStatus"])
+    // Phase 11 (HIST-01/02): paid-only, newest paidAt first history lists.
+    .index("by_buyerId_and_status_and_paidAt", ["buyerId", "status", "paidAt"])
+    .index("by_sellerId_and_status_and_paidAt", [
+      "sellerId",
+      "status",
+      "paidAt",
+    ]),
+
+  // Seller lifetime totals (Phase 11 D-12). Invariants:
+  // - One row per seller.
+  // - Written only by addSaleToEarnings inside markPaidFromCheckout (exactly
+  //   once per pending-to-paid transition) and by the internal recompute/backfill.
+  // - Values are sums of purchase snapshots (D-09/D-12), never recomputed from tier.
+  // - Never exposed through a public mutation.
+  sellerEarnings: defineTable({
+    sellerId: v.id("users"),
+    saleCount: v.number(),
+    grossCents: v.number(),
+    commissionCents: v.number(),
+    netCents: v.number(),
+  }).index("by_sellerId", ["sellerId"]),
 });

@@ -13,7 +13,9 @@
     "dashboard": "Tableau de bord",
     "notes": "Notes",
     "pinned": "Épinglées",
-    "listings": "Mes annonces"
+    "listings": "Mes annonces",
+    "purchases": "Achats",
+    "sales": "Ventes"
   },
   "NavUser": {
     "account": "Compte",
@@ -432,6 +434,43 @@
     "errorSellerNotReady": "Terminez la configuration vendeur avant de mettre des notes en vente.",
     "errorNoteMissing": "La note source n'existe plus.",
     "errorGeneric": "Une erreur est survenue. Réessayez."
+  },
+  "Purchases": {
+    "title": "Mes achats",
+    "modeCopy": "Copie",
+    "modeReadonly": "Lecture seule",
+    "openNote": "Ouvrir la note",
+    "viewListing": "Voir l'annonce",
+    "emptyTitle": "Aucun achat pour le moment",
+    "emptyBody": "Les notes que vous achetez apparaissent ici. Parcourez la marketplace pour trouver la première.",
+    "emptyCta": "Parcourir la marketplace",
+    "loadMore": "Afficher plus",
+    "loadError": "Impossible de charger vos achats. Actualisez la page ; si le problème persiste, contactez le support."
+  },
+  "Sales": {
+    "title": "Ventes et revenus",
+    "totalGross": "Total brut",
+    "totalCommission": "Total commission",
+    "totalEarned": "Total gagné",
+    "saleCount": "Ventes",
+    "payoutAccount": "Compte de versement",
+    "connectActive": "Compte Stripe actif",
+    "connectIncomplete": "Configuration Stripe incomplète",
+    "openDashboard": "Ouvrir le tableau de bord Stripe",
+    "dashboardError": "Impossible d'ouvrir Stripe pour le moment. Réessayez dans un instant.",
+    "colDate": "Date",
+    "colListing": "Annonce",
+    "colGross": "Brut",
+    "colCommission": "Commission",
+    "colNet": "Net",
+    "colPayout": "Versement",
+    "sentToStripe": "Envoyé à Stripe",
+    "footnote": "Les totaux incluent toutes les ventes payées. Le délai de versement bancaire suit le calendrier de paiement Stripe.",
+    "emptyTitle": "Aucune vente pour le moment",
+    "emptyBody": "Les ventes de vos notes apparaissent ici avec vos revenus. Publiez une note pour commencer à gagner.",
+    "emptyCta": "Publier une note",
+    "loadMore": "Afficher plus",
+    "loadError": "Impossible de charger vos ventes. Actualisez la page ; si le problème persiste, contactez le support."
   },
   "SharedNote": {
     "pageTitle": "Note partagée",

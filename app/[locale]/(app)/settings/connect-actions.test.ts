@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 
 const mockAccountsCreate = vi.fn();
 const mockAccountLinksCreate = vi.fn();
+const mockCreateLoginLink = vi.fn();
 const mockConvexQuery = vi.fn();
 const mockConvexAction = vi.fn();
 const mockSetAuth = vi.fn();
@@ -13,7 +14,10 @@ const mockRedirectNav = vi.fn((url: string) => {
 vi.mock("stripe", () => ({
   default: vi.fn().mockImplementation(function StripeMock() {
     return {
-      accounts: { create: mockAccountsCreate },
+      accounts: {
+        create: mockAccountsCreate,
+        createLoginLink: mockCreateLoginLink,
+      },
       accountLinks: { create: mockAccountLinksCreate },
     };
   }),
@@ -42,6 +46,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 let createConnectOnboardingLink: (locale: string) => Promise<void>;
+let createConnectLoginLink: () => Promise<void>;
 
 beforeAll(async () => {
   process.env.STRIPE_SECRET_KEY = "sk_test_123";
@@ -49,7 +54,9 @@ beforeAll(async () => {
   process.env.APP_URL = "https://noetree.app";
   process.env.INTERNAL_WEBHOOK_SECRET = "shared-secret";
 
-  ({ createConnectOnboardingLink } = await import("./connect-actions"));
+  ({ createConnectOnboardingLink, createConnectLoginLink } = await import(
+    "./connect-actions"
+  ));
 });
 
 describe("createConnectOnboardingLink", () => {
@@ -307,5 +314,98 @@ describe("createConnectOnboardingLink", () => {
     expect(mockRedirectNav).toHaveBeenCalledWith(
       "https://connect.stripe.com/setup/acct_success_1",
     );
+  });
+});
+
+describe("createConnectLoginLink", () => {
+  const activeAccount = {
+    stripeAccountId: "acct_seller",
+    status: "active",
+    chargesEnabled: true,
+    payoutsEnabled: true,
+  };
+
+  function authed(token: string | null = "mock_convex_token") {
+    mockAuth.mockResolvedValue({
+      userId: "user_seller_1",
+      getToken: vi.fn().mockResolvedValue(token),
+    });
+  }
+
+  beforeEach(() => {
+    mockCreateLoginLink.mockReset();
+    mockConvexQuery.mockReset();
+    mockAuth.mockReset();
+    mockSetAuth.mockReset();
+    mockRedirectNav.mockClear();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("unauthenticated caller throws UNAUTHENTICATED, Stripe not called", async () => {
+    mockAuth.mockResolvedValue({ userId: null, getToken: vi.fn() });
+    await expect(createConnectLoginLink()).rejects.toThrow("UNAUTHENTICATED");
+    expect(mockCreateLoginLink).not.toHaveBeenCalled();
+  });
+
+  it("null Convex token throws connectStatusLookupFailed, Stripe not called", async () => {
+    authed(null);
+    await expect(createConnectLoginLink()).rejects.toThrow(
+      "connectStatusLookupFailed",
+    );
+    expect(mockConvexQuery).not.toHaveBeenCalled();
+    expect(mockCreateLoginLink).not.toHaveBeenCalled();
+  });
+
+  it("no Connect account throws connectNotActive, Stripe not called", async () => {
+    authed();
+    mockConvexQuery.mockResolvedValue(null);
+    await expect(createConnectLoginLink()).rejects.toThrow("connectNotActive");
+    expect(mockCreateLoginLink).not.toHaveBeenCalled();
+  });
+
+  it("pending account throws connectNotActive, Stripe not called", async () => {
+    authed();
+    mockConvexQuery.mockResolvedValue({
+      ...activeAccount,
+      status: "pending",
+      chargesEnabled: false,
+    });
+    await expect(createConnectLoginLink()).rejects.toThrow("connectNotActive");
+    expect(mockCreateLoginLink).not.toHaveBeenCalled();
+  });
+
+  it("payouts disabled throws connectNotActive", async () => {
+    authed();
+    mockConvexQuery.mockResolvedValue({
+      ...activeAccount,
+      payoutsEnabled: false,
+    });
+    await expect(createConnectLoginLink()).rejects.toThrow("connectNotActive");
+    expect(mockCreateLoginLink).not.toHaveBeenCalled();
+  });
+
+  it("active account mints a login link for the server-read account id and redirects", async () => {
+    authed("tok_abc");
+    mockConvexQuery.mockResolvedValue(activeAccount);
+    mockCreateLoginLink.mockResolvedValue({
+      url: "https://connect.stripe.com/express/abc",
+    });
+
+    await expect(createConnectLoginLink()).rejects.toThrow(
+      "NEXT_REDIRECT:https://connect.stripe.com/express/abc",
+    );
+    expect(mockSetAuth).toHaveBeenCalledWith("tok_abc");
+    expect(mockCreateLoginLink).toHaveBeenCalledTimes(1);
+    expect(mockCreateLoginLink).toHaveBeenCalledWith("acct_seller");
+  });
+
+  it("createLoginLink failure throws connectLoginLinkFailed and does not redirect", async () => {
+    authed();
+    mockConvexQuery.mockResolvedValue(activeAccount);
+    mockCreateLoginLink.mockRejectedValueOnce(new Error("stripe down"));
+    await expect(createConnectLoginLink()).rejects.toThrow(
+      "connectLoginLinkFailed",
+    );
+    expect(mockRedirectNav).not.toHaveBeenCalled();
   });
 });
