@@ -517,10 +517,18 @@ describe("shareLinks - edit via link (SHARE-03)", () => {
     const after = await t.run(ctx => ctx.db.get("notes", note));
     expect(after?.content).toBe(doc);
     expect(after?.updated_at).toBeDefined();
-    expect({ ...after, content: "", updated_at: undefined }).toEqual({
+    // Phase 15: lastEditedBy is also stamped by the shared capture helper.
+    expect(after?.lastEditedBy).toBe(editor.userId);
+    expect({
+      ...after,
+      content: "",
+      updated_at: undefined,
+      lastEditedBy: undefined,
+    }).toEqual({
       ...before,
       content: "",
       updated_at: undefined,
+      lastEditedBy: undefined,
     });
     const shares = await t.run(ctx => ctx.db.query("shares").collect());
     expect(shares).toHaveLength(0);

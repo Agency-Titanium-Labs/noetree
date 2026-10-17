@@ -68,3 +68,94 @@ export async function getOwnerWindow(
   }
   return { cutoff: Date.now() - FREE_WINDOW_MS, isFree: true };
 }
+
+function isEmptyContent(content: string): boolean {
+  const trimmed = content.trim();
+  return trimmed === "" || trimmed === "{}";
+}
+
+/**
+ * Snapshots the note's CURRENT (prior) content as an immutable version. The
+ * author is whoever last saved that content (notes.lastEditedBy).
+ */
+export async function insertVersion(
+  ctx: MutationCtx,
+  note: Doc<"notes">,
+  opts: { isPreRestore?: boolean },
+): Promise<Id<"noteVersions">> {
+  const versionId = await ctx.db.insert("noteVersions", {
+    noteId: note._id,
+    title: note.title,
+    authorId: note.lastEditedBy,
+    createdAt: Date.now(),
+    ...(opts.isPreRestore ? { isPreRestore: true } : {}),
+  });
+  await ctx.db.insert("noteVersionContents", {
+    versionId,
+    noteId: note._id,
+    content: note.content,
+  });
+  return versionId;
+}
+
+/**
+ * The ONLY place that writes notes.content (D-01). Snapshots the prior content
+ * when it changes, at most once per SNAPSHOT_GAP_MS (D-02), skipping empty
+ * prior content and content identical to the latest snapshot (D-03).
+ * `extra` keys are patched as given (undefined values included) so
+ * updateNote keeps its previous semantics.
+ */
+export async function writeNoteContent(
+  ctx: MutationCtx,
+  note: Doc<"notes">,
+  newContent: string,
+  userId: Id<"users">,
+  extra?: {
+    title?: string;
+    parentNote?: Id<"notes">;
+    childNotes?: Id<"notes">[];
+  },
+): Promise<void> {
+  if (newContent === note.content) {
+    if (extra) {
+      await ctx.db.patch("notes", note._id, {
+        ...extra,
+        updated_at: new Date().toISOString(),
+      });
+    } else {
+      await ctx.db.patch("notes", note._id, {
+        updated_at: new Date().toISOString(),
+      });
+    }
+    return;
+  }
+
+  const latest = await ctx.db
+    .query("noteVersions")
+    .withIndex("by_noteId_and_createdAt", q => q.eq("noteId", note._id))
+    .order("desc")
+    .first();
+
+  if (latest === null || Date.now() - latest.createdAt >= SNAPSHOT_GAP_MS) {
+    let shouldSnapshot = !isEmptyContent(note.content);
+    if (shouldSnapshot && latest !== null) {
+      const latestContent = await ctx.db
+        .query("noteVersionContents")
+        .withIndex("by_versionId", q => q.eq("versionId", latest._id))
+        .unique();
+      if (latestContent !== null && latestContent.content === note.content) {
+        shouldSnapshot = false;
+      }
+    }
+    if (shouldSnapshot) {
+      await insertVersion(ctx, note, {});
+    }
+  }
+
+  await ctx.db.patch("notes", note._id, {
+    ...extra,
+    content: newContent,
+    lastEditedBy: userId,
+    updated_at: new Date().toISOString(),
+  });
+}

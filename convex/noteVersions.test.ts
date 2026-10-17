@@ -1,10 +1,12 @@
 import { convexTest } from "convex-test";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { getUserTier } from "./helpers/helper";
 import {
   FREE_WINDOW_MS,
+  SNAPSHOT_GAP_MS,
   getHistoryAccessOrNull,
   getOwnerWindow,
   requireHistoryAccess,
@@ -272,5 +274,249 @@ describe("access", () => {
           .run(async ctx => await requireHistoryAccess(ctx, gone)),
       ),
     ).toBe("NOT_FOUND");
+  });
+});
+
+const MIN = 60 * 1000;
+const C0 = JSON.stringify({ doc: "c0" });
+const C1 = JSON.stringify({ doc: "c1" });
+const C2 = JSON.stringify({ doc: "c2" });
+const C3 = JSON.stringify({ doc: "c3" });
+
+async function versionsOf(t: T, noteId: Id<"notes">) {
+  return await t.run(async ctx => {
+    const rows = await ctx.db
+      .query("noteVersions")
+      .withIndex("by_noteId_and_createdAt", q => q.eq("noteId", noteId))
+      .order("asc")
+      .take(50);
+    const out = [];
+    for (const row of rows) {
+      const body = await ctx.db
+        .query("noteVersionContents")
+        .withIndex("by_versionId", q => q.eq("versionId", row._id))
+        .unique();
+      out.push({ ...row, content: body?.content });
+    }
+    return out;
+  });
+}
+
+describe("capture", () => {
+  test("first save snapshots prior content; gate blocks inside 5 minutes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-10T12:00:00Z"));
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const noteId = await seedNote(t, owner.userId, {
+      title: "T",
+      content: C0,
+    });
+    const asOwner = t.withIdentity(owner.identity);
+    const start = Date.now();
+
+    await asOwner.mutation(api.notes.updateNoteContent, {
+      id: noteId,
+      content: C1,
+    });
+    let versions = await versionsOf(t, noteId);
+    expect(versions).toHaveLength(1);
+    expect(versions[0].title).toBe("T");
+    expect(versions[0].createdAt).toBe(start);
+    expect(versions[0].authorId).toBeUndefined();
+    expect(versions[0].content).toBe(C0);
+    const note = await t.run(async ctx => await ctx.db.get("notes", noteId));
+    expect(note!.content).toBe(C1);
+    expect(note!.lastEditedBy).toBe(owner.userId);
+
+    vi.setSystemTime(start + 4 * MIN);
+    await asOwner.mutation(api.notes.updateNoteContent, {
+      id: noteId,
+      content: C2,
+    });
+    expect(await versionsOf(t, noteId)).toHaveLength(1);
+
+    vi.setSystemTime(start + SNAPSHOT_GAP_MS);
+    await asOwner.mutation(api.notes.updateNoteContent, {
+      id: noteId,
+      content: C3,
+    });
+    versions = await versionsOf(t, noteId);
+    expect(versions).toHaveLength(2);
+    expect(versions[1].content).toBe(C2);
+    expect(versions[1].authorId).toBe(owner.userId);
+  });
+
+  test("identical content creates no version", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const noteId = await seedNote(t, owner.userId, { content: C0 });
+    await t.withIdentity(owner.identity).mutation(api.notes.updateNoteContent, {
+      id: noteId,
+      content: C0,
+    });
+    expect(await versionsOf(t, noteId)).toHaveLength(0);
+  });
+
+  test("empty prior content is skipped", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const a = await seedNote(t, owner.userId, { content: "{}" });
+    const b = await seedNote(t, owner.userId, { content: "" });
+    const asOwner = t.withIdentity(owner.identity);
+    await asOwner.mutation(api.notes.updateNoteContent, {
+      id: a,
+      content: C1,
+    });
+    await asOwner.mutation(api.notes.updateNoteContent, {
+      id: b,
+      content: C1,
+    });
+    expect(await versionsOf(t, a)).toHaveLength(0);
+    expect(await versionsOf(t, b)).toHaveLength(0);
+  });
+
+  test("prior content equal to latest snapshot is skipped", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-10T12:00:00Z"));
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const noteId = await seedNote(t, owner.userId, { content: C1 });
+    await t.run(async ctx => {
+      const versionId = await ctx.db.insert("noteVersions", {
+        noteId,
+        title: "note",
+        createdAt: Date.now() - 10 * MIN,
+      });
+      await ctx.db.insert("noteVersionContents", {
+        versionId,
+        noteId,
+        content: C1,
+      });
+    });
+    await t.withIdentity(owner.identity).mutation(api.notes.updateNoteContent, {
+      id: noteId,
+      content: C2,
+    });
+    expect(await versionsOf(t, noteId)).toHaveLength(1);
+  });
+
+  test("updateNoteTitle never creates a version", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const noteId = await seedNote(t, owner.userId, { content: C0 });
+    await t.withIdentity(owner.identity).mutation(api.notes.updateNoteTitle, {
+      id: noteId,
+      title: "renamed",
+    });
+    expect(await versionsOf(t, noteId)).toHaveLength(0);
+  });
+});
+
+describe("paths", () => {
+  test("updateNote snapshots and patches title and tree fields", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const parent = await seedNote(t, owner.userId, { title: "parent" });
+    const noteId = await seedNote(t, owner.userId, {
+      title: "old",
+      content: C0,
+    });
+    await t.withIdentity(owner.identity).mutation(api.notes.updateNote, {
+      id: noteId,
+      title: "new",
+      content: C1,
+      parentNote: parent,
+      childNotes: [],
+    });
+    const note = await t.run(async ctx => await ctx.db.get("notes", noteId));
+    expect(note!.title).toBe("new");
+    expect(note!.content).toBe(C1);
+    expect(note!.parentNote).toBe(parent);
+    expect(note!.childNotes).toEqual([]);
+    const versions = await versionsOf(t, noteId);
+    expect(versions).toHaveLength(1);
+    expect(versions[0].title).toBe("old");
+    expect(versions[0].content).toBe(C0);
+  });
+
+  test("edit-share user save sets lastEditedBy", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-10T12:00:00Z"));
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const editor = await seedUser(t, "edt");
+    const noteId = await seedNote(t, owner.userId, { content: C0 });
+    await seedShare(t, noteId, editor.userId, "edit");
+    await t
+      .withIdentity(editor.identity)
+      .mutation(api.notes.updateNoteContent, { id: noteId, content: C1 });
+    vi.setSystemTime(Date.now() + SNAPSHOT_GAP_MS);
+    await t
+      .withIdentity(owner.identity)
+      .mutation(api.notes.updateNoteContent, { id: noteId, content: C2 });
+    const versions = await versionsOf(t, noteId);
+    expect(versions).toHaveLength(2);
+    expect(versions[1].content).toBe(C1);
+    expect(versions[1].authorId).toBe(editor.userId);
+  });
+
+  test("edit-link save snapshots and sets lastEditedBy", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const guest = await seedUser(t, "gst");
+    const noteId = await seedNote(t, owner.userId, { content: C0 });
+    const token = "t".repeat(43);
+    await seedLink(t, noteId, owner.userId, token, "edit");
+    await t
+      .withIdentity(guest.identity)
+      .mutation(api.shareLinks.updateSharedNoteContent, {
+        token,
+        content: C1,
+      });
+    const note = await t.run(async ctx => await ctx.db.get("notes", noteId));
+    expect(note!.content).toBe(C1);
+    expect(note!.lastEditedBy).toBe(guest.userId);
+    const versions = await versionsOf(t, noteId);
+    expect(versions).toHaveLength(1);
+    expect(versions[0].content).toBe(C0);
+  });
+
+  test("view-share user cannot save and creates no version", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t, "own");
+    const viewer = await seedUser(t, "vw");
+    const noteId = await seedNote(t, owner.userId, { content: C0 });
+    await seedShare(t, noteId, viewer.userId, "view");
+    await expect(
+      t.withIdentity(viewer.identity).mutation(api.notes.updateNoteContent, {
+        id: noteId,
+        content: C1,
+      }),
+    ).rejects.toThrow();
+    expect(await versionsOf(t, noteId)).toHaveLength(0);
+  });
+});
+
+describe("single write path", () => {
+  test("notes.ts and shareLinks.ts never patch content directly", () => {
+    const sources = (
+      import.meta as unknown as {
+        glob: (
+          patterns: string[],
+          opts: { query: string; import: string; eager: boolean },
+        ) => Record<string, string>;
+      }
+    ).glob(["./notes.ts", "./shareLinks.ts"], {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    });
+    const entries = Object.entries(sources);
+    expect(entries).toHaveLength(2);
+    for (const [, src] of entries) {
+      expect(src).toContain("writeNoteContent(ctx");
+      expect(/patch\([^)]*?\{[^}]*\bcontent\s*:/s.test(src)).toBe(false);
+    }
   });
 });

@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { getUser } from "./helpers/helper";
+import { writeNoteContent } from "./helpers/noteVersions";
 import {
   deleteShareLinkForNote,
   getLinkByToken,
@@ -158,10 +159,9 @@ export const updateSharedNoteContent = mutation({
       throw new ConvexError("INVALID_CONTENT");
     }
 
-    await ctx.db.patch("notes", link.noteId, {
-      content: args.content,
-      updated_at: new Date().toISOString(),
-    });
+    const note = await ctx.db.get("notes", link.noteId);
+    if (!note) throw new ConvexError("LINK_INVALID");
+    await writeNoteContent(ctx, note, args.content, user._id);
     return null;
   },
 });
