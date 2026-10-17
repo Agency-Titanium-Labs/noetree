@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Marketplace de notes
-status: executing
-stopped_at: Phase 11 UI-SPEC approved
-last_updated: "2026-10-17T13:09:51.210Z"
+status: milestone_complete
+stopped_at: Milestone complete (Phase 11 was final phase)
+last_updated: 2026-10-17T14:00:39.081Z
 last_activity: 2026-10-17
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 36
-  completed_plans: 35
+  completed_plans: 36
   percent: 80
 ---
 
 ## Current Position
 
-Phase: 11 (buyer-seller-history-ui) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
+Phase: 11
+Plan: Not started
+Status: Milestone complete
 Last activity: 2026-10-17
 
 ## Project Reference
@@ -26,13 +26,13 @@ Last activity: 2026-10-17
 See: .planning/PROJECT.md (updated 2026-10-16)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente.
-**Current focus:** Phase 11 — buyer-seller-history-ui
+**Current focus:** Milestone complete
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 41
+- Total plans completed: 48
 - Average duration: —
 - Total execution time: 0 hours
 
