@@ -37,6 +37,7 @@ import { NoteTree, useTreeContext } from "@/providers/TreeProvider";
 import { useEditorContext } from "@/providers/EditorProvider";
 import ConditionChecker from "./helpers/ConditionChecker";
 import { useTranslations } from "next-intl";
+import { canLeaveShare } from "@/lib/purchaseShareUi";
 import ShareDialog from "@/components/ShareDialog";
 import ListingFormDialog from "@/components/ListingFormDialog";
 
@@ -135,7 +136,12 @@ export function NoteCard({
           onDelete();
         },
         variant: "destructive" as const,
-        show: isRoot && !!note.isShared,
+        show:
+          isRoot &&
+          canLeaveShare({
+            isShared: note.isShared,
+            isPurchased: note.isPurchased,
+          }),
       },
       {
         id: "delete",
@@ -154,6 +160,7 @@ export function NoteCard({
     note._id,
     isRoot,
     note.isShared,
+    note.isPurchased,
     isTemp,
     onAddChild,
     onDuplicateNote,

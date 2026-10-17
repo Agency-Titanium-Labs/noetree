@@ -42,8 +42,15 @@ export default function BuyPanel({
 
   const purchaseParam = searchParams?.get("purchase") === "success";
   const serverState = data?.state;
-  const delivery = data?.delivery;
-  const openNoteId = data?.openNoteId;
+  const detail = data as
+    | {
+        delivery?: "delivered" | "failed" | "pending";
+        openNoteId?: string;
+      }
+    | null
+    | undefined;
+  const delivery = detail?.delivery;
+  const openNoteId = detail?.openNoteId;
   const effective: string | null =
     override === "own"
       ? "own"

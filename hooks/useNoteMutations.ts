@@ -10,6 +10,7 @@ import {
   removeNoteFromTree,
   updateTitleInTree,
 } from "@/lib/treeUtils";
+import { emitGuardError } from "@/lib/purchaseShareUi";
 
 export function useNoteMutations(
   noteId: Id<"notes">,
@@ -105,6 +106,7 @@ export function useNoteMutations(
       if (context?.previousTree) {
         queryClient.setQueryData(queryKey, context.previousTree);
       }
+      emitGuardError(err);
     },
   });
 

@@ -35,6 +35,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { GUARD_NAMESPACE, guardErrorMessageKey } from "@/lib/purchaseShareUi";
 
 interface ListingFormDialogProps {
   noteId: Id<"notes">;
@@ -76,6 +77,7 @@ export default function ListingFormDialog({
   onOpenChange,
 }: ListingFormDialogProps) {
   const t = useTranslations("ListingForm");
+  const tGuards = useTranslations(GUARD_NAMESPACE);
 
   const existingQuery = useQuery(
     convexQuery(api.listings.getMineByNote, open ? { noteId } : "skip"),
@@ -267,6 +269,11 @@ export default function ListingFormDialog({
           break;
         case "LISTING_ALREADY_EXISTS":
           setFormError(t("errorAlreadyListed"));
+          break;
+        case "LISTING_PURCHASED_CONTENT":
+          setFormError(
+            tGuards(guardErrorMessageKey("LISTING_PURCHASED_CONTENT")!),
+          );
           break;
         case "LISTING_NOTE_MISSING":
           setFormError(t("errorNoteMissing"));

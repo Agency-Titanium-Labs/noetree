@@ -33,6 +33,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
+import {
+  LeaveShareMenuItem,
+  canLeaveShare,
+  useGuardNotice,
+} from "@/lib/purchaseShareUi";
 import { useHeaderConfig } from "@/providers/HeaderProvider";
 import {
   Form,
@@ -128,6 +133,7 @@ interface DashboardSortableItemProps {
     isPinned?: boolean;
     shareId?: Id<"shares">;
     isShared?: boolean;
+    isPurchased?: boolean;
     role?: "owner" | "admin" | "edit" | "view";
   };
   index: number;
@@ -284,16 +290,16 @@ function DashboardSortableItem({
                   )}
                   {tree.role !== "view" && <DropdownMenuSeparator />}
                   {tree.isShared ? (
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => {
+                    <LeaveShareMenuItem
+                      note={tree}
+                      as={DropdownMenuItem}
+                      icon={<LogOut />}
+                      label={t("actions.leave")}
+                      onLeave={() => {
                         setNoteToDelete(tree._id);
                         setDeleteAlertDialogOpen(true);
                       }}
-                    >
-                      <LogOut />
-                      {t("actions.leave")}
-                    </DropdownMenuItem>
+                    />
                   ) : (
                     tree.role !== "view" && (
                       <DropdownMenuItem
@@ -363,16 +369,16 @@ function DashboardSortableItem({
           )}
           {tree.role !== "view" && <ContextMenuSeparator />}
           {tree.isShared ? (
-            <ContextMenuItem
-              variant="destructive"
-              onClick={() => {
+            <LeaveShareMenuItem
+              note={tree}
+              as={ContextMenuItem}
+              icon={<LogOut />}
+              label={t("actions.leave")}
+              onLeave={() => {
                 setNoteToDelete(tree._id);
                 setDeleteAlertDialogOpen(true);
               }}
-            >
-              <LogOut />
-              {t("actions.leave")}
-            </ContextMenuItem>
+            />
           ) : (
             tree.role !== "view" && (
               <ContextMenuItem
@@ -442,6 +448,7 @@ export default function Notes() {
   } | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
+  const guardNotice = useGuardNotice();
 
   const [deleteAlertDialogOpen, setDeleteAlertDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<Id<"notes"> | null>(null);
@@ -526,6 +533,7 @@ export default function Notes() {
       if (context?.previousTrees) {
         queryClient.setQueryData(queryKey, context.previousTrees);
       }
+      guardNotice.report(err);
     },
   });
 
@@ -536,6 +544,9 @@ export default function Notes() {
       setNoteToDelete(null);
       setDeleteAlertDialogOpen(false);
       queryClient.invalidateQueries({ queryKey });
+    },
+    onError: err => {
+      guardNotice.report(err);
     },
   });
 
@@ -773,6 +784,21 @@ export default function Notes() {
 
   return (
     <div className="flex flex-col justify-center items-center gap-8 p-6">
+      {guardNotice.message && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive px-4 py-2 text-sm text-destructive"
+        >
+          {guardNotice.message}
+          <button
+            type="button"
+            className="ml-3 underline"
+            onClick={guardNotice.clear}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <ConditionChecker condition={!!isPending}>
         <p>{t("loading")}</p>
       </ConditionChecker>
@@ -915,7 +941,7 @@ export default function Notes() {
 
       {(() => {
         const noteObj = filteredTrees?.find(x => x._id === noteToDelete);
-        const isLeaving = !!noteObj?.isShared;
+        const isLeaving = !!noteObj && canLeaveShare(noteObj);
 
         return (
           <AlertDialog

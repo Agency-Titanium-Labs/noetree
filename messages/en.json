@@ -1,4 +1,9 @@
 {
+  "Guards": {
+    "noteHasPurchaseGrants": "This note was sold with read-only access and cannot be deleted.",
+    "shareProtected": "Access granted by a purchase cannot be removed.",
+    "listingPurchasedContent": "Purchased content cannot be listed for sale."
+  },
   "Metadata": {
     "title": "NoeTree",
     "description": "Visualize and manage your hierarchical notes."
