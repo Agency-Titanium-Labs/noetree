@@ -16,6 +16,9 @@ import ShareDialog from "./ShareDialog";
 import ListingFormDialog from "./ListingFormDialog";
 import CommentsButton from "./CommentsButton";
 import CommentsPanel from "./CommentsPanel";
+import HistoryButton from "./HistoryButton";
+import HistoryPanel from "./HistoryPanel";
+import VersionPreviewBanner from "./VersionPreviewBanner";
 
 function findInTree(id: string, note: NoteTree): NoteTree | null {
   if (note._id === id) return note;
@@ -34,7 +37,13 @@ export default function NoteContent() {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isListingOpen, setIsListingOpen] = useState(false);
 
-  const { editor, saveStatus, getCurrentContent } = useEditorContext();
+  const {
+    editor,
+    saveStatus,
+    getCurrentContent,
+    previewVersion,
+    exitPreview,
+  } = useEditorContext();
 
   const searchParams = useSearchParams();
   const params = useParams();
@@ -64,6 +73,14 @@ export default function NoteContent() {
     setIsCommentsOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commentsParam, focusCommentId, routeNoteId]);
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  // Client mirror of D-12; the server is authoritative.
+  const canViewHistory = !!selectedNote && selectedNote.role !== "view";
+
+  useEffect(() => {
+    if (!canViewHistory) setIsHistoryOpen(false);
+  }, [canViewHistory]);
 
   const commentsTarget = useMemo(
     () =>
@@ -103,6 +120,12 @@ export default function NoteContent() {
                   target={commentsTarget}
                   isOpen={isCommentsOpen}
                   onClick={() => setIsCommentsOpen(o => !o)}
+                />
+              )}
+              {canViewHistory && (
+                <HistoryButton
+                  isOpen={isHistoryOpen}
+                  onClick={() => setIsHistoryOpen(o => !o)}
                 />
               )}
               {selectedNote?.role === "owner" && (
@@ -159,7 +182,16 @@ export default function NoteContent() {
             </div>
           </ConditionChecker>
           <ConditionChecker condition={!!selectedNote}>
-            <EditorContent editor={editor} />
+            <>
+              <VersionPreviewBanner />
+              <div
+                onKeyDown={event => {
+                  if (event.key === "Escape" && previewVersion) exitPreview();
+                }}
+              >
+                <EditorContent editor={editor} />
+              </div>
+            </>
           </ConditionChecker>
         </div>
       </div>
@@ -176,6 +208,13 @@ export default function NoteContent() {
           open={isCommentsOpen}
           onOpenChange={handleCommentsOpenChange}
           focusCommentId={focusCommentId}
+        />
+      )}
+      {selectedNote && canViewHistory && (
+        <HistoryPanel
+          noteId={selectedNote._id}
+          open={isHistoryOpen}
+          onOpenChange={setIsHistoryOpen}
         />
       )}
       {selectedNote && isListingOpen && (
