@@ -1,7 +1,8 @@
 ---
 phase: 11
 slug: buyer-seller-history-ui
-status: draft
+status: approved
+reviewed_at: 2026-10-17
 shadcn_initialized: true
 preset: new-york / neutral base (components.json), primary overridden to #7e10b2
 created: 2026-10-17
