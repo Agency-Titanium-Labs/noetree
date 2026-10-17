@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Content, EditorContent, useEditor } from "@tiptap/react";
@@ -15,6 +16,9 @@ import SharedUnavailable from "@/components/SharedUnavailable";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import CommentsButton from "@/components/CommentsButton";
+import CommentsPanel from "@/components/CommentsPanel";
 import { Link } from "@/i18n/routing";
 
 interface PublicNoteData {
@@ -70,6 +74,19 @@ export default function PublicNoteView({
 
 function PublicNoteBody({ data }: Readonly<{ data: PublicNoteData }>) {
   const t = useTranslations("SharedNote");
+  const searchParams = useSearchParams();
+  const commentsParam = searchParams.get("comments");
+  const focusCommentId = searchParams.get("c");
+  const [isCommentsOpen, setIsCommentsOpen] = useState(commentsParam === "1");
+  const commentsTarget = useMemo(
+    () => ({ kind: "note" as const, noteId: data._id as Id<"notes"> }),
+    [data._id],
+  );
+
+  // Same-page notification clicks do not remount; re-open on param change.
+  useEffect(() => {
+    if (commentsParam === "1") setIsCommentsOpen(true);
+  }, [commentsParam, focusCommentId]);
 
   const editor = useEditor({
     extensions: [StarterKit, TiptapLink, Image],
@@ -101,6 +118,13 @@ function PublicNoteBody({ data }: Readonly<{ data: PublicNoteData }>) {
       <SharedHeader
         badgeLabel={t("badgePublic")}
         badgeIcon={<Globe className="size-4" />}
+        actions={
+          <CommentsButton
+            target={commentsTarget}
+            isOpen={isCommentsOpen}
+            onClick={() => setIsCommentsOpen(o => !o)}
+          />
+        }
       />
       <main className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6">
         <h1 className="text-[32px] font-semibold leading-tight">
@@ -133,6 +157,12 @@ function PublicNoteBody({ data }: Readonly<{ data: PublicNoteData }>) {
           </>
         )}
       </main>
+      <CommentsPanel
+        target={commentsTarget}
+        open={isCommentsOpen}
+        onOpenChange={setIsCommentsOpen}
+        focusCommentId={focusCommentId}
+      />
     </>
   );
 }
