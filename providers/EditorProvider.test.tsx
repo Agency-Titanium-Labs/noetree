@@ -244,3 +244,56 @@ describe("preview", () => {
     expect(ctx.getCurrentContent()).not.toBeNull();
   });
 });
+
+describe("leaving preview does not autosave (GAP-1)", () => {
+  beforeEach(() => {
+    h.fake.isDestroyed = false;
+    h.fake.isEditable = true;
+    h.fake.current = JSON.parse(doc("current"));
+    h.fake.getJSON.mockImplementation(() => h.fake.current);
+    // Mirror Tiptap: setEditable(editable, emitUpdate = true) emits "update".
+    h.fake.setEditable.mockImplementation((v: boolean, emitUpdate = true) => {
+      h.fake.isEditable = v;
+      if (emitUpdate !== false) h.fake.listener?.({ editor: h.fake });
+    });
+    h.fake.commands.setContent.mockImplementation((c: unknown) => {
+      h.fake.current = c;
+    });
+    h.fake.on.mockImplementation(
+      (ev: string, cb: (arg: { editor: unknown }) => void) => {
+        if (ev === "update") h.fake.listener = cb;
+      },
+    );
+    setNote();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("exitPreview(override) leaves saveStatus idle and schedules no save", () => {
+    mount();
+    act(() => ctx.enterPreview(version("old")));
+    h.debounced.mockClear();
+    act(() => ctx.exitPreview(doc("R")));
+    expect(ctx.saveStatus).toBe("idle");
+    expect(h.debounced).not.toHaveBeenCalled();
+  });
+
+  it("exitPreview() (back to current) leaves saveStatus idle and schedules no save", () => {
+    mount();
+    act(() => ctx.enterPreview(version("old")));
+    h.debounced.mockClear();
+    act(() => ctx.exitPreview());
+    expect(ctx.saveStatus).toBe("idle");
+    expect(h.debounced).not.toHaveBeenCalled();
+  });
+
+  it("normal typing still autosaves", () => {
+    mount();
+    h.debounced.mockClear();
+    act(() => h.fake.listener?.({ editor: h.fake }));
+    expect(ctx.saveStatus).toBe("unsaved");
+    expect(h.debounced).toHaveBeenCalledTimes(1);
+  });
+});
