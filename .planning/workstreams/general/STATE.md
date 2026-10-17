@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: executing
+status: verifying
 stopped_at: Phase 15 UI-SPEC approved
-last_updated: "2026-10-17T13:13:50.507Z"
+last_updated: "2026-10-17T14:40:40.787Z"
 last_activity: 2026-10-17
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 26
-  completed_plans: 25
-  percent: 60
+  completed_phases: 4
+  total_plans: 27
+  completed_plans: 27
+  percent: 80
 ---
 
 ## Current Position
 
 Phase: 15 (Version History & Restoration) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-17
 
 Progress: [██████████] 96%
