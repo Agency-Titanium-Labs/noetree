@@ -43,7 +43,10 @@ Declared values (multiples of 4), identical to project scale:
 | 2xl   | 48px  | not used                                                                       |
 | 3xl   | 64px  | not used                                                                       |
 
-Exceptions: touch targets on mobile are `min-h-11` (44px) for version rows and banner buttons, reverting to `md:min-h-9` on desktop (same convention as `CommentThread` `min-h-11 md:min-h-7`).
+Exceptions:
+
+- Touch targets on mobile are `min-h-11` (44px) for version rows and banner buttons, reverting to `md:min-h-9` on desktop (same convention as `CommentThread` `min-h-11 md:min-h-7`).
+- Border-width exception: the selected-version row indicator is a 2px-wide left bar (`bg-primary`). 2px is a border width, not a spacing token, and is not on the 4px scale by design.
 
 Layout: Sheet `side="right"`, `className="flex w-full flex-col gap-0 p-0 sm:max-w-md"` (full width on mobile, 448px max on >= sm), identical to `CommentsPanel`.
 
@@ -77,11 +80,14 @@ Existing theme tokens only (light/dark handled by CSS variables).
 
 Accent reserved for:
 
-1. The "Restore" primary button in the preview banner (`Button` default variant).
+1. The "Restore version" primary button in the preview banner (`Button` default variant).
 2. The selected-version row indicator (2px-wide left border bar using `bg-primary`; row background stays `bg-muted`).
-3. The "Upgrade to Premium" link inside the Free hint line.
+3. The "Upgrade" link inside the Free hint line.
+4. The "Restore version" confirm button in the restore `AlertDialog` (`Button` default variant).
 
-Everything else (History toolbar button, Back to current, badges, timestamps) uses `ghost` / `outline` / `secondary` variants and muted foreground. The "Before restore" badge uses `Badge variant="secondary"` (no accent).
+Everything else (History toolbar button, Back to current, Keep current version, badges, timestamps) uses `ghost` / `outline` / `secondary` variants and muted foreground. The "Before restore" badge uses `Badge variant="secondary"` (no accent).
+
+**Primary visual anchor:** while previewing, the anchor is the `VersionPreviewBanner` with its accent "Restore version" button (the single accent call to action on screen). When not previewing, the anchor is the selected-row indicator (2px primary left bar) in the history list; with no selection, the Sheet title "History" carries the hierarchy and no accent is shown.
 
 ---
 
@@ -95,21 +101,21 @@ Everything else (History toolbar button, Back to current, badges, timestamps) us
 - Line 2: 24px `Avatar` + author name (14px/400, truncate); `Avatar` falls back to initials. No email anywhere. Missing author renders `unknownAuthor` copy and a neutral fallback avatar.
 - Row states: default transparent; hover `bg-accent`; selected `bg-muted` with primary left bar; focus-visible uses the standard ring; `aria-pressed` reflects selection.
 - Title at the time of snapshot is NOT shown in the row (preview banner only, per D-04 display-in-preview).
-- Pagination: first 30 rows; a "Load more" `Button variant="ghost"` at the list end when `hasMore` (increments `limit` by 30; reactive query, no infinite scroll).
+- Pagination: first 30 rows; a "Show more versions" `Button variant="ghost"` at the list end when `hasMore` (increments `limit` by 30; reactive query, no infinite scroll).
 
 **Free hint (D-07):** when `hasHidden` is true, a single non-interactive row at the end of the list inside a `bg-muted` rounded card: 14px text `hintOlderVersions` with an inline link "Upgrade" to the localized pricing page (same Link helper used by existing upgrade prompts). Shown only for flag, no counts or timestamps.
 
 **Preview (D-10):**
 
 - Selecting a row calls `enterPreview(version)`; the Sheet stays open on desktop. On mobile (< sm, full-width Sheet) selecting a row closes the Sheet so the preview is visible; the History button re-opens it.
-- `VersionPreviewBanner` renders above the editor, full width, `bg-muted`, `border-b`, `px-4 py-2` (8px/16px), 14px text: "Viewing version from {date and time}" (+ title-at-time suffix only if it differs from the current title). Right side: `Back to current` (`variant="outline"`) and `Restore` (default, accent). On < md the banner stacks: text on top, buttons below as an equal-width row (`min-h-11`).
+- `VersionPreviewBanner` renders above the editor, full width, `bg-muted`, `border-b`, `px-4 py-2` (8px/16px), 14px text: "Viewing version from {date and time}" (+ title-at-time suffix only if it differs from the current title). Right side: `Back to current` (`variant="outline"`) and `Restore version` (default, accent). On < md the banner stacks: text on top, buttons below as an equal-width row (`min-h-11`).
 - Banner has `role="status"` and is announced on enter; focus moves to the `Back to current` button is NOT forced (focus stays on the selected row).
 - Editor is read-only (`setEditable(false)`), shows no caret or toolbar editing affordances, content area gets `opacity-100` (no dimming, so it stays legible). Autosave and sync suppressed per RESEARCH Pattern 4.
 - `Back to current` and Escape (when focus is in the banner or editor) call `exitPreview()`; closing the Sheet while previewing does NOT exit preview (banner remains the single exit path).
 
 **Restore (D-14, D-15):**
 
-- Click `Restore` opens an `AlertDialog` (non-destructive wording, default focus on the confirm action): title "Restore this version?", description explains the current content is saved first so nothing is lost. Buttons: `Restore version` (accent) and `Cancel` (outline).
+- Click `Restore version` in the banner opens an `AlertDialog` (non-destructive wording, default focus on the confirm action): title "Restore this version?", description explains the current content is saved first so nothing is lost. Buttons: `Restore version` (accent) and `Keep current version` (outline).
 - On confirm: button shows disabled state with spinner (`Loader2`, `animate-spin`) and label "Restoring...". On success: dialog closes, `exitPreview()`, `sonner` toast "Version restored. The previous content was saved as 'Before restore'." with no Undo action (the pre-restore snapshot in the list is the undo path). On failure: toast error (see Copywriting), preview and banner remain.
 - After a successful restore the editor shows the new content live via the existing reactive sync; the list gains a top "Before restore" row.
 
@@ -144,10 +150,10 @@ New `History` namespace in `messages/en.json` and `messages/fr.json` (placed bes
 | Pre-restore badge            | Before restore                                                                                                                                                             |
 | Unknown author               | Unknown author                                                                                                                                                             |
 | Free upsell hint             | Older versions available with Premium. Upgrade                                                                                                                             |
-| Load more                    | Show more versions                                                                                                                                                         |
+| Pagination                   | Show more versions                                                                                                                                                         |
 | Restore dialog title         | Restore this version?                                                                                                                                                      |
 | Restore dialog body          | Your current content is saved as a "Before restore" version first, so you can always come back to it. The title and comments are not changed.                              |
-| Restore dialog actions       | Restore version / Cancel                                                                                                                                                   |
+| Restore dialog actions       | Restore version / Keep current version                                                                                                                                     |
 | Restoring state              | Restoring...                                                                                                                                                               |
 | Restore success toast        | Version restored. The previous content was saved as "Before restore".                                                                                                      |
 | Error state (restore)        | Couldn't restore this version. Check your connection and try again.                                                                                                        |
@@ -156,7 +162,7 @@ New `History` namespace in `messages/en.json` and `messages/fr.json` (placed bes
 | Error (no access)            | You no longer have access to this note's history.                                                                                                                          |
 | Destructive confirmation     | None. Restore is non-destructive (pre-restore snapshot), so it uses a neutral confirmation dialog, not a destructive style. No delete-version action exists in this phase. |
 
-French copy: translated by the executor with the same keys (fr is required for parity; keep "Avant restauration" for the badge, "Restaurer cette version" for the CTA).
+French copy: translated by the executor with the same keys (fr is required for parity). French anchor keys: badge "Avant restauration", CTA (banner and dialog confirm) "Restaurer cette version", dialog dismiss "Garder la version actuelle", pagination "Afficher plus de versions", upsell link "Passer à Premium".
 
 ---
 
