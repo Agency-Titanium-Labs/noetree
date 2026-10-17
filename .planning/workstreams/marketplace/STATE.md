@@ -2,24 +2,24 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Marketplace de notes
-status: milestone_complete
-stopped_at: Milestone complete (Phase 11 was final phase)
-last_updated: 2026-10-17T14:00:39.081Z
-last_activity: 2026-10-17
+status: Awaiting next milestone
+stopped_at: Milestone v1.1 complete and archived
+last_updated: "2026-10-17T14:21:08.290Z"
+last_activity: 2026-10-17 — Milestone v1.1 completed and archived
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 36
   completed_plans: 36
-  percent: 80
+  percent: 100
 ---
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-10-17
+Phase: Milestone v1.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-17 — Milestone v1.1 completed and archived
 
 ## Project Reference
 
@@ -125,5 +125,15 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Run `/gsd-plan-phase 8 --ws marketplace` (optionally `/gsd-discuss-phase 8` first)
-- Run `/gsd:plan-phase 7` to begin planning Phase 7 (Connect Onboarding & Seller Enablement)
+- Start the next milestone with /gsd-new-milestone
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone close on 2026-10-17:
+
+| Category | Item | Status |
+|----------|------|--------|
+| uat_gap | 07-HUMAN-UAT.md (2 open scenarios, e.g. reactive Pending to Active badge flip) | partial |
+| uat_gap | 08-UAT.md | partial |
+| verification_gap | 07-VERIFICATION.md | human_needed |
+| verification_gap | 08-VERIFICATION.md (08-09 Task 2 browser check not formally run) | human_needed |

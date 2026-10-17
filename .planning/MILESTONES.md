@@ -1,5 +1,21 @@
 # Milestones — Noetree
 
+## v1.1 Marketplace de notes (Shipped: 2026-10-17)
+
+**Phases completed:** 5 phases (7-11), 36 plans
+
+**Key accomplishments:**
+
+- Stripe Connect (Express) onboarding from Settings, with webhook-driven status and a server-side payout-readiness gate (`isSellerActive`) enforced at listing creation and checkout
+- Listings (note or note+subtree, price, copy / read-only mode) and a public marketplace with search, tag filter, sort and partial preview before purchase
+- Stripe Checkout with the Noetree commission split at source (20% Free seller / 10% Premium seller), idempotent webhook processing and a fix of the marketplace webhook path
+- Exactly-once purchase fulfilment: editable copy or read-only access grant, failed-delivery recording and retry
+- Buyer "My Purchases" and seller "Sales and earnings" pages (EN/FR) backed by a replay-safe `sellerEarnings` counter, plus a Stripe Express dashboard login link
+
+**Known deferred items at close: 4** (Phase 7/8 human-verification and UAT items, see STATE.md Deferred Items and `milestones/v1.1-MILESTONE-AUDIT.md`)
+
+---
+
 ## v1.0 Monétisation & Paiements (Shipped: 2026-07-12)
 
 **Phases completed:** 7 phases, 32 plans, 68 tasks

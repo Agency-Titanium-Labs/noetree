@@ -28,23 +28,22 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 **Précédent milestone shipped :** v1.0 Monétisation & Paiements — voir `.planning/MILESTONES.md` pour le détail complet
 
-## Parallel Milestone: v1.1 Marketplace de notes (branche milestone/v1.1-marketplace-de-notes)
+## Shipped Milestone: v1.1 Marketplace de notes (2026-10-17)
 
-**Goal :** Permettre aux utilisateurs de vendre et acheter des notes entre eux via Stripe Connect, avec commission Noetree.
+**Goal :** Permettre aux utilisateurs de vendre et acheter des notes entre eux via Stripe Connect, avec commission Noetree différenciée.
 
-**Target features :**
+**Livré :**
 
-- Page marketplace publique (browse + recherche)
-- Mise en vente d'une note : prix libre, choix note seule ou note+sous-arbre, choix copie éditable ou accès lecture seule pour l'acheteur
-- Aperçu partiel (titre + description + extrait) avant achat
-- Achat via Stripe Checkout, payout automatique vendeur via Stripe Connect (onboarding KYC géré par Stripe)
-- Commission Noetree différenciée : 20% (vendeur Free) / 10% (vendeur Premium) prélevée à la source sur chaque vente
-- Vente ouverte à tous (Free + Pro)
-- ~~Notes achetées en mode copie comptent dans le quota 20 notes Free existant~~ — superseded : plafond 20 notes supprimé en v1.2 (commit 97b0637) ; aucune vérification de quota au checkout ni à la livraison (D-07)
-- Ventes finales, pas de remboursement (contenu numérique)
-- Pas de modération de contenu ce milestone (déféré à plus tard)
+- Onboarding Stripe Connect (Express) depuis Settings, statut piloté par webhook, garde serveur `isSellerActive` (création d'annonce + checkout)
+- Annonces (note seule ou note+sous-arbre, prix libre, copie éditable ou lecture seule) et marketplace publique (recherche, tags, tri, aperçu partiel)
+- Achat via Stripe Checkout, commission 20% (vendeur Free) / 10% (vendeur Premium) prélevée à la source, webhook idempotent
+- Livraison exactement-une-fois (copie ou accès lecture seule), échecs enregistrés et rejouables
+- Pages « Mes achats » et « Ventes et revenus » (EN/FR) avec compteur `sellerEarnings` sûr au rejeu, lien vers le dashboard Stripe Express
+- Ventes finales, pas de remboursement ; pas de modération ce milestone
 
-**Previous milestone:** v1.0 Monétisation & Paiements — Shipped 2026-07-12, voir `.planning/MILESTONES.md` pour le détail complet
+**Archives :** `.planning/milestones/v1.1-ROADMAP.md`, `v1.1-REQUIREMENTS.md`, `v1.1-MILESTONE-AUDIT.md` (statut tech_debt, 4 éléments différés listés dans le STATE du workstream marketplace)
+
+**Précédent milestone :** v1.0 Monétisation & Paiements — voir `.planning/MILESTONES.md`
 
 ## Requirements
 
@@ -71,6 +70,10 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - ✓ User can view pricing page (Free vs Pro plans) — Phase 3 (PLAN-01)
 - ✓ User can subscribe to Pro plan via Stripe Checkout, with in-app confirmation after activation — Phase 3 (PAY-01, PAY-02)
 - ✓ Seller can complete Stripe Connect (Express) onboarding from Settings; capability status is webhook-driven and enforceable server-side via `isSellerActive` — Phase 7 (CONNECT-01, CONNECT-02, CONNECT-03)
+- ✓ Annonces de notes (note/sous-arbre, prix, copie ou lecture seule) et marketplace publique avec recherche, tags, tri et aperçu partiel — v1.1 (LIST-01..04, BROWSE-01..06)
+- ✓ Achat d'une annonce via Stripe Checkout avec commission différenciée (20%/10%) prélevée à la source, auto-achat et double achat bloqués — v1.1 (BUY-01..03, BUY-05)
+- ✓ Livraison exactement-une-fois après paiement (copie éditable ou accès lecture seule), échecs rejouables — v1.1 (DELIVER-01..03)
+- ✓ L'acheteur consulte ses achats ; le vendeur consulte ses ventes (brut, commission, net, total gagné) et ouvre son dashboard Stripe Express — v1.1 (HIST-01, HIST-02)
 
 ### Active
 
@@ -78,13 +81,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 **Milestone v1.2 (Pricing V2 & social) :** voir `.planning/workstreams/general/REQUIREMENTS.md`.
 
-**Milestone v1.1 (Marketplace) :**
-
-- [ ] Page marketplace publique (browse + recherche de notes en vente)
-- [ ] Mise en vente d'une note (prix, portée note/sous-arbre, mode copie/lecture seule)
-- [ ] Aperçu partiel avant achat
-- [ ] Achat via Stripe Checkout + payout vendeur via Stripe Connect
-- [ ] Commission Noetree différenciée (20% vendeur Free / 10% vendeur Premium) prélevée à la source
+**Milestone v1.1 (Marketplace) :** livré le 2026-10-17 — voir Validated et `.planning/milestones/v1.1-ROADMAP.md`.
 
 ### Out of Scope
 
@@ -95,6 +92,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - Collaboration temps réel (co-édition + chat) — reportée à une milestone future (hors scope v1.2)
 - Modération de contenu marketplace — déféré (v1.1)
 - Remboursement acheteur — ventes finales (v1.1)
+- Paiement asynchrone / autres moyens que la carte sur la marketplace — le webhook ne traite que `checkout.session.completed` (v1.1)
 
 ## Context
 
@@ -119,6 +117,10 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 | UI custom (pas Stripe Portal)         | Meilleure cohérence UX dans l'app                           | ✓ Confirmé — Phase 6 (Settings page)                       |
 | Convex pour stocker statut abonnement | Temps réel, cohérent avec le reste du stack                 | ✓ Confirmé — Phase 2                                       |
 | Modèle hybride Free/Pro + crédits     | Monétisation flexible : récurrent + usage IA                | ✓ Confirmé — Phase 2 (reset), Phase 5 (déduction + top-up) |
+| Snapshot à l'achat (titre, prix, commission) sur la ligne `purchases` | L'historique ne dépend pas de l'annonce vivante (dépubliée/supprimée/renommée) | ✓ Confirmé — v1.1 Phase 11 |
+| Compteur `sellerEarnings` incrémenté une fois dans `markPaidFromCheckout` | Totaux vendeur O(1) et sûrs au rejeu du webhook ; backfill idempotent | ✓ Confirmé — v1.1 Phase 11 |
+| Garde `isSellerActive` interne appelée côté serveur (annonce + checkout) | Payout-readiness imposé même si le client est contourné | ✓ Confirmé — v1.1 Phases 7-9 |
+| Pas de remboursement (ventes finales) | Contenu numérique ; doublons de paiement journalisés seulement | ⚠️ Revisit — anomalies webhook à traiter manuellement |
 
 ## Evolution
 
@@ -141,4 +143,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-10-16 — v1.1 (marketplace) et v1.2 (pricing/social) fusionnés_
+_Last updated: 2026-10-17 — after v1.1 milestone (Marketplace de notes) shipped_
