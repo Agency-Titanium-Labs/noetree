@@ -148,8 +148,18 @@ Plans:
 1. Buyer can view a "My Purchases" page listing everything they've bought, both copy-mode and read-only-mode
 2. Seller can view a basic earnings view per sale (gross, commission at their tier's rate — 20% Free / 10% Premium, net) with running balance and payout status
 
-**Plans**: TBD
+**Plans**: 7 plans
 **UI hint**: yes
+
+Plans:
+
+- [ ] 11-01-PLAN.md — purchases compound indexes, shared resolveDelivery helper, listMyPurchases + sales.listMySales (paginated, projected)
+- [ ] 11-02-PLAN.md — createConnectLoginLink server action (Stripe Express login link) + tests
+- [ ] 11-03-PLAN.md — EN/FR Purchases/Sales copy, sidebar entries, shadcn table, i18n parity test
+- [ ] 11-04-PLAN.md — sellerEarnings counter (exactly-once increment), getMyTotals, idempotent backfill
+- [ ] 11-05-PLAN.md — /purchases page, MyPurchasesList, PurchaseRow + tests
+- [ ] 11-06-PLAN.md — /sales page, SalesSummary (totals, payout panel), SalesTable + tests
+- [ ] 11-07-PLAN.md — phase gate: full suite/build, dev backfill run, live UAT
 
 ## Progress
 
