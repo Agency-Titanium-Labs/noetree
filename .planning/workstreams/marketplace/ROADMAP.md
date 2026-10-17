@@ -157,7 +157,7 @@ Plans:
 - [x] 11-02-PLAN.md — createConnectLoginLink server action (Stripe Express login link) + tests
 - [x] 11-03-PLAN.md — EN/FR Purchases/Sales copy, sidebar entries, shadcn table, i18n parity test
 - [x] 11-04-PLAN.md — sellerEarnings counter (exactly-once increment), getMyTotals, idempotent backfill
-- [ ] 11-05-PLAN.md — /purchases page, MyPurchasesList, PurchaseRow + tests
+- [x] 11-05-PLAN.md — /purchases page, MyPurchasesList, PurchaseRow + tests
 - [ ] 11-06-PLAN.md — /sales page, SalesSummary (totals, payout panel), SalesTable + tests
 - [ ] 11-07-PLAN.md — phase gate: full suite/build, dev backfill run, live UAT
 
@@ -179,7 +179,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 8. Listings & Marketplace Browse/Search         | v1.1      | 9/9            | Complete    | 2026-10-16 |
 | 9. Marketplace Checkout & Webhook Fix           | v1.1      | 6/6            | Complete    | 2026-10-16 |
 | 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 8/8            | Complete    | 2026-10-17 |
-| 11. Buyer & Seller History UI                   | v1.1      | 4/7 | In Progress|  |
+| 11. Buyer & Seller History UI                   | v1.1      | 5/7 | In Progress|  |
 
 ---
 
