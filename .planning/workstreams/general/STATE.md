@@ -2,33 +2,33 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: planning
-stopped_at: Phase 15 context gathered
-last_updated: "2026-10-17T10:30:12.671Z"
+status: executing
+stopped_at: Phase 15 UI-SPEC approved
+last_updated: "2026-10-17T11:58:05.807Z"
 last_activity: 2026-10-17
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 21
-  completed_plans: 21
+  total_plans: 26
+  completed_plans: 22
   percent: 60
 ---
 
 ## Current Position
 
-Phase: 15
-Plan: Not started
-Status: Ready to plan
+Phase: 15 (Version History & Restoration) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
 Last activity: 2026-10-17
 
-Progress: [██████████] 100%
+Progress: [█████████░] 85%
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-08-25)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
-**Current focus:** Phase 15 — version history & restoration
+**Current focus:** Phase 15 — Version History & Restoration
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ _Updated after each plan completion_
 | Phase 14 P04 | 15min | 2 tasks | 5 files |
 | Phase 14 P02 | 20min | 2 tasks | 5 files |
 | Phase 14 P03 | 15min | 2 tasks | 4 files |
+| Phase 15 P01 | 45min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,7 @@ Decisions relevant to v1.2 planning (from research, to be confirmed during phase
 - Notifications are in-app only, no email digest this milestone — per NOTIF scope and REQUIREMENTS.md v2 deferral of NOTIF-03.
 - Version restore never deletes/hides comments as a side effect — per COMMENT-04.
 - [Phase 14]: [14-02] D-12 trade-off: link-only/lost-access root authors get no reply notification; owner always notified
+- [Phase 15]: Phase 15-01: history window owner is note.owner literally (D-06); version author = notes.lastEditedBy
 
 ### Pending Todos
 
@@ -96,9 +98,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-10-17T10:30:12.661Z
-Stopped at: Phase 15 context gathered
-Resume file: .planning/workstreams/general/phases/15-version-history-restoration/15-CONTEXT.md
+Last session: 2026-10-17T11:57:34.143Z
+Stopped at: Phase 15 UI-SPEC approved
+Resume file: None
 
 ## Operator Next Steps
 

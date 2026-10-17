@@ -165,8 +165,27 @@ Plans:
 3. User can preview a past version's content before deciding whether to restore it
 4. User can restore a note to a past version, and the pre-restore state is itself snapshotted first so the restore is non-destructive
 5. Free-tier users see version history capped at roughly the last 24 hours, while Premium users see full, unlimited history
-   **Plans**: TBD
+   **Plans**: 5 plans (4 waves)
    **UI hint**: yes
+
+Plans:
+
+**Wave 1**
+
+- [x] 15-01-PLAN.md — Version tables, owner-tier window + edit-level access helpers, shared capture helper wired into all 3 content-write paths, Wave 0 tests (wave 1)
+- [ ] 15-02-PLAN.md — EditorProvider read-only preview state with autosave/sync suppression + History en/fr copy (wave 1)
+
+**Wave 2**
+
+- [ ] 15-03-PLAN.md — noteVersions list/get (tier-gated) + atomic non-destructive restore + deleteNote cascade (wave 2)
+
+**Wave 3**
+
+- [ ] 15-04-PLAN.md — HistoryPanel Sheet, HistoryButton, VersionPreviewBanner + restore dialog + component tests (wave 3)
+
+**Wave 4**
+
+- [ ] 15-05-PLAN.md — Mount History in NoteContent (edit roles only), end-to-end human verification (wave 4)
 
 ### Phase 16: AI Credit System Revision
 
@@ -201,7 +220,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
 | 13. Sharing — Links & Public Notes             | v1.2      | 6/7            | In Progress |            |
 | 14. Comments & Notifications                   | v1.2      | 8/8            | Complete    | 2026-10-17 |
-| 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |
+| 15. Version History & Restoration              | v1.2      | 1/5            | In Progress |            |
 | 16. AI Credit System Revision                  | v1.2      | 0/TBD          | Not started | -          |
 
 ---
