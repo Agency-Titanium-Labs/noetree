@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Home, FileText, Pin, Store } from "lucide-react";
+import { Home, FileText, Pin, Store, ShoppingBag, Wallet } from "lucide-react";
 import { NavUser } from "@/components/nav-user";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
@@ -35,6 +35,16 @@ const items = [
     title: "listings",
     url: "/listings",
     icon: Store,
+  },
+  {
+    title: "purchases",
+    url: "/purchases",
+    icon: ShoppingBag,
+  },
+  {
+    title: "sales",
+    url: "/sales",
+    icon: Wallet,
   },
 ];
 
