@@ -1,9 +1,10 @@
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
 import { unpublishListingForNote } from "./helpers/listings";
 import { deleteShareLinkForNote } from "./helpers/sharing";
+import { planCopy, writeCopy } from "./helpers/delivery";
 import {
   getInheritedPermission,
   getUserPermission,
@@ -683,6 +684,43 @@ export const deleteNote = mutation({
       await requireEditAccess(ctx, args.id, user._id);
     }
 
+    // D-05: read-only sales must not lose their source. Pre-scan, no writes.
+    // Ancestors: a purchase share with scope other than "note" covers this
+    // subtree. Undefined sorts lowest in index order, so descending yields every
+    // purchase-share row before any manual row (see shareIndexes.test.ts).
+    let ancestorId = rootNote.parentNote;
+    for (let hops = 0; ancestorId && hops < 64; hops++) {
+      for await (const share of ctx.db
+        .query("shares")
+        .withIndex("by_note_and_purchaseId", q => q.eq("noteId", ancestorId!))
+        .order("desc")) {
+        if (share.purchaseId === undefined) break;
+        if (share.scope !== "note") {
+          throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
+        }
+      }
+      const ancestor: Doc<"notes"> | null = await ctx.db.get(ancestorId);
+      ancestorId = ancestor?.parentNote;
+    }
+    // Subtree: any note carrying a purchase share blocks deletion.
+    const queue: Id<"notes">[] = [args.id];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const top = await ctx.db
+        .query("shares")
+        .withIndex("by_note_and_purchaseId", q => q.eq("noteId", current))
+        .order("desc")
+        .first();
+      if (top && top.purchaseId !== undefined) {
+        throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
+      }
+      for await (const child of ctx.db
+        .query("notes")
+        .withIndex("by_parent", q => q.eq("parentNote", current))) {
+        queue.push(child._id);
+      }
+    }
+
     const deleteRecursive = async (noteId: Id<"notes">) => {
       const children = await ctx.db
         .query("notes")
@@ -742,46 +780,6 @@ export const duplicateNote = mutation({
       await requireEditAccess(ctx, sourceNote.parentNote, user._id);
     }
 
-    const duplicateRecursive = async (
-      noteId: Id<"notes">,
-      newParentId?: Id<"notes">,
-      newTitleOverride?: string,
-    ): Promise<Id<"notes">> => {
-      const note = await ctx.db.get(noteId);
-      if (!note) {
-        throw new Error("Note not found");
-      }
-
-      const title = newTitleOverride || note.title;
-
-      const newNoteId = await ctx.db.insert("notes", {
-        owner: user._id,
-        title: title,
-        content: note.content,
-        parentNote: newParentId,
-        childNotes: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      const children = await ctx.db
-        .query("notes")
-        .withIndex("by_parent", q => q.eq("parentNote", noteId))
-        .collect();
-
-      const newChildIds: Id<"notes">[] = [];
-      for (const child of children) {
-        const newChildId = await duplicateRecursive(child._id, newNoteId);
-        newChildIds.push(newChildId);
-      }
-
-      if (newChildIds.length > 0) {
-        await ctx.db.patch(newNoteId, { childNotes: newChildIds });
-      }
-
-      return newNoteId;
-    };
-
     const baseTitle = `${sourceNote.title} - Copy`;
     let uniqueTitle = baseTitle;
     let counter = 1;
@@ -804,11 +802,16 @@ export const duplicateNote = mutation({
       counter++;
     }
 
-    const newNoteId = await duplicateRecursive(
-      args.id,
-      sourceNote.parentNote,
-      uniqueTitle,
-    );
+    // D-11: shared copy helper. Descendants now keep their sibling index (D-20).
+    const planned = await planCopy(ctx, args.id, {});
+    if (!planned.ok) {
+      throw new Error("Note not found");
+    }
+    const newNoteId = await writeCopy(ctx, planned.plan, {
+      owner: user._id,
+      parentNote: sourceNote.parentNote,
+      rootTitle: uniqueTitle,
+    });
 
     if (sourceNote.parentNote) {
       const parent = await ctx.db.get(sourceNote.parentNote);
@@ -992,14 +995,15 @@ export const inviteUser = mutation({
       return { success: false, error: "CANNOT_INVITE_SELF" };
     }
 
-    const existingShare = await ctx.db
+    // D-03: only manual shares count; purchase shares never block an invite
+    const existingShares = await ctx.db
       .query("shares")
       .withIndex("by_email_note", q =>
         q.eq("email", args.email).eq("noteId", args.noteId),
       )
-      .first();
+      .take(10);
 
-    if (existingShare) {
+    if (existingShares.some(s => s.purchaseId === undefined)) {
       return { success: false, error: "ALREADY_SHARED" };
     }
 
@@ -1022,6 +1026,9 @@ export const inviteUser = mutation({
     };
   },
 });
+
+// Manual shares are hand-invited collaborators; 200 is far above realistic use.
+const MAX_MANUAL_SHARES_LISTED = 200;
 
 export const getNoteShares = query({
   args: {
@@ -1051,10 +1058,14 @@ export const getNoteShares = query({
 
     const ownerUser = await ctx.db.get(note.owner);
 
+    // Manual shares only (D-03): purchase shares are excluded by the index so
+    // buyer identities never leak and sales never count toward the cap.
     const shares = await ctx.db
       .query("shares")
-      .withIndex("by_note", q => q.eq("noteId", args.noteId))
-      .collect();
+      .withIndex("by_note_and_purchaseId", q =>
+        q.eq("noteId", args.noteId).eq("purchaseId", undefined),
+      )
+      .take(MAX_MANUAL_SHARES_LISTED);
 
     const sharedUsers = [];
 
@@ -1130,6 +1141,10 @@ export const removeShare = mutation({
     if (!share) {
       throw new Error("Share not found");
     }
+    // D-03/D-04: purchase-granted shares are permanent, for every caller
+    if (share.purchaseId !== undefined) {
+      throw new ConvexError("SHARE_PROTECTED");
+    }
 
     const userRole = await getUserPermission(ctx, share.noteId, user._id);
     const isSelfRevoke =
@@ -1160,6 +1175,10 @@ export const updateShareRole = mutation({
     const share = await ctx.db.get(args.shareId);
     if (!share) {
       throw new Error("Share not found");
+    }
+    // D-03: purchase-granted shares are immutable
+    if (share.purchaseId !== undefined) {
+      throw new ConvexError("SHARE_PROTECTED");
     }
 
     const currentUserRole = await getUserPermission(
