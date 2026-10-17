@@ -1,8 +1,8 @@
 ---
 phase: 14-comments-notifications
 verified: 2026-10-17T00:00:00Z
-status: human_needed
-score: 6/6 must-haves verified in code (3 browser-only flows pending human)
+status: passed
+score: 6/6 must-haves verified (3 browser-only flows confirmed by user)
 overrides_applied: 0
 re_verification: false
 human_verification:
@@ -66,3 +66,7 @@ COMMENT-01..04, NOTIF-01, NOTIF-02: all satisfied in code. No orphaned requireme
 No code gaps. Status is human_needed solely because three browser flows were not verified.
 
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+**Human verification (2026-10-17):** user confirmed the three outstanding browser checks (two-account bell flow, /p/<id> page, root-note-with-child-selected) passed. Status updated human_needed -> passed.
