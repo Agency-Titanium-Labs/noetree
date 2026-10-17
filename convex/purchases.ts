@@ -23,6 +23,7 @@ import { getUser } from "./helpers/helper";
 import { countSubtree, syncListingTags } from "./helpers/listings";
 import { computeCommission } from "./helpers/commission";
 import { deliverPurchase } from "./helpers/delivery";
+import { addSaleToEarnings } from "./helpers/earnings";
 import { resolveDelivery } from "./helpers/purchaseAccess";
 import { paginationOptsValidator } from "convex/server";
 
@@ -313,6 +314,8 @@ export const markPaidFromCheckout = internalMutation({
       stripePaymentIntentId: args.stripePaymentIntentId,
       stripeCheckoutSessionId: args.stripeCheckoutSessionId,
     });
+    // Phase 11 D-12: exactly-once, past the already-paid early return (Pitfall 1).
+    await addSaleToEarnings(ctx, p);
     // D-12: delivery commits atomically with payment. Data problems are
     // recorded as deliveryStatus "failed" (D-17), never thrown.
     await deliverPurchase(ctx, p._id);

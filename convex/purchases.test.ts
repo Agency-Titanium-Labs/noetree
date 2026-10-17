@@ -1222,3 +1222,58 @@ describe("listMyPurchases (HIST-01)", () => {
     expect(p2.page).toHaveLength(1);
   });
 });
+
+describe("earnings counter (HIST-02)", () => {
+  const earnings = (t: T) =>
+    t.run(ctx => ctx.db.query("sellerEarnings").take(10));
+
+  test("paid sale counted once; same-event replay does not double count", async () => {
+    const { t, purchaseId } = await preparePending();
+    await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId),
+    );
+    await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId),
+    );
+    const rows = await earnings(t);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      saleCount: 1,
+      grossCents: 1000,
+      commissionCents: 200,
+      netCents: 800,
+    });
+  });
+
+  test("different event id for already-paid purchase does not double count", async () => {
+    const { t, purchaseId } = await preparePending();
+    await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId),
+    );
+    await t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(purchaseId, {
+        stripeEventId: "evt_z",
+        stripeCheckoutSessionId: "cs_other",
+      }),
+    );
+    expect((await earnings(t))[0].saleCount).toBe(1);
+  });
+
+  test("anomaly path leaves no earnings row", async () => {
+    const { t, purchaseId } = await preparePending();
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await t.mutation(
+        internal.purchases.markPaidFromCheckout,
+        paidArgs(purchaseId, { amountTotal: 999 }),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await earnings(t)).toHaveLength(0);
+  });
+});

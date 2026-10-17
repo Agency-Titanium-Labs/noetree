@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import {
@@ -136,5 +136,189 @@ describe("listMySales (HIST-02)", () => {
     expect(
       await s.t.query(api.sales.listMySales, { paginationOpts: first }),
     ).toEqual({ page: [], isDone: true, continueCursor: "" });
+  });
+});
+
+async function setupTotals() {
+  const t = convexTest(schema, modules);
+  const sellerId = await seedUser(t, { key: "seller", connect: true });
+  const otherSellerId = await seedUser(t, { key: "seller2", connect: true });
+  await seedUser(t, { key: "buyer" });
+  return { t, sellerId, otherSellerId };
+}
+type TotalsSetup = Awaited<ReturnType<typeof setupTotals>>;
+let totalsEvt = 0;
+
+async function sellPaid(s: TotalsSetup, other = false) {
+  const sellerId = other ? s.otherSellerId : s.sellerId;
+  const { rootId } = await seedTree(s.t, sellerId, { title: "root" });
+  const listingId = await seedListing(s.t, {
+    sellerId,
+    sellerKey: other ? "seller2" : "seller",
+    noteId: rootId,
+  });
+  const purchaseId = await preparePendingPurchase(s.t, "buyer", listingId);
+  totalsEvt++;
+  await s.t.mutation(
+    internal.purchases.markPaidFromCheckout,
+    paidArgs(purchaseId, {
+      stripeEventId: `evt_t${totalsEvt}`,
+      stripeCheckoutSessionId: `cs_t${totalsEvt}`,
+      stripePaymentIntentId: `pi_t${totalsEvt}`,
+    }),
+  );
+  return purchaseId;
+}
+
+describe("getMyTotals", () => {
+  test("one paid sale", async () => {
+    const s = await setupTotals();
+    await sellPaid(s);
+    expect(
+      await asUser(s.t, "seller").query(api.sales.getMyTotals, {}),
+    ).toEqual({
+      saleCount: 1,
+      grossCents: 1000,
+      commissionCents: 200,
+      netCents: 800,
+    });
+  });
+
+  test("totals equal sums over all paged rows and exclude other sellers", async () => {
+    const s = await setupTotals();
+    await sellPaid(s);
+    await sellPaid(s);
+    await sellPaid(s);
+    await sellPaid(s, true);
+    const seller = asUser(s.t, "seller");
+    const rows: Array<{
+      priceCents: number;
+      commissionCents: number;
+      sellerNetCents: number;
+    }> = [];
+    let cursor: string | null = null;
+    for (;;) {
+      const res: {
+        page: typeof rows;
+        isDone: boolean;
+        continueCursor: string;
+      } = await seller.query(api.sales.listMySales, {
+        paginationOpts: { numItems: 1, cursor },
+      });
+      rows.push(...res.page);
+      if (res.isDone) break;
+      cursor = res.continueCursor;
+    }
+    expect(rows).toHaveLength(3);
+    expect(await seller.query(api.sales.getMyTotals, {})).toEqual({
+      saleCount: 3,
+      grossCents: rows.reduce((a, r) => a + r.priceCents, 0),
+      commissionCents: rows.reduce((a, r) => a + r.commissionCents, 0),
+      netCents: rows.reduce((a, r) => a + r.sellerNetCents, 0),
+    });
+  });
+
+  test("zeros for no sales and unauthenticated", async () => {
+    const s = await setupTotals();
+    const zero = {
+      saleCount: 0,
+      grossCents: 0,
+      commissionCents: 0,
+      netCents: 0,
+    };
+    expect(
+      await asUser(s.t, "seller").query(api.sales.getMyTotals, {}),
+    ).toEqual(zero);
+    expect(await s.t.query(api.sales.getMyTotals, {})).toEqual(zero);
+  });
+});
+
+describe("backfillEarnings", () => {
+  const totalsOf = (s: TotalsSetup, key: string) =>
+    asUser(s.t, key).query(api.sales.getMyTotals, {});
+  const wipe = (s: TotalsSetup) =>
+    s.t.run(async ctx => {
+      for (const r of await ctx.db.query("sellerEarnings").take(100))
+        await ctx.db.delete("sellerEarnings", r._id);
+    });
+  async function run(s: TotalsSetup, args: { batchSize?: number } = {}) {
+    vi.useFakeTimers();
+    try {
+      const res = await s.t.mutation(internal.sales.backfillEarnings, args);
+      await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+      return res;
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  test("rebuilds legacy data and is idempotent", async () => {
+    const s = await setupTotals();
+    await sellPaid(s);
+    await sellPaid(s);
+    await sellPaid(s, true);
+    await wipe(s);
+    expect((await totalsOf(s, "seller")).saleCount).toBe(0);
+    await run(s);
+    const a = await totalsOf(s, "seller");
+    const b = await totalsOf(s, "seller2");
+    expect(a).toEqual({
+      saleCount: 2,
+      grossCents: 2000,
+      commissionCents: 400,
+      netCents: 1600,
+    });
+    expect(b.saleCount).toBe(1);
+    await run(s);
+    expect(await totalsOf(s, "seller")).toEqual(a);
+    expect(await totalsOf(s, "seller2")).toEqual(b);
+  });
+
+  test("corrupted counter is corrected", async () => {
+    const s = await setupTotals();
+    await sellPaid(s);
+    await s.t.run(async ctx => {
+      const r = (await ctx.db.query("sellerEarnings").take(1))[0];
+      await ctx.db.patch("sellerEarnings", r._id, { saleCount: 99 });
+    });
+    await run(s);
+    expect((await totalsOf(s, "seller")).saleCount).toBe(1);
+  });
+
+  test("pending purchases are not counted", async () => {
+    const s = await setupTotals();
+    await sellPaid(s);
+    const { rootId } = await seedTree(s.t, s.sellerId, { title: "r2" });
+    const listingId = await seedListing(s.t, {
+      sellerId: s.sellerId,
+      sellerKey: "seller",
+      noteId: rootId,
+    });
+    await preparePendingPurchase(s.t, "buyer", listingId);
+    await wipe(s);
+    await run(s);
+    expect((await totalsOf(s, "seller")).saleCount).toBe(1);
+  });
+
+  test("batchSize 1 reschedules and converges", async () => {
+    const s = await setupTotals();
+    await sellPaid(s);
+    await sellPaid(s);
+    await sellPaid(s);
+    await wipe(s);
+    const res = await run(s, { batchSize: 1 });
+    expect(res.rescheduled).toBe(true);
+    expect((await totalsOf(s, "seller")).saleCount).toBe(3);
+  });
+
+  test("seller with no paid rows and no counter inserts nothing", async () => {
+    const s = await setupTotals();
+    const res = await s.t.mutation(internal.sales.recomputeSellerEarnings, {
+      sellerId: s.sellerId,
+    });
+    expect(res.saleCount).toBe(0);
+    expect(
+      await s.t.run(ctx => ctx.db.query("sellerEarnings").take(5)),
+    ).toEqual([]);
   });
 });
