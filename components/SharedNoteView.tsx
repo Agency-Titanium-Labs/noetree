@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SignInButton } from "@clerk/nextjs";
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -13,6 +13,8 @@ import { Eye, Pencil } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useDebouncedCallback } from "use-debounce";
 
+import CommentsButton from "@/components/CommentsButton";
+import CommentsPanel from "@/components/CommentsPanel";
 import SharedHeader from "@/components/SharedHeader";
 import SharedUnavailable from "@/components/SharedUnavailable";
 import { Button } from "@/components/ui/button";
@@ -79,6 +81,11 @@ function SharedNoteBody({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [revoked, setRevoked] = useState(false);
   const [href, setHref] = useState("");
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const commentsTarget = useMemo(
+    () => ({ kind: "link" as const, token }),
+    [token],
+  );
 
   const editable = data.canEdit && !revoked;
 
@@ -191,6 +198,13 @@ function SharedNoteBody({
           )
         }
         status={status}
+        actions={
+          <CommentsButton
+            target={commentsTarget}
+            isOpen={isCommentsOpen}
+            onClick={() => setIsCommentsOpen(o => !o)}
+          />
+        }
       />
       {data.role === "edit" && !data.isAuthenticated && (
         <div className="sticky top-0 z-10 border-b bg-muted">
@@ -212,6 +226,11 @@ function SharedNoteBody({
           <EditorContent editor={editor} />
         </div>
       </main>
+      <CommentsPanel
+        target={commentsTarget}
+        open={isCommentsOpen}
+        onOpenChange={setIsCommentsOpen}
+      />
     </>
   );
 }

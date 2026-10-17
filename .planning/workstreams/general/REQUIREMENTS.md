@@ -25,15 +25,15 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Comments
 
-- [ ] **COMMENT-01**: User can add a note-level comment on a note they have at least view access to
-- [ ] **COMMENT-02**: User can reply to a comment, forming a thread
-- [ ] **COMMENT-03**: User can resolve/unresolve a comment thread
-- [ ] **COMMENT-04**: A version restore never deletes or hides existing comments as a side effect
+- [x] **COMMENT-01**: User can add a note-level comment on a note they have at least view access to
+- [x] **COMMENT-02**: User can reply to a comment, forming a thread
+- [x] **COMMENT-03**: User can resolve/unresolve a comment thread
+- [x] **COMMENT-04**: A version restore never deletes or hides existing comments as a side effect
 
 ### Notifications
 
-- [ ] **NOTIF-01**: Note owner receives an in-app notification when a comment is added to their note
-- [ ] **NOTIF-02**: User sees an unread-notification indicator (bell + count) that updates reactively
+- [x] **NOTIF-01**: Note owner receives an in-app notification when a comment is added to their note
+- [x] **NOTIF-02**: User sees an unread-notification indicator (bell + count) that updates reactively
 
 ### Version History
 
@@ -104,12 +104,12 @@ Explicitly excluded. Documented to prevent scope creep.
 | SHARE-04    | Phase 13 — Sharing — Links & Public Notes     | Complete |
 | SHARE-05    | Phase 13 — Sharing — Links & Public Notes     | Complete |
 | SHARE-06    | Phase 13 — Sharing — Links & Public Notes     | Complete |
-| COMMENT-01  | Phase 14 — Comments & Notifications           | Pending  |
-| COMMENT-02  | Phase 14 — Comments & Notifications           | Pending  |
-| COMMENT-03  | Phase 14 — Comments & Notifications           | Pending  |
-| COMMENT-04  | Phase 14 — Comments & Notifications           | Pending  |
-| NOTIF-01    | Phase 14 — Comments & Notifications           | Pending  |
-| NOTIF-02    | Phase 14 — Comments & Notifications           | Pending  |
+| COMMENT-01  | Phase 14 — Comments & Notifications           | Complete |
+| COMMENT-02  | Phase 14 — Comments & Notifications           | Complete |
+| COMMENT-03  | Phase 14 — Comments & Notifications           | Complete |
+| COMMENT-04  | Phase 14 — Comments & Notifications           | Complete |
+| NOTIF-01    | Phase 14 — Comments & Notifications           | Complete |
+| NOTIF-02    | Phase 14 — Comments & Notifications           | Complete |
 | HIST-01     | Phase 15 — Version History & Restoration      | Pending  |
 | HIST-02     | Phase 15 — Version History & Restoration      | Pending  |
 | HIST-03     | Phase 15 — Version History & Restoration      | Pending  |

@@ -37,7 +37,7 @@ export async function getLinkByToken(
     .unique();
 }
 
-async function getCurrentUserOrNull(
+export async function getCurrentUserOrNull(
   ctx: QueryCtx | MutationCtx,
 ): Promise<Doc<"users"> | null> {
   const identity = await ctx.auth.getUserIdentity();

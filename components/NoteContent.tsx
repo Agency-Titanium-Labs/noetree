@@ -1,27 +1,84 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import EditorToolbar from "./editor/EditorToolbar";
 import { EditorContent } from "@tiptap/react";
 import ConditionChecker from "./helpers/ConditionChecker";
 import { AlertCircle, CheckCircle2, Store, UserPlus } from "lucide-react";
 import { useEditorContext } from "@/providers/EditorProvider";
-import { useTreeContext } from "@/providers/TreeProvider";
+import { useTreeContext, type NoteTree } from "@/providers/TreeProvider";
+import { usePathname, useRouter } from "@/i18n/routing";
 import { Skeleton } from "./ui/skeleton";
 import { useTranslations } from "next-intl";
 import { Button } from "./ui/button";
 import ShareDialog from "./ShareDialog";
 import ListingFormDialog from "./ListingFormDialog";
+import CommentsButton from "./CommentsButton";
+import CommentsPanel from "./CommentsPanel";
+
+function findInTree(id: string, note: NoteTree): NoteTree | null {
+  if (note._id === id) return note;
+  for (const child of note.childNotes ?? []) {
+    const found = findInTree(id, child);
+    if (found) return found;
+  }
+  return null;
+}
 
 export default function NoteContent() {
   const t = useTranslations("NoteContent");
   const tShare = useTranslations("ShareDialog");
-  const { selectedNote } = useTreeContext();
+  const { selectedNote, tree, onSelectNote } = useTreeContext();
   const tListing = useTranslations("ListingForm");
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isListingOpen, setIsListingOpen] = useState(false);
 
-  const { editor, saveStatus } = useEditorContext();
+  const { editor, saveStatus, getCurrentContent } = useEditorContext();
+
+  const searchParams = useSearchParams();
+  const params = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const commentsParam = searchParams.get("comments");
+  const focusCommentId = searchParams.get("c");
+  const routeNoteId = params.id as string | undefined;
+  const [isCommentsOpen, setIsCommentsOpen] = useState(
+    searchParams.get("comments") === "1",
+  );
+
+  // D-15: a bell click for the note already on screen is a same-route push
+  // that does not remount NoteContent, so re-open on param changes. Also
+  // select the notification's note so the panel targets the right note.
+  useEffect(() => {
+    if (commentsParam !== "1") return;
+    if (
+      routeNoteId &&
+      tree &&
+      selectedNote &&
+      selectedNote._id !== routeNoteId
+    ) {
+      const target = findInTree(routeNoteId, tree);
+      if (target) onSelectNote(target, getCurrentContent);
+    }
+    setIsCommentsOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commentsParam, focusCommentId, routeNoteId]);
+
+  const commentsTarget = useMemo(
+    () =>
+      selectedNote ? { kind: "note" as const, noteId: selectedNote._id } : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedNote?._id],
+  );
+
+  const handleCommentsOpenChange = useCallback(
+    (open: boolean) => {
+      setIsCommentsOpen(open);
+      if (!open && searchParams.get("comments")) router.replace(pathname);
+    },
+    [searchParams, router, pathname],
+  );
 
   return (
     <div className="min-h-full flex flex-col gap-2">
@@ -41,6 +98,13 @@ export default function NoteContent() {
               >
                 <UserPlus />
               </Button>
+              {commentsTarget && (
+                <CommentsButton
+                  target={commentsTarget}
+                  isOpen={isCommentsOpen}
+                  onClick={() => setIsCommentsOpen(o => !o)}
+                />
+              )}
               {selectedNote?.role === "owner" && (
                 <Button
                   variant="outline"
@@ -104,6 +168,14 @@ export default function NoteContent() {
           noteId={selectedNote._id}
           open={isShareOpen}
           onOpenChange={setIsShareOpen}
+        />
+      )}
+      {commentsTarget && (
+        <CommentsPanel
+          target={commentsTarget}
+          open={isCommentsOpen}
+          onOpenChange={handleCommentsOpenChange}
+          focusCommentId={focusCommentId}
         />
       )}
       {selectedNote && isListingOpen && (

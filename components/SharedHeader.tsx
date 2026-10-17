@@ -5,12 +5,14 @@ interface SharedHeaderProps {
   badgeLabel: string;
   badgeIcon: React.ReactNode;
   status?: string;
+  actions?: React.ReactNode;
 }
 
 export default function SharedHeader({
   badgeLabel,
   badgeIcon,
   status,
+  actions,
 }: Readonly<SharedHeaderProps>) {
   return (
     <header className="border-b bg-background">
@@ -19,6 +21,7 @@ export default function SharedHeader({
           NoeTree
         </Link>
         <div className="flex items-center gap-3">
+          {actions}
           {status && (
             <span className="text-sm text-muted-foreground" aria-live="polite">
               {status}

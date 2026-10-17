@@ -267,3 +267,71 @@ describe("notes.deleteNote — auto-unpublish listing (D-18)", () => {
     expect(gone).toBeNull();
   });
 });
+
+describe("nested notification destination", () => {
+  async function seed() {
+    const t = convexTest(schema, modules);
+    const mk = async (suffix: string) =>
+      await t.run(async ctx => {
+        const roleId = await ctx.db.insert("roles", { role: "user" });
+        return await ctx.db.insert("users", {
+          tokenIdentifier: "https://clerk.dev|user_" + suffix,
+          role: roleId,
+        });
+      });
+    const idn = (suffix: string) => ({
+      tokenIdentifier: "https://clerk.dev|user_" + suffix,
+      subject: "user_" + suffix,
+    });
+    const a = await mk("nest_a");
+    const b = await mk("nest_b");
+    await mk("nest_d");
+    const { rootId, childId } = await t.run(async ctx => {
+      const rootId = await ctx.db.insert("notes", {
+        owner: a,
+        title: "R",
+        content: "{}",
+      });
+      const childId = await ctx.db.insert("notes", {
+        owner: a,
+        title: "C",
+        content: "{}",
+        parentNote: rootId,
+      });
+      await ctx.db.insert("shares", {
+        noteId: rootId,
+        userId: b,
+        email: "b@x.io",
+        role: "view",
+      });
+      return { rootId, childId };
+    });
+    return { t, idn, rootId, childId };
+  }
+
+  test("shared viewer opens a nested note with role view", async () => {
+    const { t, idn, childId } = await seed();
+    const res = await t
+      .withIdentity(idn("nest_b"))
+      .query(api.notes.getTreeById, { id: childId });
+    expect(res?._id).toBe(childId);
+    expect(res?.role).toBe("view");
+  });
+
+  test("owner opens a nested note with role owner", async () => {
+    const { t, idn, childId } = await seed();
+    const res = await t
+      .withIdentity(idn("nest_a"))
+      .query(api.notes.getTreeById, { id: childId });
+    expect(res?.role).toBe("owner");
+  });
+
+  test("user without a share cannot open the nested note", async () => {
+    const { t, idn, childId } = await seed();
+    await expect(
+      t
+        .withIdentity(idn("nest_d"))
+        .query(api.notes.getTreeById, { id: childId }),
+    ).rejects.toThrow();
+  });
+});

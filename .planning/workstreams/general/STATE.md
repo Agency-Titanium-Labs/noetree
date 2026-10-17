@@ -2,39 +2,39 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: executing
-stopped_at: Phase 14 UI-SPEC approved
-last_updated: "2026-10-16T21:30:03.618Z"
-last_activity: 2026-10-16 -- Phase 14 planning complete
+status: ready_to_plan
+stopped_at: Phase 14 complete (8/8) — ready to discuss Phase 15
+last_updated: 2026-10-17T01:13:49.441Z
+last_activity: 2026-10-17
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 21
-  completed_plans: 13
-  percent: 40
+  completed_plans: 21
+  percent: 60
 ---
 
 ## Current Position
 
-Phase: 13 (Sharing — Links & Public Notes) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
-Last activity: 2026-10-16 -- Phase 14 planning complete
+Phase: 15
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-17
 
-Progress: [█████████░] 92%
+Progress: [██████████] 100%
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-08-25)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
-**Current focus:** Phase 13 — Sharing — Links & Public Notes
+**Current focus:** Phase 15 — version history & restoration
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 27 (from v1.0; v1.2 has not started execution)
+- Total plans completed: 35 (from v1.0; v1.2 has not started execution)
 - Average duration: —
 - Total execution time: 0 hours (v1.2)
 
@@ -44,7 +44,7 @@ See: .planning/PROJECT.md (updated 2026-08-25)
 | ----- | ----- | ----- | -------- |
 | 12    | 6     | -     | -        |
 | 13    | TBD   | -     | -        |
-| 14    | TBD   | -     | -        |
+| 14    | 8     | -     | -        |
 | 15    | TBD   | -     | -        |
 | 16    | TBD   | -     | -        |
 
@@ -54,6 +54,9 @@ See: .planning/PROJECT.md (updated 2026-08-25)
 - Trend: —
 
 _Updated after each plan completion_
+| Phase 14 P04 | 15min | 2 tasks | 5 files |
+| Phase 14 P02 | 20min | 2 tasks | 5 files |
+| Phase 14 P03 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -72,6 +75,7 @@ Decisions relevant to v1.2 planning (from research, to be confirmed during phase
 - Comments are note-level only (no text-selection anchoring) for this milestone — per COMMENT scope and REQUIREMENTS.md v2 deferral of COMMENT-05.
 - Notifications are in-app only, no email digest this milestone — per NOTIF scope and REQUIREMENTS.md v2 deferral of NOTIF-03.
 - Version restore never deletes/hides comments as a side effect — per COMMENT-04.
+- [Phase 14]: [14-02] D-12 trade-off: link-only/lost-access root authors get no reply notification; owner always notified
 
 ### Pending Todos
 
@@ -92,9 +96,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-10-16T20:38:29.876Z
+Last session: 2026-10-17T00:59:58.274Z
 Stopped at: Phase 14 UI-SPEC approved
-Resume file: .planning/workstreams/general/phases/14-comments-notifications/14-UI-SPEC.md
+Resume file: None
 
 ## Operator Next Steps
 

@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ConvexClientProvider } from "@/providers/ConvexClientProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { Toaster } from "@/components/ui/sonner";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations } from "next-intl/server";
 import { routing } from "@/i18n/routing";
@@ -58,6 +59,7 @@ export default async function RootLayout({
                 disableTransitionOnChange
               >
                 {children}
+                <Toaster />
               </ThemeProvider>
             </NextIntlClientProvider>
           </body>

@@ -9,7 +9,9 @@
  */
 
 import type * as aiCredits from "../aiCredits.js";
+import type * as comments from "../comments.js";
 import type * as connectAccounts from "../connectAccounts.js";
+import type * as helpers_commentAccess from "../helpers/commentAccess.js";
 import type * as helpers_commission from "../helpers/commission.js";
 import type * as helpers_helper from "../helpers/helper.js";
 import type * as helpers_listings from "../helpers/listings.js";
@@ -18,6 +20,7 @@ import type * as helpers_sharing from "../helpers/sharing.js";
 import type * as listings from "../listings.js";
 import type * as marketplace from "../marketplace.js";
 import type * as notes from "../notes.js";
+import type * as notifications from "../notifications.js";
 import type * as purchases from "../purchases.js";
 import type * as shareLinks from "../shareLinks.js";
 import type * as shareLinksNode from "../shareLinksNode.js";
@@ -33,7 +36,9 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   aiCredits: typeof aiCredits;
+  comments: typeof comments;
   connectAccounts: typeof connectAccounts;
+  "helpers/commentAccess": typeof helpers_commentAccess;
   "helpers/commission": typeof helpers_commission;
   "helpers/helper": typeof helpers_helper;
   "helpers/listings": typeof helpers_listings;
@@ -42,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   listings: typeof listings;
   marketplace: typeof marketplace;
   notes: typeof notes;
+  notifications: typeof notifications;
   purchases: typeof purchases;
   shareLinks: typeof shareLinks;
   shareLinksNode: typeof shareLinksNode;

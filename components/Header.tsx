@@ -4,6 +4,7 @@ import { useStoreUserEffect } from "@/hooks/useStoreUserEffect";
 import ConditionChecker from "@/components/helpers/ConditionChecker";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import NotificationBell from "@/components/NotificationBell";
 import { useHeader } from "@/providers/HeaderProvider";
 
 export default function Header() {
@@ -28,6 +29,9 @@ export default function Header() {
 
       <div className="flex items-center gap-3 shrink-0">
         {action}
+        <ConditionChecker condition={!isLoading && isAuthenticated}>
+          <NotificationBell />
+        </ConditionChecker>
         <ConditionChecker condition={!isLoading}>
           <ConditionChecker condition={!isAuthenticated}>
             <div className="flex items-center gap-2">

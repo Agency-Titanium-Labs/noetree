@@ -136,6 +136,41 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_noteId", ["noteId"]),
 
+  // Comments / notifications invariants (Phase 14):
+  // - Comments are note-level only (no block anchors).
+  // - parentId is set only on replies and ALWAYS points at a root comment (D-07).
+  // - Thread state (resolvedAt/resolvedBy) lives on the root row only (D-08).
+  // - A root with replies is tombstoned via deletedAt with body "" (D-09).
+  // - comments and notifications are NEVER written, filtered, copied or
+  //   restored by note snapshot/restore/duplicate/purchase logic, and no
+  //   comment field may be added to notes (D-11, COMMENT-04, Phase 15 guardrail).
+  // - notifications store kind, not display text (D-13).
+  comments: defineTable({
+    noteId: v.id("notes"),
+    authorId: v.id("users"),
+    parentId: v.optional(v.id("comments")),
+    body: v.string(),
+    deletedAt: v.optional(v.number()),
+    resolvedAt: v.optional(v.number()),
+    resolvedBy: v.optional(v.id("users")),
+  })
+    .index("by_noteId", ["noteId"])
+    .index("by_parentId", ["parentId"])
+    .index("by_authorId", ["authorId"]),
+
+  notifications: defineTable({
+    recipientId: v.id("users"),
+    actorId: v.id("users"),
+    noteId: v.id("notes"),
+    commentId: v.id("comments"),
+    kind: v.union(v.literal("comment"), v.literal("reply")),
+    readAt: v.optional(v.number()),
+  })
+    .index("by_recipientId", ["recipientId"])
+    .index("by_recipientId_and_readAt", ["recipientId", "readAt"])
+    .index("by_noteId", ["noteId"])
+    .index("by_commentId", ["commentId"]),
+
   // Listings invariants (Phase 8):
   // - One listing row per note for life (D-17): unpublish flips status, rows
   //   are never deleted so future purchases keep a valid reference (D-16/D-18).
