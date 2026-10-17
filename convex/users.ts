@@ -70,8 +70,22 @@ export const store = mutation({
 
       return user._id;
     }
-    const roleId: Id<"roles"> =
-      "jd73rghdc6jjjxhm0e6gd8gys57bx472" as Id<"roles">;
+    // The original dev deployment seeded this roles row; a fresh deployment has
+    // no such row, so fall back to finding or creating the "user" role.
+    const seededRoleId = ctx.db.normalizeId(
+      "roles",
+      "jd73rghdc6jjjxhm0e6gd8gys57bx472",
+    );
+    let roleId: Id<"roles"> | null =
+      seededRoleId && (await ctx.db.get("roles", seededRoleId))
+        ? seededRoleId
+        : null;
+    if (!roleId) {
+      const roles = await ctx.db.query("roles").take(20);
+      roleId =
+        roles.find(r => r.role === "user")?._id ??
+        (await ctx.db.insert("roles", { role: "user" }));
+    }
 
     // If it's a new identity, create a new `User`.
     const newUserId = await ctx.db.insert("users", {
