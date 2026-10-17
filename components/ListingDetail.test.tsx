@@ -56,6 +56,10 @@ const messages: Record<string, string> = {
   ownedBadge: "Owned",
   ownedBody: "You already own this listing.",
   ownedCta: "Open the app",
+  openNote: "Open note",
+  deliveryFailedTitle: "Delivery problem",
+  deliveryFailedBody: "We could not deliver this note.",
+  deliveryPending: "Your note is being prepared…",
   processingTitle: "Payment received — processing",
   processingBody: "We're confirming your payment.",
   processingSlow: "Still waiting? Refresh the page.",
@@ -205,6 +209,52 @@ describe("ListingDetail buy panel", () => {
     const btn = screen.getByRole("button", { name: /Buy now, / });
     expect(btn).toHaveAttribute("aria-label", expect.stringContaining("15"));
     expect(screen.getByText(/All sales are final/)).toBeInTheDocument();
+  });
+
+  it("owned + delivered + openNoteId shows Open note link", () => {
+    mockState.value = {
+      data: { state: "owned", delivery: "delivered", openNoteId: "n1" },
+      isPending: false,
+    };
+    render(<ListingDetail listingId="abc" />);
+    const link = screen.getByRole("link", { name: "Open note" });
+    expect(link.getAttribute("href")).toMatch(/\/notes\/n1$/);
+  });
+
+  it("owned + delivery failed shows notice, no Open note link", () => {
+    mockState.value = {
+      data: { state: "owned", delivery: "failed" },
+      isPending: false,
+    };
+    render(<ListingDetail listingId="abc" />);
+    expect(screen.getByText("Delivery problem")).toBeInTheDocument();
+    expect(
+      screen.getByText("We could not deliver this note."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Open note")).not.toBeInTheDocument();
+  });
+
+  it("owned + delivery pending shows preparing line, no Open note link", () => {
+    mockState.value = {
+      data: { state: "owned", delivery: "pending" },
+      isPending: false,
+    };
+    render(<ListingDetail listingId="abc" />);
+    expect(screen.getByText(/being prepared/)).toBeInTheDocument();
+    expect(screen.queryByText("Open note")).not.toBeInTheDocument();
+  });
+
+  it("owned + delivered without openNoteId renders without link", () => {
+    mockState.value = {
+      data: { state: "owned", delivery: "delivered" },
+      isPending: false,
+    };
+    render(<ListingDetail listingId="abc" />);
+    expect(screen.getByText("Owned")).toBeInTheDocument();
+    expect(
+      screen.getByText("You already own this listing."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Open note")).not.toBeInTheDocument();
   });
 
   it("pending without param is treated as buyable", () => {
