@@ -4,29 +4,29 @@ milestone: v1.1
 milestone_name: Marketplace de notes
 status: executing
 stopped_at: Phase 11 UI-SPEC approved
-last_updated: "2026-10-17T10:54:01.300Z"
-last_activity: 2026-10-17 -- Phase 11 planning complete
+last_updated: "2026-10-17T11:31:18.177Z"
+last_activity: 2026-10-17
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 36
-  completed_plans: 29
+  completed_plans: 30
   percent: 80
 ---
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 11 (buyer-seller-history-ui) — EXECUTING
+Plan: 2 of 7
 Status: Ready to execute
-Last activity: 2026-10-17 -- Phase 11 planning complete
+Last activity: 2026-10-17
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-10-16)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente.
-**Current focus:** Phase 11 — buyer & seller history ui
+**Current focus:** Phase 11 — buyer-seller-history-ui
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ _Updated after each plan completion_
 | Phase 10 P04 | 15min | 2 tasks | 4 files |
 | Phase 10 P05 | 15min | 2 tasks | 2 files |
 | Phase 10 P07 | 25min | 2 tasks | 12 files |
+| Phase 11 P01 | 15min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -117,9 +118,9 @@ v1.1 deferred to v2 (see REQUIREMENTS.md v2 Requirements): seller public profile
 
 ## Session Continuity
 
-Last session: 2026-10-17T10:35:04.002Z
+Last session: 2026-10-17T11:31:01.856Z
 Stopped at: Phase 11 UI-SPEC approved
-Resume file: .planning/workstreams/marketplace/phases/11-buyer-seller-history-ui/11-UI-SPEC.md
+Resume file: None
 
 ## Operator Next Steps
 
