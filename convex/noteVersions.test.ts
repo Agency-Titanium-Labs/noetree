@@ -21,6 +21,8 @@ const modules = (
 ).glob("./**/*.*s");
 
 // Schema-typed handle so index names and the data model are checked.
+// Only referenced via `typeof` below, which the unused-vars rule does not count.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function newTest() {
   return convexTest(schema, modules);
 }

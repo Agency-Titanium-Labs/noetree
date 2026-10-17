@@ -17,7 +17,6 @@ import {
   MutationCtx,
 } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { getUser } from "./helpers/helper";
 import { countSubtree, syncListingTags } from "./helpers/listings";

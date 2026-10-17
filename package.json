@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "start:ci": "next start -p 3000",
-    "lint": "next lint",
+    "lint": "eslint .",
     "convex": "npx convex dev",
     "stripe:setup-premium": "ts-node --project scripts/tsconfig.json scripts/setup-premium-prices.ts",
     "stripe:migrate-premium": "ts-node --project scripts/tsconfig.json scripts/migrate-pro-to-premium.ts",

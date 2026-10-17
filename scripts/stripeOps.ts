@@ -230,6 +230,8 @@ export async function archiveOldPriceIfUnused(
   }
 
   let activeCount = 0;
+  // The loop only counts results; the iteration variable is intentionally unused.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for await (const _subscription of stripe.subscriptions.list({
     price: oldPriceId,
     status: "active",
