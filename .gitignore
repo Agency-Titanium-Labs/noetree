@@ -52,3 +52,7 @@ cypress/screenshots/
 
 # git worktrees (isolated workspaces for parallel milestone/feature work)
 .worktrees/
+
+# Claude Code local runtime state
+.claude/scheduled_tasks.lock
+.claude/worktrees/
