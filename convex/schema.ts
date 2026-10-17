@@ -307,5 +307,12 @@ export default defineSchema({
     .index("by_sellerId", ["sellerId"])
     .index("by_buyerId", ["buyerId"])
     // D-13/D-16: backfill of paid purchases not yet delivered.
-    .index("by_status_and_deliveryStatus", ["status", "deliveryStatus"]),
+    .index("by_status_and_deliveryStatus", ["status", "deliveryStatus"])
+    // Phase 11 (HIST-01/02): paid-only, newest paidAt first history lists.
+    .index("by_buyerId_and_status_and_paidAt", ["buyerId", "status", "paidAt"])
+    .index("by_sellerId_and_status_and_paidAt", [
+      "sellerId",
+      "status",
+      "paidAt",
+    ]),
 });

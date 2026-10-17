@@ -4,7 +4,7 @@ import { ConvexError } from "convex/values";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { seedTree } from "../test-utils/convexSeed";
+import { seedTree, preparePendingPurchase } from "../test-utils/convexSeed";
 
 const modules = (
   import.meta as unknown as {
@@ -1051,5 +1051,174 @@ describe("listing state delivery", () => {
       expect(o).not.toHaveProperty("delivery");
       expect(o).not.toHaveProperty("openNoteId");
     }
+  });
+});
+
+describe("listMyPurchases (HIST-01)", () => {
+  const EMPTY = { page: [], isDone: true, continueCursor: "" };
+  const first = { numItems: 10, cursor: null };
+  let evt = 0;
+
+  async function setup() {
+    const t = convexTest(schema, modules);
+    const sellerId = await seedSeller(t, "seller");
+    await seedUser(t, { key: "buyer" });
+    await seedUser(t, { key: "other" });
+    return { t, sellerId };
+  }
+
+  async function buy(
+    s: Awaited<ReturnType<typeof setup>>,
+    buyerKey: string,
+    opts: {
+      paidAt?: number;
+      accessMode?: "copy" | "readonly";
+      pay?: boolean;
+    } = {},
+  ) {
+    const { rootId } = await seedTree(s.t, s.sellerId, { title: "root" });
+    const listingId = await seedListing(s.t, {
+      sellerId: s.sellerId,
+      sellerKey: "seller",
+      noteId: rootId,
+      accessMode: opts.accessMode ?? "copy",
+    });
+    const purchaseId = await preparePendingPurchase(s.t, buyerKey, listingId);
+    if (opts.pay !== false) {
+      await s.t.mutation(
+        internal.purchases.markPaidFromCheckout,
+        paidArgs(purchaseId, {
+          stripeEventId: `evt_${++evt}`,
+          stripeCheckoutSessionId: `cs_h${evt}`,
+          stripePaymentIntentId: `pi_h${evt}`,
+          amountTotal: 1000,
+        }),
+      );
+      if (opts.paidAt !== undefined) {
+        await s.t.run(ctx =>
+          ctx.db.patch("purchases", purchaseId, { paidAt: opts.paidAt }),
+        );
+      }
+    }
+    return { purchaseId, listingId, rootId };
+  }
+
+  test("paid only, newest first, scoped to caller", async () => {
+    const s = await setup();
+    const a = await buy(s, "buyer", { paidAt: 1000 });
+    const b = await buy(s, "buyer", { paidAt: 3000 });
+    const c = await buy(s, "buyer", { paidAt: 2000 });
+    await buy(s, "buyer", { pay: false });
+    await buy(s, "other", { paidAt: 5000 });
+    const res = await asUser(s.t, "buyer").query(
+      api.purchases.listMyPurchases,
+      {
+        paginationOpts: first,
+      },
+    );
+    expect(res.page.map(r => r._id)).toEqual([
+      b.purchaseId,
+      c.purchaseId,
+      a.purchaseId,
+    ]);
+  });
+
+  test("copy delivered row exposes openNoteId; deleted copy drops it", async () => {
+    const s = await setup();
+    const p = await buy(s, "buyer", { paidAt: 1000 });
+    const buyer = asUser(s.t, "buyer");
+    const row = await s.t.run(ctx => ctx.db.get("purchases", p.purchaseId));
+    const before = await buyer.query(api.purchases.listMyPurchases, {
+      paginationOpts: first,
+    });
+    expect(before.page[0].delivery).toBe("delivered");
+    expect(before.page[0].openNoteId).toBe(row!.deliveredNoteId);
+    await s.t.run(ctx => ctx.db.delete("notes", row!.deliveredNoteId!));
+    const after = await buyer.query(api.purchases.listMyPurchases, {
+      paginationOpts: first,
+    });
+    expect(after.page[0].delivery).toBe("delivered");
+    expect(after.page[0].openNoteId).toBeUndefined();
+  });
+
+  test("readonly delivered row opens the listing note", async () => {
+    const s = await setup();
+    const p = await buy(s, "buyer", { accessMode: "readonly" });
+    const res = await asUser(s.t, "buyer").query(
+      api.purchases.listMyPurchases,
+      {
+        paginationOpts: first,
+      },
+    );
+    expect(res.page[0].openNoteId).toBe(p.rootId);
+  });
+
+  test("failed and pending delivery; no deliveryError leak", async () => {
+    const s = await setup();
+    const f = await buy(s, "buyer", { paidAt: 2000 });
+    const p = await buy(s, "buyer", { paidAt: 1000 });
+    await s.t.run(async ctx => {
+      await ctx.db.patch("purchases", f.purchaseId, {
+        deliveryStatus: "failed",
+        deliveryError: "x",
+      });
+      await ctx.db.patch("purchases", p.purchaseId, {
+        deliveryStatus: undefined,
+      });
+    });
+    const res = await asUser(s.t, "buyer").query(
+      api.purchases.listMyPurchases,
+      {
+        paginationOpts: first,
+      },
+    );
+    expect(res.page[0].delivery).toBe("failed");
+    expect(res.page[0].openNoteId).toBeUndefined();
+    expect("deliveryError" in res.page[0]).toBe(false);
+    expect(res.page[1].delivery).toBe("pending");
+  });
+
+  test("snapshot title survives listing rename and unpublish", async () => {
+    const s = await setup();
+    const p = await buy(s, "buyer");
+    const snap = await s.t.run(ctx => ctx.db.get("purchases", p.purchaseId));
+    await s.t.run(ctx =>
+      ctx.db.patch("listings", p.listingId, {
+        title: "Renamed",
+        status: "unpublished",
+      }),
+    );
+    const res = await asUser(s.t, "buyer").query(
+      api.purchases.listMyPurchases,
+      {
+        paginationOpts: first,
+      },
+    );
+    expect(res.page[0].title).toBe(snap!.title);
+    expect(res.page[0].title).not.toBe("Renamed");
+  });
+
+  test("unauthenticated gets empty page", async () => {
+    const s = await setup();
+    expect(
+      await s.t.query(api.purchases.listMyPurchases, { paginationOpts: first }),
+    ).toEqual(EMPTY);
+  });
+
+  test("paginates", async () => {
+    const s = await setup();
+    await buy(s, "buyer", { paidAt: 1000 });
+    await buy(s, "buyer", { paidAt: 3000 });
+    await buy(s, "buyer", { paidAt: 2000 });
+    const buyer = asUser(s.t, "buyer");
+    const p1 = await buyer.query(api.purchases.listMyPurchases, {
+      paginationOpts: { numItems: 2, cursor: null },
+    });
+    expect(p1.page).toHaveLength(2);
+    expect(p1.isDone).toBe(false);
+    const p2 = await buyer.query(api.purchases.listMyPurchases, {
+      paginationOpts: { numItems: 2, cursor: p1.continueCursor },
+    });
+    expect(p2.page).toHaveLength(1);
   });
 });

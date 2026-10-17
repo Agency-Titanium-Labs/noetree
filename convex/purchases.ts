@@ -23,6 +23,8 @@ import { getUser } from "./helpers/helper";
 import { countSubtree, syncListingTags } from "./helpers/listings";
 import { computeCommission } from "./helpers/commission";
 import { deliverPurchase } from "./helpers/delivery";
+import { resolveDelivery } from "./helpers/purchaseAccess";
+import { paginationOptsValidator } from "convex/server";
 
 async function requireBuyer(ctx: MutationCtx | QueryCtx) {
   const identity = await ctx.auth.getUserIdentity();
@@ -424,25 +426,11 @@ export const getMyListingState = query({
       .unique();
     if (purchase?.status === "paid") {
       // D-18/D-21: delivery fields are only exposed to the owning buyer.
-      const delivery = purchase.deliveryStatus ?? ("pending" as const);
-      let openNoteId: Id<"notes"> | undefined;
-      if (delivery === "delivered") {
-        if (purchase.accessMode === "copy") {
-          if (purchase.deliveredNoteId) {
-            const copy = await ctx.db.get("notes", purchase.deliveredNoteId);
-            if (copy && copy.owner === user._id) openNoteId = copy._id;
-          }
-        } else {
-          const share = await ctx.db
-            .query("shares")
-            .withIndex("by_purchaseId", q => q.eq("purchaseId", purchase._id))
-            .first();
-          const note = share
-            ? await ctx.db.get("notes", purchase.noteId)
-            : null;
-          if (note) openNoteId = note._id;
-        }
-      }
+      const { delivery, openNoteId } = await resolveDelivery(
+        ctx,
+        purchase,
+        user._id,
+      );
       return {
         state: "owned" as const,
         delivery,
@@ -451,5 +439,81 @@ export const getMyListingState = query({
     }
     if (purchase?.status === "pending") return { state: "pending" as const };
     return { state: "buyable" as const };
+  },
+});
+
+const PURCHASES_PAGE_MAX = 20;
+
+/**
+ * Buyer history (Phase 11, HIST-01). Paid purchases of the caller, newest paid
+ * first. Rows come from the purchase snapshot (D-04), so they survive listing
+ * rename/unpublish/delete. Delivery state shares resolveDelivery with
+ * getMyListingState (D-05/D-06); deliveryError is never returned.
+ */
+export const listMyPurchases = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({
+    page: v.array(
+      v.object({
+        _id: v.id("purchases"),
+        listingId: v.id("listings"),
+        title: v.string(),
+        priceCents: v.number(),
+        paidAt: v.optional(v.number()),
+        accessMode: v.union(v.literal("copy"), v.literal("readonly")),
+        delivery: v.union(
+          v.literal("delivered"),
+          v.literal("failed"),
+          v.literal("pending"),
+        ),
+        openNoteId: v.optional(v.id("notes")),
+      }),
+    ),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+    splitCursor: v.optional(v.union(v.string(), v.null())),
+    pageStatus: v.optional(
+      v.union(
+        v.literal("SplitRecommended"),
+        v.literal("SplitRequired"),
+        v.null(),
+      ),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const user = await getUser(ctx);
+    if (!user) return { page: [], isDone: true, continueCursor: "" };
+    const rawN = Math.floor(args.paginationOpts.numItems);
+    const numItems = Math.min(
+      Math.max(Number.isFinite(rawN) ? rawN : 1, 1),
+      PURCHASES_PAGE_MAX,
+    );
+    const res = await ctx.db
+      .query("purchases")
+      .withIndex("by_buyerId_and_status_and_paidAt", q =>
+        q.eq("buyerId", user._id).eq("status", "paid"),
+      )
+      .order("desc")
+      .paginate({ ...args.paginationOpts, numItems });
+    const page = await Promise.all(
+      res.page.map(async p => {
+        const { delivery, openNoteId } = await resolveDelivery(
+          ctx,
+          p,
+          user._id,
+        );
+        return {
+          _id: p._id,
+          listingId: p.listingId,
+          title: p.title,
+          priceCents: p.priceCents,
+          paidAt: p.paidAt,
+          accessMode: p.accessMode,
+          delivery,
+          ...(openNoteId ? { openNoteId } : {}),
+        };
+      }),
+    );
+    return { ...res, page };
   },
 });
