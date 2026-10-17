@@ -21,6 +21,7 @@ import type * as helpers_permissions from "../helpers/permissions.js";
 import type * as helpers_sharing from "../helpers/sharing.js";
 import type * as listings from "../listings.js";
 import type * as marketplace from "../marketplace.js";
+import type * as noteVersions from "../noteVersions.js";
 import type * as notes from "../notes.js";
 import type * as notifications from "../notifications.js";
 import type * as purchases from "../purchases.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   "helpers/sharing": typeof helpers_sharing;
   listings: typeof listings;
   marketplace: typeof marketplace;
+  noteVersions: typeof noteVersions;
   notes: typeof notes;
   notifications: typeof notifications;
   purchases: typeof purchases;

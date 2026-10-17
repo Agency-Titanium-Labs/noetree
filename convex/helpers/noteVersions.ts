@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { internal } from "../_generated/api";
 import { Doc, Id } from "../_generated/dataModel";
 import { MutationCtx, QueryCtx } from "../_generated/server";
 import { tierFromClerkUserId } from "./helper";
@@ -67,6 +68,50 @@ export async function getOwnerWindow(
     if (tier === "premium") return { cutoff: 0, isFree: false };
   }
   return { cutoff: Date.now() - FREE_WINDOW_MS, isFree: true };
+}
+
+// Content rows can approach 1 MB each, so keep content batches small.
+const CONTENT_DELETE_BATCH = 20;
+const METADATA_DELETE_BATCH = 100;
+
+/**
+ * Deletes a note's versions in bounded batches and self-reschedules when a
+ * batch was full (D-08). Content rows go first so no orphaned content remains.
+ */
+export async function deleteVersionsForNote(
+  ctx: MutationCtx,
+  noteId: Id<"notes">,
+): Promise<void> {
+  const contents = await ctx.db
+    .query("noteVersionContents")
+    .withIndex("by_noteId", q => q.eq("noteId", noteId))
+    .take(CONTENT_DELETE_BATCH);
+  for (const c of contents) {
+    await ctx.db.delete("noteVersionContents", c._id);
+    const meta = await ctx.db.get("noteVersions", c.versionId);
+    if (meta) await ctx.db.delete("noteVersions", meta._id);
+  }
+
+  const metas = await ctx.db
+    .query("noteVersions")
+    .withIndex("by_noteId_and_createdAt", q => q.eq("noteId", noteId))
+    .take(METADATA_DELETE_BATCH);
+  for (const m of metas) {
+    const body = await ctx.db
+      .query("noteVersionContents")
+      .withIndex("by_versionId", q => q.eq("versionId", m._id))
+      .first();
+    if (body === null) await ctx.db.delete("noteVersions", m._id);
+  }
+
+  if (
+    contents.length === CONTENT_DELETE_BATCH ||
+    metas.length === METADATA_DELETE_BATCH
+  ) {
+    await ctx.scheduler.runAfter(0, internal.noteVersions.purgeNote, {
+      noteId,
+    });
+  }
 }
 
 function isEmptyContent(content: string): boolean {

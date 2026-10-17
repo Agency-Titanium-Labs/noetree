@@ -6,7 +6,7 @@ import { unpublishListingForNote } from "./helpers/listings";
 import { deleteShareLinkForNote } from "./helpers/sharing";
 import { deleteCommentsForNote } from "./helpers/commentAccess";
 import { planCopy, writeCopy } from "./helpers/delivery";
-import { writeNoteContent } from "./helpers/noteVersions";
+import { deleteVersionsForNote, writeNoteContent } from "./helpers/noteVersions";
 import {
   getInheritedPermission,
   getUserPermission,
@@ -756,6 +756,7 @@ export const deleteNote = mutation({
       await unpublishListingForNote(ctx, noteId);
       await deleteShareLinkForNote(ctx, noteId);
       await deleteCommentsForNote(ctx, noteId);
+      await deleteVersionsForNote(ctx, noteId);
     };
 
     if (rootNote.parentNote) {
