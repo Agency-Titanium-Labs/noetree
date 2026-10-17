@@ -457,14 +457,17 @@ const { data } = useQuery({
 | A4  | Skipping empty-document prior content (`""`/`"{}"`) is desirable                                   | Pattern 1                                                   | Planner may prefer to keep it; harmless either way                                               |
 | A5  | If restore target equals current content, return without writing                                   | Pattern 3                                                   | Could instead force a pre-restore snapshot anyway (D-15 literal reading); low impact             |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Which "owner" for tier (Pitfall 6)?**
    - Known: D-06 says note owner; `note.owner` is the creator and can differ from the tree root's owner.
    - Unclear: whether collaborator-created children should use root owner's tier.
    - Recommendation: implement `note.owner` (literal D-06) behind a single `ownerWindow()` function so switching to a root-owner walk later is a one-place change; confirm with user in plan review.
+   - RESOLVED: tier follows `note.owner` (literal D-06), isolated behind the single `getOwnerWindow(ctx, note)` helper (15-01) that list/get/restore all call (15-03). No root-owner walk; changing it later is a one-function change.
 2. **Pricing link target:** pricing page is `app/[locale]/(marketing)/pricing`; planner should reuse whatever localized `Link` the existing upgrade prompts use (grep `SettingsPlanCard`/`CreditsExhaustedDialog`).
+   - RESOLVED: HistoryPanel uses the localized `Link` from `@/i18n/routing` with `href="/pricing"`, same as SettingsPlanCard.tsx (15-04 Task 2).
 3. **i18n:** add a `History` namespace to both `messages/en.json` and `messages/fr.json` (next to `Comments`).
+   - RESOLVED: 15-02 Task 2 adds a 26-key `History` namespace right after `Comments` in both en.json and fr.json, with identical keys checked by a node script.
 
 ## Environment Availability
 
