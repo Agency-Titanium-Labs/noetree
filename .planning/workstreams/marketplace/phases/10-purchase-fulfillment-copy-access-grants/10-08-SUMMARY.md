@@ -58,8 +58,14 @@ Left unfixed per scope boundary.
 - Did not execute Tasks 2 and 3 by orchestrator/user decision.
 - Did not set `nyquist_compliant: true` (condition "everything passed" not met).
 
+## Live verification (2026-10-17, dev:frugal-echidna-922, Stripe test mode)
+
+- Task 2: `purchases:deliverPending` delivered 1 (Phase 9 test purchase), second run processed 0.
+- Task 3: copy purchase delivered (one buyer-root copy with purchaseId, subtree intact); read-only subtree and note-only (scope "note") shares created with userId; share dialog hides buyer; deleteNote rejected on sold read-only note with localized error; replaying the copy purchase event produced no duplicate (one copy root, salesCount unchanged at 1, no extra shares). Buyer-side visuals (steps 3/4/5/6/9/10) approved by user ("all approved").
+- Not exercised live: deleting the copy-mode source note (covered by unit tests; user's own data left intact).
+- Dev-only note: a Next dev-overlay "1 issue" badge appeared after the rejected delete (thrown ConvexError surfaced in dev); banner message displays correctly.
+- Pre-existing lint errors remain (not Phase 10).
+
 ## Remaining
 
-1. User approval, then run `purchases:deliverPending` on dev (Task 2) and record the result.
-2. Live Stripe verification steps 1-10 (Task 3).
-3. Decide on the pre-existing lint errors (separate cleanup), then flip validation flags.
+None for Phase 10. Pre-existing lint errors are a separate cleanup.

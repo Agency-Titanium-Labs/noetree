@@ -1,9 +1,9 @@
 ---
 phase: 10
 slug: purchase-fulfillment-copy-access-grants
-status: automated-gate-partial
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-10-16
 ---
 
@@ -53,6 +53,6 @@ Always pass explicit paths (a bare `convex/` filter pulls in `.agents/` and `.cl
 
 - [x] All tasks have automated verify or Wave 0 dependencies
 - [x] Sampling continuity maintained
-- [ ] `nyquist_compliant: true` set after execution
+- [x] `nyquist_compliant: true` set after execution
 
 **Approval:** automated gate partial (suite 315/315, tsc, build green; lint has 4 pre-existing non-Phase-10 errors; convex push skipped by decision). `nyquist_compliant` stays false pending live verification (10-08 Tasks 2-3).
