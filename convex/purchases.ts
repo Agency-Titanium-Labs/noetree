@@ -21,6 +21,7 @@ import { internal } from "./_generated/api";
 import { getUser } from "./helpers/helper";
 import { countSubtree, syncListingTags } from "./helpers/listings";
 import { computeCommission } from "./helpers/commission";
+import { deliverPurchase } from "./helpers/delivery";
 
 async function requireBuyer(ctx: MutationCtx | QueryCtx) {
   const identity = await ctx.auth.getUserIdentity();
@@ -228,7 +229,8 @@ export const attachCheckoutSession = mutation({
  * Verifies against the stored SNAPSHOT only (D-11) and never reads
  * listing.status (D-09). Data problems return an anomaly (2xx to Stripe, no
  * retry storm) and never throw. No refund path (D-14): a duplicate payment is
- * logged for manual Dashboard handling.
+ * logged for manual Dashboard handling. Phase 10: delivery (copy or read-only
+ * share) runs in the same transaction right after the paid patch (D-12).
  */
 export const markPaidFromCheckout = internalMutation({
   args: {
@@ -308,6 +310,9 @@ export const markPaidFromCheckout = internalMutation({
       stripePaymentIntentId: args.stripePaymentIntentId,
       stripeCheckoutSessionId: args.stripeCheckoutSessionId,
     });
+    // D-12: delivery commits atomically with payment. Data problems are
+    // recorded as deliveryStatus "failed" (D-17), never thrown.
+    await deliverPurchase(ctx, p._id);
 
     const listing = await ctx.db.get("listings", p.listingId);
     if (listing) {

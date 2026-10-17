@@ -1,9 +1,10 @@
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { ConvexError } from "convex/values";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { seedTree } from "../test-utils/convexSeed";
 
 const modules = (
   import.meta as unknown as {
@@ -681,5 +682,139 @@ describe("snapshot honored", () => {
     );
     expect(res).toEqual({ success: true });
     expect((await purchaseRows(t))[0].status).toBe("paid");
+  });
+});
+
+async function deliverySetup(
+  accessMode: "copy" | "readonly",
+  scope: "note" | "subtree",
+) {
+  const t = convexTest(schema, modules);
+  const sellerId = await seedSeller(t, "seller");
+  const buyerId = await seedUser(t, { key: "buyer" });
+  const { rootId, ids } = await seedTree(t, sellerId, {
+    title: "root",
+    children: [{ title: "A", children: [{ title: "A1" }] }, { title: "B" }],
+  });
+  const listingId = await seedListing(t, {
+    sellerId,
+    sellerKey: "seller",
+    noteId: rootId,
+    scope,
+    accessMode,
+  });
+  const res = await asUser(t, "buyer").mutation(api.purchases.preparePurchase, {
+    listingId,
+  });
+  return {
+    t,
+    sellerId,
+    buyerId,
+    rootId,
+    ids,
+    listingId,
+    purchaseId: res.purchaseId,
+  };
+}
+
+async function replayThrice(t: T, purchaseId: Id<"purchases">) {
+  await t.mutation(
+    internal.purchases.markPaidFromCheckout,
+    paidArgs(purchaseId),
+  );
+  await t.mutation(
+    internal.purchases.markPaidFromCheckout,
+    paidArgs(purchaseId),
+  );
+  await t.mutation(
+    internal.purchases.markPaidFromCheckout,
+    paidArgs(purchaseId, {
+      stripeEventId: "evt_y",
+      stripeCheckoutSessionId: "cs_other",
+    }),
+  );
+}
+
+describe("delivery replay", () => {
+  test("copy/subtree delivers one root and four notes", async () => {
+    const s = await deliverySetup("copy", "subtree");
+    await replayThrice(s.t, s.purchaseId);
+    const roots = await s.t.run(ctx =>
+      ctx.db
+        .query("notes")
+        .withIndex("by_purchaseId", q => q.eq("purchaseId", s.purchaseId))
+        .take(10),
+    );
+    expect(roots).toHaveLength(1);
+    const owned = await s.t.run(ctx =>
+      ctx.db
+        .query("notes")
+        .withIndex("by_owner", q => q.eq("owner", s.buyerId))
+        .take(50),
+    );
+    expect(owned).toHaveLength(4);
+    expect((await getListing(s.t, s.listingId))?.salesCount).toBe(1);
+    const [row] = await purchaseRows(s.t);
+    expect(row.deliveryStatus).toBe("delivered");
+    expect(row.deliveredNoteId).toBe(roots[0]._id);
+  });
+
+  test("readonly/subtree inserts exactly one share", async () => {
+    const s = await deliverySetup("readonly", "subtree");
+    await replayThrice(s.t, s.purchaseId);
+    const shares = await s.t.run(ctx =>
+      ctx.db
+        .query("shares")
+        .withIndex("by_purchaseId", q => q.eq("purchaseId", s.purchaseId))
+        .take(10),
+    );
+    expect(shares).toHaveLength(1);
+    expect(shares[0]).toMatchObject({ userId: s.buyerId, scope: "subtree" });
+    expect((await getListing(s.t, s.listingId))?.salesCount).toBe(1);
+  });
+
+  test("copy/note copies only the root", async () => {
+    const s = await deliverySetup("copy", "note");
+    await replayThrice(s.t, s.purchaseId);
+    const owned = await s.t.run(ctx =>
+      ctx.db
+        .query("notes")
+        .withIndex("by_owner", q => q.eq("owner", s.buyerId))
+        .take(50),
+    );
+    expect(owned).toHaveLength(1);
+    expect((await getListing(s.t, s.listingId))?.salesCount).toBe(1);
+  });
+});
+
+describe("failed delivery", () => {
+  test("missing source: paid, failed, salesCount incremented, no throw", async () => {
+    const s = await deliverySetup("copy", "subtree");
+    await s.t.run(ctx => ctx.db.delete("notes", s.rootId));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const res = await s.t.mutation(
+        internal.purchases.markPaidFromCheckout,
+        paidArgs(s.purchaseId),
+      );
+      expect(res).toEqual({ success: true });
+      expect(
+        spy.mock.calls.some(c => String(c[0]).includes("delivery anomaly")),
+      ).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    const [row] = await purchaseRows(s.t);
+    expect(row.status).toBe("paid");
+    expect(row.deliveryStatus).toBe("failed");
+    expect(row.deliveryError).toBe("SOURCE_MISSING");
+    expect((await getListing(s.t, s.listingId))?.salesCount).toBe(1);
+    const owned = await s.t.run(ctx =>
+      ctx.db
+        .query("notes")
+        .withIndex("by_owner", q => q.eq("owner", s.buyerId))
+        .take(50),
+    );
+    expect(owned).toHaveLength(0);
   });
 });
