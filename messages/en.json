@@ -1,4 +1,9 @@
 {
+  "Guards": {
+    "noteHasPurchaseGrants": "This note was sold with read-only access and cannot be deleted.",
+    "shareProtected": "Access granted by a purchase cannot be removed.",
+    "listingPurchasedContent": "Purchased content cannot be listed for sale."
+  },
   "Metadata": {
     "title": "NoeTree",
     "description": "Visualize and manage your hierarchical notes."
@@ -337,6 +342,10 @@
     "ownedBadge": "Owned",
     "ownedBody": "You already own this listing.",
     "ownedCta": "Open the app",
+    "openNote": "Open note",
+    "deliveryFailedTitle": "Delivery problem",
+    "deliveryFailedBody": "Your payment was received, but we could not deliver this note. Please contact support.",
+    "deliveryPending": "Your note is being prepared…",
     "processingTitle": "Payment received — processing",
     "processingBody": "We're confirming your payment. This usually takes a few seconds. You can stay on this page.",
     "processingSlow": "Still waiting? Refresh the page or check back shortly. You will not be charged twice.",

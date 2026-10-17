@@ -17,10 +17,12 @@ import {
   MutationCtx,
 } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { getUser } from "./helpers/helper";
 import { countSubtree, syncListingTags } from "./helpers/listings";
 import { computeCommission } from "./helpers/commission";
+import { deliverPurchase } from "./helpers/delivery";
 
 async function requireBuyer(ctx: MutationCtx | QueryCtx) {
   const identity = await ctx.auth.getUserIdentity();
@@ -228,7 +230,8 @@ export const attachCheckoutSession = mutation({
  * Verifies against the stored SNAPSHOT only (D-11) and never reads
  * listing.status (D-09). Data problems return an anomaly (2xx to Stripe, no
  * retry storm) and never throw. No refund path (D-14): a duplicate payment is
- * logged for manual Dashboard handling.
+ * logged for manual Dashboard handling. Phase 10: delivery (copy or read-only
+ * share) runs in the same transaction right after the paid patch (D-12).
  */
 export const markPaidFromCheckout = internalMutation({
   args: {
@@ -308,6 +311,9 @@ export const markPaidFromCheckout = internalMutation({
       stripePaymentIntentId: args.stripePaymentIntentId,
       stripeCheckoutSessionId: args.stripeCheckoutSessionId,
     });
+    // D-12: delivery commits atomically with payment. Data problems are
+    // recorded as deliveryStatus "failed" (D-17), never thrown.
+    await deliverPurchase(ctx, p._id);
 
     const listing = await ctx.db.get("listings", p.listingId);
     if (listing) {
@@ -319,6 +325,58 @@ export const markPaidFromCheckout = internalMutation({
 
     await recordEvent();
     return { success: true };
+  },
+});
+
+/**
+ * D-16: backfill/recovery for paid purchases that were never delivered.
+ * Run once after deploy: `npx convex run purchases:deliverPending`.
+ * Recovery of failed deliveries: `npx convex run purchases:deliverPending '{"retryFailed": true}'`.
+ * The default mode only selects never-attempted rows (deliveryStatus unset), so
+ * failures are not reselected and it terminates; it reschedules itself only
+ * while batches are full. retryFailed processes exactly one batch.
+ */
+export const deliverPending = internalMutation({
+  args: {
+    retryFailed: v.optional(v.boolean()),
+    batchSize: v.optional(v.number()),
+  },
+  returns: v.object({
+    processed: v.number(),
+    delivered: v.number(),
+    failed: v.number(),
+    rescheduled: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const retryFailed = args.retryFailed ?? false;
+    const batchSize = Math.min(
+      10,
+      Math.max(1, Math.floor(args.batchSize ?? 3)),
+    );
+    const batch = await ctx.db
+      .query("purchases")
+      .withIndex("by_status_and_deliveryStatus", q =>
+        q
+          .eq("status", "paid")
+          .eq("deliveryStatus", retryFailed ? "failed" : undefined),
+      )
+      .take(batchSize);
+
+    let delivered = 0;
+    let failed = 0;
+    for (const p of batch) {
+      const res = await deliverPurchase(ctx, p._id);
+      if (res.status === "delivered") delivered++;
+      else if (res.status === "failed") failed++;
+    }
+
+    const rescheduled = !retryFailed && batch.length === batchSize;
+    if (rescheduled) {
+      await ctx.scheduler.runAfter(0, internal.purchases.deliverPending, {
+        batchSize,
+      });
+    }
+    return { processed: batch.length, delivered, failed, rescheduled };
   },
 });
 
@@ -334,6 +392,14 @@ export const getMyListingState = query({
         v.literal("pending"),
         v.literal("buyable"),
       ),
+      delivery: v.optional(
+        v.union(
+          v.literal("delivered"),
+          v.literal("failed"),
+          v.literal("pending"),
+        ),
+      ),
+      openNoteId: v.optional(v.id("notes")),
     }),
   ),
   handler: async (ctx, args) => {
@@ -356,7 +422,33 @@ export const getMyListingState = query({
         q.eq("buyerId", user._id).eq("listingId", listing._id),
       )
       .unique();
-    if (purchase?.status === "paid") return { state: "owned" as const };
+    if (purchase?.status === "paid") {
+      // D-18/D-21: delivery fields are only exposed to the owning buyer.
+      const delivery = purchase.deliveryStatus ?? ("pending" as const);
+      let openNoteId: Id<"notes"> | undefined;
+      if (delivery === "delivered") {
+        if (purchase.accessMode === "copy") {
+          if (purchase.deliveredNoteId) {
+            const copy = await ctx.db.get("notes", purchase.deliveredNoteId);
+            if (copy && copy.owner === user._id) openNoteId = copy._id;
+          }
+        } else {
+          const share = await ctx.db
+            .query("shares")
+            .withIndex("by_purchaseId", q => q.eq("purchaseId", purchase._id))
+            .first();
+          const note = share
+            ? await ctx.db.get("notes", purchase.noteId)
+            : null;
+          if (note) openNoteId = note._id;
+        }
+      }
+      return {
+        state: "owned" as const,
+        delivery,
+        ...(openNoteId ? { openNoteId } : {}),
+      };
+    }
     if (purchase?.status === "pending") return { state: "pending" as const };
     return { state: "buyable" as const };
   },

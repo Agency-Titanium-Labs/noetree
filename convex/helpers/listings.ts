@@ -309,3 +309,54 @@ export async function unpublishListingForNote(
   });
   await syncListingTags(ctx, listing._id);
 }
+
+const MAX_ANCESTOR_HOPS = 64;
+
+/**
+ * D-09 / D-21: purchased content cannot be re-listed.
+ *  (a) the note or any ancestor (bounded to 64 hops) carries purchaseId, or
+ *  (b) the note's subtree contains one of the caller's delivered copy roots
+ *      (a purchased copy the buyer moved under it).
+ * Check (b) walks up from each delivered root instead of down from the note,
+ * so no unbounded subtree read is needed.
+ */
+export async function assertNotPurchasedContent(
+  ctx: QueryCtx | MutationCtx,
+  noteId: Id<"notes">,
+  userId: Id<"users">,
+): Promise<void> {
+  // (a) ancestor walk, inclusive of noteId.
+  let currentId: Id<"notes"> | undefined = noteId;
+  for (let hops = 0; currentId && hops < MAX_ANCESTOR_HOPS; hops++) {
+    const current: Doc<"notes"> | null = await ctx.db.get("notes", currentId);
+    if (!current) break;
+    if (current.purchaseId !== undefined) {
+      throw new ConvexError("LISTING_PURCHASED_CONTENT");
+    }
+    currentId = current.parentNote;
+  }
+
+  // (b) delivered copy roots of this buyer. The cap of 500 purchases per buyer
+  // is far beyond expected volume.
+  const purchases = await ctx.db
+    .query("purchases")
+    .withIndex("by_buyerId", q => q.eq("buyerId", userId))
+    .take(500);
+  for (const purchase of purchases) {
+    if (!purchase.deliveredNoteId) continue;
+    const root = await ctx.db.get("notes", purchase.deliveredNoteId);
+    if (!root) continue;
+    let ancestorId: Id<"notes"> | undefined = root.parentNote;
+    for (let hops = 0; ancestorId && hops < MAX_ANCESTOR_HOPS; hops++) {
+      if (ancestorId === noteId) {
+        throw new ConvexError("LISTING_PURCHASED_CONTENT");
+      }
+      const ancestor: Doc<"notes"> | null = await ctx.db.get(
+        "notes",
+        ancestorId,
+      );
+      if (!ancestor) break;
+      ancestorId = ancestor.parentNote;
+    }
+  }
+}

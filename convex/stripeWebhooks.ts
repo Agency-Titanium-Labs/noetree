@@ -29,6 +29,8 @@ function mapStripeSubscriptionStatus(
 export const processWebhookEvent = action({
   args: { event: v.any(), secret: v.string() },
   returns: v.any(),
+  // Explicit return annotation breaks circular type inference (Convex: actions calling same-module internal functions).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handler: async (ctx, args): Promise<any> => {
     if (args.secret !== process.env.INTERNAL_WEBHOOK_SECRET) {
       // ConvexError (not a plain Error) is required here: Convex's documented

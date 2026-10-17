@@ -1,9 +1,10 @@
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { ConvexError } from "convex/values";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { seedTree } from "../test-utils/convexSeed";
 
 const modules = (
   import.meta as unknown as {
@@ -319,7 +320,7 @@ describe("owned", () => {
     const owned = await buyer.query(api.purchases.getMyListingState, {
       listingId,
     });
-    expect(owned).toEqual({ state: "owned" });
+    expect(owned).toEqual({ state: "owned", delivery: "pending" });
     expect(owned).not.toHaveProperty("destinationAccountId");
     expect(
       await buyer.query(api.purchases.getMyListingState, {
@@ -681,5 +682,374 @@ describe("snapshot honored", () => {
     );
     expect(res).toEqual({ success: true });
     expect((await purchaseRows(t))[0].status).toBe("paid");
+  });
+});
+
+async function deliverySetup(
+  accessMode: "copy" | "readonly",
+  scope: "note" | "subtree",
+) {
+  const t = convexTest(schema, modules);
+  const sellerId = await seedSeller(t, "seller");
+  const buyerId = await seedUser(t, { key: "buyer" });
+  const { rootId, ids } = await seedTree(t, sellerId, {
+    title: "root",
+    children: [{ title: "A", children: [{ title: "A1" }] }, { title: "B" }],
+  });
+  const listingId = await seedListing(t, {
+    sellerId,
+    sellerKey: "seller",
+    noteId: rootId,
+    scope,
+    accessMode,
+  });
+  const res = await asUser(t, "buyer").mutation(api.purchases.preparePurchase, {
+    listingId,
+  });
+  return {
+    t,
+    sellerId,
+    buyerId,
+    rootId,
+    ids,
+    listingId,
+    purchaseId: res.purchaseId,
+  };
+}
+
+async function replayThrice(t: T, purchaseId: Id<"purchases">) {
+  await t.mutation(
+    internal.purchases.markPaidFromCheckout,
+    paidArgs(purchaseId),
+  );
+  await t.mutation(
+    internal.purchases.markPaidFromCheckout,
+    paidArgs(purchaseId),
+  );
+  await t.mutation(
+    internal.purchases.markPaidFromCheckout,
+    paidArgs(purchaseId, {
+      stripeEventId: "evt_y",
+      stripeCheckoutSessionId: "cs_other",
+    }),
+  );
+}
+
+describe("delivery replay", () => {
+  test("copy/subtree delivers one root and four notes", async () => {
+    const s = await deliverySetup("copy", "subtree");
+    await replayThrice(s.t, s.purchaseId);
+    const roots = await s.t.run(ctx =>
+      ctx.db
+        .query("notes")
+        .withIndex("by_purchaseId", q => q.eq("purchaseId", s.purchaseId))
+        .take(10),
+    );
+    expect(roots).toHaveLength(1);
+    const owned = await s.t.run(ctx =>
+      ctx.db
+        .query("notes")
+        .withIndex("by_owner", q => q.eq("owner", s.buyerId))
+        .take(50),
+    );
+    expect(owned).toHaveLength(4);
+    expect((await getListing(s.t, s.listingId))?.salesCount).toBe(1);
+    const [row] = await purchaseRows(s.t);
+    expect(row.deliveryStatus).toBe("delivered");
+    expect(row.deliveredNoteId).toBe(roots[0]._id);
+  });
+
+  test("readonly/subtree inserts exactly one share", async () => {
+    const s = await deliverySetup("readonly", "subtree");
+    await replayThrice(s.t, s.purchaseId);
+    const shares = await s.t.run(ctx =>
+      ctx.db
+        .query("shares")
+        .withIndex("by_purchaseId", q => q.eq("purchaseId", s.purchaseId))
+        .take(10),
+    );
+    expect(shares).toHaveLength(1);
+    expect(shares[0]).toMatchObject({ userId: s.buyerId, scope: "subtree" });
+    expect((await getListing(s.t, s.listingId))?.salesCount).toBe(1);
+  });
+
+  test("copy/note copies only the root", async () => {
+    const s = await deliverySetup("copy", "note");
+    await replayThrice(s.t, s.purchaseId);
+    const owned = await s.t.run(ctx =>
+      ctx.db
+        .query("notes")
+        .withIndex("by_owner", q => q.eq("owner", s.buyerId))
+        .take(50),
+    );
+    expect(owned).toHaveLength(1);
+    expect((await getListing(s.t, s.listingId))?.salesCount).toBe(1);
+  });
+});
+
+describe("failed delivery", () => {
+  test("missing source: paid, failed, salesCount incremented, no throw", async () => {
+    const s = await deliverySetup("copy", "subtree");
+    await s.t.run(ctx => ctx.db.delete("notes", s.rootId));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const res = await s.t.mutation(
+        internal.purchases.markPaidFromCheckout,
+        paidArgs(s.purchaseId),
+      );
+      expect(res).toEqual({ success: true });
+      expect(
+        spy.mock.calls.some(c => String(c[0]).includes("delivery anomaly")),
+      ).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    const [row] = await purchaseRows(s.t);
+    expect(row.status).toBe("paid");
+    expect(row.deliveryStatus).toBe("failed");
+    expect(row.deliveryError).toBe("SOURCE_MISSING");
+    expect((await getListing(s.t, s.listingId))?.salesCount).toBe(1);
+    const owned = await s.t.run(ctx =>
+      ctx.db
+        .query("notes")
+        .withIndex("by_owner", q => q.eq("owner", s.buyerId))
+        .take(50),
+    );
+    expect(owned).toHaveLength(0);
+  });
+});
+
+async function insertPaid(
+  t: T,
+  o: {
+    buyerId: Id<"users">;
+    sellerId: Id<"users">;
+    listingId: Id<"listings">;
+    noteId: Id<"notes">;
+    accessMode?: "copy" | "readonly";
+    buyerKey?: string;
+  },
+) {
+  return await t.run(ctx =>
+    ctx.db.insert("purchases", {
+      buyerId: o.buyerId,
+      buyerClerkUserId: o.buyerKey ?? "buyer",
+      listingId: o.listingId,
+      noteId: o.noteId,
+      sellerId: o.sellerId,
+      sellerClerkUserId: "seller",
+      status: "paid",
+      title: "Pack",
+      priceCents: 1000,
+      currency: "eur",
+      sellerTier: "free",
+      commissionRateBps: 2000,
+      commissionCents: 200,
+      sellerNetCents: 800,
+      scope: "note",
+      accessMode: o.accessMode ?? "copy",
+      noteCount: 1,
+      destinationAccountId: "acct_seller",
+      snapshotVersion: 1,
+      snapshotAt: 1,
+      paidAt: 2,
+    }),
+  );
+}
+
+async function backfillSetup(legacy: number) {
+  const t = convexTest(schema, modules);
+  const sellerId = await seedSeller(t, "seller");
+  const noteId = await seedNote(t, sellerId);
+  const listingId = await seedListing(t, {
+    sellerId,
+    sellerKey: "seller",
+    noteId,
+  });
+  const purchaseIds: Id<"purchases">[] = [];
+  for (let i = 0; i < legacy; i++) {
+    const buyerId = await seedUser(t, { key: `b${i}` });
+    purchaseIds.push(
+      await insertPaid(t, {
+        buyerId,
+        sellerId,
+        listingId,
+        noteId,
+        buyerKey: `b${i}`,
+      }),
+    );
+  }
+  return { t, sellerId, noteId, listingId, purchaseIds };
+}
+
+const getPurchase = (t: T, id: Id<"purchases">) =>
+  t.run(ctx => ctx.db.get("purchases", id));
+
+describe("backfill", () => {
+  test("delivers legacy paid rows, leaves delivered untouched, second run is a no-op", async () => {
+    const s = await backfillSetup(3);
+    const [done, ...legacy] = s.purchaseIds;
+    await s.t.run(ctx =>
+      ctx.db.patch("purchases", done, {
+        deliveryStatus: "delivered",
+        deliveredAt: 5,
+      }),
+    );
+    const res = await s.t.mutation(internal.purchases.deliverPending, {});
+    expect(res).toMatchObject({ processed: 2, delivered: 2, failed: 0 });
+    for (const id of legacy) {
+      expect((await getPurchase(s.t, id))?.deliveryStatus).toBe("delivered");
+    }
+    expect((await getPurchase(s.t, done))?.deliveredAt).toBe(5);
+    const again = await s.t.mutation(internal.purchases.deliverPending, {});
+    expect(again.processed).toBe(0);
+  });
+
+  test("failed rows are not reselected; retryFailed recovers them", async () => {
+    const s = await backfillSetup(1);
+    const src = await s.t.run(ctx => ctx.db.get("notes", s.noteId));
+    await s.t.run(ctx => ctx.db.delete("notes", s.noteId));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const first = await s.t.mutation(internal.purchases.deliverPending, {});
+      expect(first).toMatchObject({
+        processed: 1,
+        failed: 1,
+        rescheduled: false,
+      });
+      expect((await getPurchase(s.t, s.purchaseIds[0]))?.deliveryStatus).toBe(
+        "failed",
+      );
+      const second = await s.t.mutation(internal.purchases.deliverPending, {});
+      expect(second.processed).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+    await s.t.run(async ctx => {
+      // Restore the source note; the new id differs so repoint the purchase.
+      const rest = {
+        owner: src!.owner,
+        title: src!.title,
+        content: src!.content,
+      };
+      const newId = await ctx.db.insert("notes", rest);
+      await ctx.db.patch("purchases", s.purchaseIds[0], { noteId: newId });
+    });
+    const retry = await s.t.mutation(internal.purchases.deliverPending, {
+      retryFailed: true,
+    });
+    expect(retry).toMatchObject({
+      processed: 1,
+      delivered: 1,
+      rescheduled: false,
+    });
+    expect((await getPurchase(s.t, s.purchaseIds[0]))?.deliveryStatus).toBe(
+      "delivered",
+    );
+  });
+
+  test("batchSize 1 reschedules until all delivered", async () => {
+    vi.useFakeTimers();
+    try {
+      const s = await backfillSetup(2);
+      const first = await s.t.mutation(internal.purchases.deliverPending, {
+        batchSize: 1,
+      });
+      expect(first).toMatchObject({ processed: 1, rescheduled: true });
+      await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+      for (const id of s.purchaseIds) {
+        expect((await getPurchase(s.t, id))?.deliveryStatus).toBe("delivered");
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("listing state delivery", () => {
+  test("copy: delivered exposes openNoteId, deleted copy omits it", async () => {
+    const s = await deliverySetup("copy", "note");
+    await s.t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(s.purchaseId),
+    );
+    const buyer = asUser(s.t, "buyer");
+    const [row] = await purchaseRows(s.t);
+    const state = await buyer.query(api.purchases.getMyListingState, {
+      listingId: s.listingId,
+    });
+    expect(state).toEqual({
+      state: "owned",
+      delivery: "delivered",
+      openNoteId: row.deliveredNoteId,
+    });
+    await s.t.run(ctx => ctx.db.delete("notes", row.deliveredNoteId!));
+    const after = await buyer.query(api.purchases.getMyListingState, {
+      listingId: s.listingId,
+    });
+    expect(after).toEqual({ state: "owned", delivery: "delivered" });
+    expect((await purchaseRows(s.t))[0].deliveredAt).toBeTypeOf("number");
+  });
+
+  test("readonly: openNoteId is the listing note", async () => {
+    const s = await deliverySetup("readonly", "subtree");
+    await s.t.mutation(
+      internal.purchases.markPaidFromCheckout,
+      paidArgs(s.purchaseId),
+    );
+    const state = await asUser(s.t, "buyer").query(
+      api.purchases.getMyListingState,
+      { listingId: s.listingId },
+    );
+    expect(state).toEqual({
+      state: "owned",
+      delivery: "delivered",
+      openNoteId: s.rootId,
+    });
+  });
+
+  test("failed delivery has no openNoteId", async () => {
+    const s = await deliverySetup("copy", "subtree");
+    await s.t.run(ctx => ctx.db.delete("notes", s.rootId));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await s.t.mutation(
+        internal.purchases.markPaidFromCheckout,
+        paidArgs(s.purchaseId),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    const state = await asUser(s.t, "buyer").query(
+      api.purchases.getMyListingState,
+      { listingId: s.listingId },
+    );
+    expect(state).toEqual({ state: "owned", delivery: "failed" });
+  });
+
+  test("legacy paid is pending; non-owners never see delivery fields", async () => {
+    const s = await backfillSetup(1);
+    const buyer = asUser(s.t, "b0");
+    expect(
+      await buyer.query(api.purchases.getMyListingState, {
+        listingId: s.listingId,
+      }),
+    ).toEqual({ state: "owned", delivery: "pending" });
+    await seedUser(s.t, { key: "other" });
+    const others = [
+      await asUser(s.t, "seller").query(api.purchases.getMyListingState, {
+        listingId: s.listingId,
+      }),
+      await asUser(s.t, "other").query(api.purchases.getMyListingState, {
+        listingId: s.listingId,
+      }),
+      await s.t.query(api.purchases.getMyListingState, {
+        listingId: s.listingId,
+      }),
+    ];
+    for (const o of others) {
+      expect(o).not.toHaveProperty("delivery");
+      expect(o).not.toHaveProperty("openNoteId");
+    }
   });
 });

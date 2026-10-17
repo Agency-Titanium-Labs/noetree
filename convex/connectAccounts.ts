@@ -137,6 +137,8 @@ export const recordPendingAccount = action({
     stripeAccountId: v.string(),
   },
   returns: v.any(),
+  // Explicit return annotation breaks circular type inference (Convex: actions calling same-module internal functions).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handler: async (ctx, args): Promise<any> => {
     if (!isValidInternalSecret(args.secret)) {
       throw new ConvexError("Unauthorized: invalid INTERNAL_WEBHOOK_SECRET");
@@ -308,6 +310,8 @@ export const upsertFromStripeAccount = internalMutation({
 export const processConnectWebhookEvent = action({
   args: { event: v.any(), secret: v.string() },
   returns: v.any(),
+  // Explicit return annotation breaks circular type inference (Convex: actions calling same-module internal functions).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handler: async (ctx, args): Promise<any> => {
     if (!isValidInternalSecret(args.secret)) {
       // ConvexError (not a plain Error) is required here: Convex's documented

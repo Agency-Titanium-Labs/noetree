@@ -129,13 +129,13 @@ Plans:
 
 Plans:
 
-- [ ] 10-01-PLAN.md — Schema delivery fields/indexes, shared test seeds, [BLOCKING] push
-- [ ] 10-02-PLAN.md — Delivery helper (plan-then-write copy, readonly grant, idempotency) — TDD
-- [ ] 10-03-PLAN.md — Scope-aware getUserPermission + tree-query leak fixes, isPurchased flag
-- [ ] 10-04-PLAN.md — createListing re-list guard for purchased content
-- [ ] 10-05-PLAN.md — Purchase-share immutability, deleteNote guard, duplicateNote via helper
-- [ ] 10-06-PLAN.md — markPaidFromCheckout delivery hook, deliverPending backfill, getMyListingState, replay test
-- [ ] 10-07-PLAN.md — BuyPanel Open note / failure / pending, hide Leave, FR/EN error copy
+- [x] 10-01-PLAN.md — Schema delivery fields/indexes, shared test seeds, [BLOCKING] push
+- [x] 10-02-PLAN.md — Delivery helper (plan-then-write copy, readonly grant, idempotency) — TDD
+- [x] 10-03-PLAN.md — Scope-aware getUserPermission + tree-query leak fixes, isPurchased flag
+- [x] 10-04-PLAN.md — createListing re-list guard for purchased content
+- [x] 10-05-PLAN.md — Purchase-share immutability, deleteNote guard, duplicateNote via helper
+- [x] 10-06-PLAN.md — markPaidFromCheckout delivery hook, deliverPending backfill, getMyListingState, replay test
+- [x] 10-07-PLAN.md — BuyPanel Open note / failure / pending, hide Leave, FR/EN error copy
 - [ ] 10-08-PLAN.md — Phase gate, backfill run, live Stripe verification (checkpoint)
 
 ### Phase 11: Buyer & Seller History UI
@@ -168,7 +168,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11
 | 7. Connect Onboarding & Seller Enablement       | v1.1      | 6/6            | Complete    | 2026-10-16 |
 | 8. Listings & Marketplace Browse/Search         | v1.1      | 9/9            | Complete    | 2026-10-16 |
 | 9. Marketplace Checkout & Webhook Fix           | v1.1      | 6/6            | Complete    | 2026-10-16 |
-| 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 0/TBD          | Not started | -          |
+| 10. Purchase Fulfillment (Copy & Access Grants) | v1.1      | 7/8            | In Progress |            |
 | 11. Buyer & Seller History UI                   | v1.1      | 0/TBD          | Not started | -          |
 
 ---

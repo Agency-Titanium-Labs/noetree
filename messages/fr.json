@@ -1,4 +1,9 @@
 {
+  "Guards": {
+    "noteHasPurchaseGrants": "Cette note a été vendue en accès lecture seule et ne peut pas être supprimée.",
+    "shareProtected": "Un accès obtenu par un achat ne peut pas être retiré.",
+    "listingPurchasedContent": "Un contenu acheté ne peut pas être mis en vente."
+  },
   "Metadata": {
     "title": "NoeTree",
     "description": "Visualisez et gérez vos notes hiérarchiques."
@@ -337,6 +342,10 @@
     "ownedBadge": "Acquise",
     "ownedBody": "Vous possédez déjà cette annonce.",
     "ownedCta": "Ouvrir l'application",
+    "openNote": "Ouvrir la note",
+    "deliveryFailedTitle": "Problème de livraison",
+    "deliveryFailedBody": "Votre paiement a bien été reçu, mais nous n'avons pas pu livrer cette note. Veuillez contacter le support.",
+    "deliveryPending": "Votre note est en cours de préparation…",
     "processingTitle": "Paiement reçu — traitement en cours",
     "processingBody": "Nous confirmons votre paiement. Cela prend généralement quelques secondes. Vous pouvez rester sur cette page.",
     "processingSlow": "Toujours en attente ? Actualisez la page ou revenez dans un instant. Vous ne serez pas débité deux fois.",

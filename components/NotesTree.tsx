@@ -32,6 +32,7 @@ import {
 import { PointerActivationConstraints } from "@dnd-kit/dom";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { cn } from "@/lib/utils";
+import { canLeaveShare, useGuardNotice } from "@/lib/purchaseShareUi";
 
 const customSensors = [
   PointerSensor.configure({
@@ -233,6 +234,7 @@ export default function NotesTree() {
   const tNotes = useTranslations("Notes");
   const router = useRouter();
   const leaveShareMutation = useMutation(api.notes.removeShare);
+  const guardNotice = useGuardNotice();
   const {
     tree,
     selectedNote,
@@ -659,8 +661,24 @@ export default function NotesTree() {
           <Crosshair className="h-4 w-4" />
         </Button>
       )}
+      {guardNotice.message && (
+        <div
+          role="alert"
+          className="absolute top-4 left-1/2 z-40 -translate-x-1/2 rounded-md border border-destructive bg-background px-4 py-2 text-sm text-destructive shadow-md"
+        >
+          {guardNotice.message}
+          <button
+            type="button"
+            className="ml-3 underline"
+            onClick={guardNotice.clear}
+          >
+            ×
+          </button>
+        </div>
+      )}
       {(() => {
-        const isLeaving = noteToDelete === tree?._id && tree?.isShared;
+        const isLeaving =
+          noteToDelete === tree?._id && !!tree && canLeaveShare(tree);
 
         return (
           <AlertDialog
@@ -693,7 +711,7 @@ export default function NotesTree() {
                           await leaveShareMutation({ shareId: tree.shareId });
                           router.push("/notes");
                         } catch (err) {
-                          console.error(err);
+                          if (!guardNotice.report(err)) console.error(err);
                         }
                       } else {
                         onDeleteNote(noteToDelete);

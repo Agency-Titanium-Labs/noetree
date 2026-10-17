@@ -42,6 +42,15 @@ export default function BuyPanel({
 
   const purchaseParam = searchParams?.get("purchase") === "success";
   const serverState = data?.state;
+  const detail = data as
+    | {
+        delivery?: "delivered" | "failed" | "pending";
+        openNoteId?: string;
+      }
+    | null
+    | undefined;
+  const delivery = detail?.delivery;
+  const openNoteId = detail?.openNoteId;
   const effective: string | null =
     override === "own"
       ? "own"
@@ -142,6 +151,25 @@ export default function BuyPanel({
           </Badge>
         </div>
         <p className="text-sm">{t("ownedBody")}</p>
+        {delivery === "failed" ? (
+          <Alert role="status">
+            <AlertTitle>{t("deliveryFailedTitle")}</AlertTitle>
+            <AlertDescription>{t("deliveryFailedBody")}</AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            {delivery === "pending" && (
+              <p className="text-sm text-muted-foreground">
+                {t("deliveryPending")}
+              </p>
+            )}
+            {openNoteId && (
+              <Button asChild className="w-full sm:w-auto">
+                <Link href={`/notes/${openNoteId}`}>{t("openNote")}</Link>
+              </Button>
+            )}
+          </>
+        )}
         <Button asChild variant="outline" className="w-full sm:w-auto">
           <Link href="/">{t("ownedCta")}</Link>
         </Button>

@@ -1,11 +1,15 @@
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
 import { unpublishListingForNote } from "./helpers/listings";
 import { deleteShareLinkForNote } from "./helpers/sharing";
 import { deleteCommentsForNote } from "./helpers/commentAccess";
-import { getUserPermission } from "./helpers/permissions";
+import { planCopy, writeCopy } from "./helpers/delivery";
+import {
+  getInheritedPermission,
+  getUserPermission,
+} from "./helpers/permissions";
 
 type Notes = Doc<"notes">;
 
@@ -14,7 +18,26 @@ interface NotesToSend extends Omit<Notes, "childNotes"> {
   nestedNotesCount?: number;
   shareId?: Id<"shares">;
   isShared?: boolean;
+  isPurchased?: boolean;
   role?: "owner" | "admin" | "edit" | "view";
+}
+
+type SharedNote = Doc<"notes"> & {
+  shareId?: Id<"shares">;
+  isShared?: boolean;
+  isPurchased?: boolean;
+};
+
+// D-21: children are only visible when the viewer owns the note or holds a
+// share that applies to descendants (scope "note" shares do not).
+async function canSeeChildren(
+  ctx: QueryCtx,
+  noteId: Id<"notes">,
+  userId: Id<"users">,
+  role: string | null | undefined,
+): Promise<boolean> {
+  if (role === "owner") return true;
+  return (await getInheritedPermission(ctx, noteId, userId)) !== null;
 }
 
 async function hasAccess(
@@ -41,35 +64,46 @@ async function getNoteShareInfo(
   ctx: QueryCtx,
   note: Doc<"notes">,
   user: Doc<"users">,
-): Promise<{ isShared: boolean; shareId?: Id<"shares"> }> {
+): Promise<{
+  isShared: boolean;
+  shareId?: Id<"shares">;
+  isPurchased?: boolean;
+}> {
   if (note.owner !== user._id) {
-    const shareByUserId = await ctx.db
+    const rows = await ctx.db
       .query("shares")
       .withIndex("by_user_note", q =>
         q.eq("userId", user._id).eq("noteId", note._id),
       )
-      .first();
-    if (shareByUserId) {
-      return { isShared: true, shareId: shareByUserId._id };
-    }
+      .take(10);
     if (user.email) {
-      const shareByEmail = await ctx.db
+      const email = user.email.trim().toLowerCase();
+      const emailRows = await ctx.db
         .query("shares")
         .withIndex("by_email_note", q =>
-          q.eq("email", user.email!).eq("noteId", note._id),
+          q.eq("email", email).eq("noteId", note._id),
         )
-        .first();
-      if (shareByEmail) {
-        return { isShared: true, shareId: shareByEmail._id };
-      }
+        .take(10);
+      rows.push(...emailRows);
     }
-    return { isShared: false };
+    if (rows.length === 0) return { isShared: false };
+    const manual = rows.find(r => r.purchaseId === undefined);
+    const chosen = manual ?? rows[0];
+    const isPurchased = rows.some(r => r.purchaseId !== undefined);
+    return {
+      isShared: true,
+      shareId: chosen._id,
+      ...(isPurchased ? { isPurchased: true } : {}),
+    };
   } else {
-    const shares = await ctx.db
+    // D-03: only manual shares make the seller's note look shared.
+    const manual = await ctx.db
       .query("shares")
-      .withIndex("by_note", q => q.eq("noteId", note._id))
+      .withIndex("by_note_and_purchaseId", q =>
+        q.eq("noteId", note._id).eq("purchaseId", undefined),
+      )
       .first();
-    return { isShared: shares !== null };
+    return { isShared: manual !== null };
   }
 }
 
@@ -104,15 +138,19 @@ export const getTreeById = query({
     const isShared = shareInfo.isShared;
     const shareId = shareInfo.shareId;
     const role = await getUserPermission(ctx, args.id, user._id);
+    const topSeesChildren = await canSeeChildren(ctx, args.id, user._id, role);
 
     //step 5 - map current notes to be as NotesToSend
     const noteToSend: NotesToSend = {
       ...note,
-      childNotes: note.childNotes || [],
+      childNotes: topSeesChildren ? note.childNotes || [] : [],
       shareId,
       isShared,
+      isPurchased: shareInfo.isPurchased,
       role: role || undefined,
     };
+    const hiddenChildren = new Set<Id<"notes">>();
+    if (!topSeesChildren) hiddenChildren.add(noteToSend._id);
 
     //step 6 - check if deep is provided and if so, get the children notes until deep level
     if (args.deep) {
@@ -125,6 +163,7 @@ export const getTreeById = query({
 
         // Process each note at the current level
         for (const currentNote of currentLevelNotes) {
+          if (hiddenChildren.has(currentNote._id)) continue;
           // Fetch its children
           const childrenNotes = await ctx.db
             .query("notes")
@@ -135,15 +174,17 @@ export const getTreeById = query({
             const orderedIds = currentNote.childNotes as Id<"notes">[];
 
             // Convert children to NotesToSend format
-            const childrenNotesToSend: NotesToSend[] = await Promise.all(
+            const resolvedChildren = await Promise.all(
               childrenNotes.map(async childNote => {
                 let childIsShared = currentNote.isShared;
                 let childShareId = currentNote.shareId;
+                let childIsPurchased = currentNote.isPurchased;
 
                 if (!childIsShared) {
                   const info = await getNoteShareInfo(ctx, childNote, user);
                   childIsShared = info.isShared;
                   childShareId = info.shareId;
+                  childIsPurchased = info.isPurchased;
                 }
 
                 const resolvedRole = await getUserPermission(
@@ -151,15 +192,32 @@ export const getTreeById = query({
                   childNote._id,
                   user._id,
                 );
+                // Drop children the viewer cannot access (D-21).
+                if (resolvedRole === null) return null;
 
-                return {
+                const seesGrandchildren = await canSeeChildren(
+                  ctx,
+                  childNote._id,
+                  user._id,
+                  resolvedRole,
+                );
+                if (!seesGrandchildren) hiddenChildren.add(childNote._id);
+
+                const sendable: NotesToSend = {
                   ...childNote,
-                  childNotes: childNote.childNotes || [],
+                  childNotes: seesGrandchildren
+                    ? childNote.childNotes || []
+                    : [],
                   shareId: childShareId,
                   isShared: childIsShared,
-                  role: resolvedRole || undefined,
+                  isPurchased: childIsPurchased,
+                  role: resolvedRole,
                 };
+                return sendable;
               }),
+            );
+            const childrenNotesToSend: NotesToSend[] = resolvedChildren.filter(
+              (c): c is NotesToSend => c !== null,
             );
 
             // Sort childrenNotesToSend by parent's childNotes order
@@ -238,26 +296,35 @@ export const getTreesByMe = query({
       }
     }
 
-    const sharedNotes: (Doc<"notes"> & {
-      shareId?: Id<"shares">;
-      isShared?: boolean;
-    })[] = [];
+    // One entry per shared note: a manual share wins over a purchase share
+    // so the viewer keeps the ability to leave a manually shared note.
+    const sharedEntries = new Map<
+      Id<"notes">,
+      { share: Doc<"shares">; isPurchased: boolean }
+    >();
     for (const share of allShares) {
-      const sharedNote = await ctx.db.get(share.noteId);
+      const isPurchased = share.purchaseId !== undefined;
+      const existing = sharedEntries.get(share.noteId);
+      if (!existing || (existing.isPurchased && !isPurchased)) {
+        sharedEntries.set(share.noteId, { share, isPurchased });
+      }
+    }
+
+    const sharedNotes: SharedNote[] = [];
+    for (const { share, isPurchased } of sharedEntries.values()) {
+      const sharedNote = await ctx.db.get("notes", share.noteId);
       if (sharedNote) {
         sharedNotes.push({
           ...sharedNote,
           shareId: share._id,
           isShared: true,
+          isPurchased,
         });
       }
     }
 
     // Combine both sets
-    const notes: (Doc<"notes"> & {
-      shareId?: Id<"shares">;
-      isShared?: boolean;
-    })[] = [...ownedRootNotes];
+    const notes: SharedNote[] = [...ownedRootNotes];
     for (const s of sharedNotes) {
       if (!notes.some(n => n._id === s._id)) {
         notes.push(s);
@@ -282,13 +349,11 @@ export const getTreesByMe = query({
       .withIndex("by_owner", q => q.eq("owner", user._id))
       .collect();
 
-    const sharedNotesDescendants: (Doc<"notes"> & {
-      shareId?: Id<"shares">;
-      isShared?: boolean;
-    })[] = [];
+    const sharedNotesDescendants: SharedNote[] = [];
     const collectDescendants = async (
       noteId: Id<"notes">,
-      parentShareId?: Id<"shares">,
+      parentShareId: Id<"shares">,
+      isPurchased: boolean,
     ) => {
       const children = await ctx.db
         .query("notes")
@@ -299,29 +364,30 @@ export const getTreesByMe = query({
           ...child,
           shareId: parentShareId,
           isShared: true,
+          isPurchased,
         });
-        await collectDescendants(child._id, parentShareId);
+        await collectDescendants(child._id, parentShareId, isPurchased);
       }
     };
 
-    for (const share of allShares) {
-      const sharedNote = await ctx.db.get(share.noteId);
+    for (const { share, isPurchased } of sharedEntries.values()) {
+      const sharedNote = await ctx.db.get("notes", share.noteId);
       if (sharedNote) {
         if (!sharedNotesDescendants.some(n => n._id === sharedNote._id)) {
           sharedNotesDescendants.push({
             ...sharedNote,
             shareId: share._id,
             isShared: true,
+            isPurchased,
           });
         }
-        await collectDescendants(sharedNote._id, share._id);
+        // D-02/D-21: a scope "note" share never exposes descendants.
+        if (share.scope === "note") continue;
+        await collectDescendants(sharedNote._id, share._id, isPurchased);
       }
     }
 
-    const allNotes: (Doc<"notes"> & {
-      shareId?: Id<"shares">;
-      isShared?: boolean;
-    })[] = [...ownedNotes];
+    const allNotes: SharedNote[] = [...ownedNotes];
     for (const n of sharedNotesDescendants) {
       if (!allNotes.some(x => x._id === n._id)) {
         allNotes.push(n);
@@ -329,10 +395,7 @@ export const getTreesByMe = query({
     }
 
     // Map parent note to its children
-    const childMap = new Map<
-      string,
-      (Doc<"notes"> & { shareId?: Id<"shares">; isShared?: boolean })[]
-    >();
+    const childMap = new Map<string, SharedNote[]>();
     for (const n of allNotes) {
       if (n.parentNote) {
         const parentId = n.parentNote;
@@ -354,22 +417,33 @@ export const getTreesByMe = query({
     };
 
     //step 4 - map current notes to be as NotesToSend
+    const hiddenChildren = new Set<Id<"notes">>();
     const notesToSend: NotesToSend[] = await Promise.all(
       notes.map(async note => {
         let isShared = note.isShared;
         let shareId = note.shareId;
+        let isPurchased = note.isPurchased;
         if (!isShared) {
           const info = await getNoteShareInfo(ctx, note, user);
           isShared = info.isShared;
           shareId = info.shareId;
+          isPurchased = info.isPurchased;
         }
         const role = await getUserPermission(ctx, note._id, user._id);
+        const seesChildren = await canSeeChildren(
+          ctx,
+          note._id,
+          user._id,
+          role,
+        );
+        if (!seesChildren) hiddenChildren.add(note._id);
         return {
           ...note,
-          childNotes: note.childNotes || [],
-          nestedNotesCount: countDescendants(note._id),
+          childNotes: seesChildren ? note.childNotes || [] : [],
+          nestedNotesCount: seesChildren ? countDescendants(note._id) : 0,
           shareId,
           isShared,
+          isPurchased,
           role: role || undefined,
         };
       }),
@@ -386,6 +460,7 @@ export const getTreesByMe = query({
 
         // Process each note at the current level
         for (const currentNote of currentLevelNotes) {
+          if (hiddenChildren.has(currentNote._id)) continue;
           // Find its children in memory from allNotes
           const childrenNotes = allNotes.filter(
             n => n.parentNote === currentNote._id,
@@ -395,15 +470,18 @@ export const getTreesByMe = query({
             const orderedIds = currentNote.childNotes as Id<"notes">[];
 
             // Convert children to NotesToSend format
-            const childrenNotesToSend: NotesToSend[] = await Promise.all(
+            const resolvedChildren = await Promise.all(
               childrenNotes.map(async childNote => {
                 let childIsShared = currentNote.isShared || childNote.isShared;
                 let childShareId = childNote.shareId;
+                let childIsPurchased =
+                  currentNote.isPurchased || childNote.isPurchased;
 
                 if (!childIsShared) {
                   const info = await getNoteShareInfo(ctx, childNote, user);
                   childIsShared = info.isShared;
                   childShareId = info.shareId;
+                  childIsPurchased = info.isPurchased;
                 }
 
                 const resolvedRole = await getUserPermission(
@@ -411,15 +489,32 @@ export const getTreesByMe = query({
                   childNote._id,
                   user._id,
                 );
+                // Drop children the viewer cannot access (D-21).
+                if (resolvedRole === null) return null;
 
-                return {
+                const seesGrandchildren = await canSeeChildren(
+                  ctx,
+                  childNote._id,
+                  user._id,
+                  resolvedRole,
+                );
+                if (!seesGrandchildren) hiddenChildren.add(childNote._id);
+
+                const sendable: NotesToSend = {
                   ...childNote,
-                  childNotes: childNote.childNotes || [],
+                  childNotes: seesGrandchildren
+                    ? childNote.childNotes || []
+                    : [],
                   shareId: childShareId,
                   isShared: childIsShared,
-                  role: resolvedRole || undefined,
+                  isPurchased: childIsPurchased,
+                  role: resolvedRole,
                 };
+                return sendable;
               }),
+            );
+            const childrenNotesToSend: NotesToSend[] = resolvedChildren.filter(
+              (c): c is NotesToSend => c !== null,
             );
 
             // Sort childrenNotesToSend by parent's childNotes order
@@ -590,6 +685,43 @@ export const deleteNote = mutation({
       await requireEditAccess(ctx, args.id, user._id);
     }
 
+    // D-05: read-only sales must not lose their source. Pre-scan, no writes.
+    // Ancestors: a purchase share with scope other than "note" covers this
+    // subtree. Undefined sorts lowest in index order, so descending yields every
+    // purchase-share row before any manual row (see shareIndexes.test.ts).
+    let ancestorId = rootNote.parentNote;
+    for (let hops = 0; ancestorId && hops < 64; hops++) {
+      for await (const share of ctx.db
+        .query("shares")
+        .withIndex("by_note_and_purchaseId", q => q.eq("noteId", ancestorId!))
+        .order("desc")) {
+        if (share.purchaseId === undefined) break;
+        if (share.scope !== "note") {
+          throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
+        }
+      }
+      const ancestor: Doc<"notes"> | null = await ctx.db.get(ancestorId);
+      ancestorId = ancestor?.parentNote;
+    }
+    // Subtree: any note carrying a purchase share blocks deletion.
+    const queue: Id<"notes">[] = [args.id];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const top = await ctx.db
+        .query("shares")
+        .withIndex("by_note_and_purchaseId", q => q.eq("noteId", current))
+        .order("desc")
+        .first();
+      if (top && top.purchaseId !== undefined) {
+        throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
+      }
+      for await (const child of ctx.db
+        .query("notes")
+        .withIndex("by_parent", q => q.eq("parentNote", current))) {
+        queue.push(child._id);
+      }
+    }
+
     const deleteRecursive = async (noteId: Id<"notes">) => {
       const children = await ctx.db
         .query("notes")
@@ -650,46 +782,6 @@ export const duplicateNote = mutation({
       await requireEditAccess(ctx, sourceNote.parentNote, user._id);
     }
 
-    const duplicateRecursive = async (
-      noteId: Id<"notes">,
-      newParentId?: Id<"notes">,
-      newTitleOverride?: string,
-    ): Promise<Id<"notes">> => {
-      const note = await ctx.db.get(noteId);
-      if (!note) {
-        throw new Error("Note not found");
-      }
-
-      const title = newTitleOverride || note.title;
-
-      const newNoteId = await ctx.db.insert("notes", {
-        owner: user._id,
-        title: title,
-        content: note.content,
-        parentNote: newParentId,
-        childNotes: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      const children = await ctx.db
-        .query("notes")
-        .withIndex("by_parent", q => q.eq("parentNote", noteId))
-        .collect();
-
-      const newChildIds: Id<"notes">[] = [];
-      for (const child of children) {
-        const newChildId = await duplicateRecursive(child._id, newNoteId);
-        newChildIds.push(newChildId);
-      }
-
-      if (newChildIds.length > 0) {
-        await ctx.db.patch(newNoteId, { childNotes: newChildIds });
-      }
-
-      return newNoteId;
-    };
-
     const baseTitle = `${sourceNote.title} - Copy`;
     let uniqueTitle = baseTitle;
     let counter = 1;
@@ -712,11 +804,16 @@ export const duplicateNote = mutation({
       counter++;
     }
 
-    const newNoteId = await duplicateRecursive(
-      args.id,
-      sourceNote.parentNote,
-      uniqueTitle,
-    );
+    // D-11: shared copy helper. Descendants now keep their sibling index (D-20).
+    const planned = await planCopy(ctx, args.id, {});
+    if (!planned.ok) {
+      throw new Error("Note not found");
+    }
+    const newNoteId = await writeCopy(ctx, planned.plan, {
+      owner: user._id,
+      parentNote: sourceNote.parentNote,
+      rootTitle: uniqueTitle,
+    });
 
     if (sourceNote.parentNote) {
       const parent = await ctx.db.get(sourceNote.parentNote);
@@ -900,14 +997,15 @@ export const inviteUser = mutation({
       return { success: false, error: "CANNOT_INVITE_SELF" };
     }
 
-    const existingShare = await ctx.db
+    // D-03: only manual shares count; purchase shares never block an invite
+    const existingShares = await ctx.db
       .query("shares")
       .withIndex("by_email_note", q =>
         q.eq("email", args.email).eq("noteId", args.noteId),
       )
-      .first();
+      .take(10);
 
-    if (existingShare) {
+    if (existingShares.some(s => s.purchaseId === undefined)) {
       return { success: false, error: "ALREADY_SHARED" };
     }
 
@@ -930,6 +1028,9 @@ export const inviteUser = mutation({
     };
   },
 });
+
+// Manual shares are hand-invited collaborators; 200 is far above realistic use.
+const MAX_MANUAL_SHARES_LISTED = 200;
 
 export const getNoteShares = query({
   args: {
@@ -959,10 +1060,14 @@ export const getNoteShares = query({
 
     const ownerUser = await ctx.db.get(note.owner);
 
+    // Manual shares only (D-03): purchase shares are excluded by the index so
+    // buyer identities never leak and sales never count toward the cap.
     const shares = await ctx.db
       .query("shares")
-      .withIndex("by_note", q => q.eq("noteId", args.noteId))
-      .collect();
+      .withIndex("by_note_and_purchaseId", q =>
+        q.eq("noteId", args.noteId).eq("purchaseId", undefined),
+      )
+      .take(MAX_MANUAL_SHARES_LISTED);
 
     const sharedUsers = [];
 
@@ -1038,6 +1143,10 @@ export const removeShare = mutation({
     if (!share) {
       throw new Error("Share not found");
     }
+    // D-03/D-04: purchase-granted shares are permanent, for every caller
+    if (share.purchaseId !== undefined) {
+      throw new ConvexError("SHARE_PROTECTED");
+    }
 
     const userRole = await getUserPermission(ctx, share.noteId, user._id);
     const isSelfRevoke =
@@ -1068,6 +1177,10 @@ export const updateShareRole = mutation({
     const share = await ctx.db.get(args.shareId);
     if (!share) {
       throw new Error("Share not found");
+    }
+    // D-03: purchase-granted shares are immutable
+    if (share.purchaseId !== undefined) {
+      throw new ConvexError("SHARE_PROTECTED");
     }
 
     const currentUserRole = await getUserPermission(

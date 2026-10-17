@@ -20,6 +20,7 @@ import { v, ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import { getUser } from "./helpers/helper";
 import {
+  assertNotPurchasedContent,
   buildSearchText,
   buildSnapshot,
   countSubtree,
@@ -66,6 +67,7 @@ export const createListing = mutation({
     if (!note || note.owner !== user._id) {
       throw new ConvexError("LISTING_NOT_OWNER");
     }
+    await assertNotPurchasedContent(ctx, note._id, user._id);
     await assertSellerActive(ctx, identity.subject);
     if (!args.attested) throw new ConvexError("LISTING_ATTESTATION_REQUIRED");
 
