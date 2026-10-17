@@ -49,7 +49,9 @@ vi.mock("@/providers/TreeProvider", () => ({
 }));
 
 import { toast } from "sonner";
-import VersionPreviewBanner, { historyErrorMessage } from "./VersionPreviewBanner";
+import VersionPreviewBanner, {
+  historyErrorMessage,
+} from "./VersionPreviewBanner";
 
 function version(title = "Current") {
   return {
