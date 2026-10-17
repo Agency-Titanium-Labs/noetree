@@ -13,7 +13,9 @@
     "dashboard": "Dashboard",
     "notes": "Notes",
     "pinned": "Pinned",
-    "listings": "My listings"
+    "listings": "My listings",
+    "purchases": "Purchases",
+    "sales": "Sales"
   },
   "NavUser": {
     "account": "Account",
@@ -432,6 +434,43 @@
     "errorSellerNotReady": "Finish seller onboarding before listing notes.",
     "errorNoteMissing": "The source note no longer exists.",
     "errorGeneric": "Something went wrong. Try again."
+  },
+  "Purchases": {
+    "title": "My purchases",
+    "modeCopy": "Copy",
+    "modeReadonly": "Read-only",
+    "openNote": "Open note",
+    "viewListing": "View listing",
+    "emptyTitle": "No purchases yet",
+    "emptyBody": "Notes you buy will show up here. Browse the marketplace to find your first one.",
+    "emptyCta": "Browse the marketplace",
+    "loadMore": "Load more",
+    "loadError": "We could not load your purchases. Refresh the page; if it keeps happening, contact support."
+  },
+  "Sales": {
+    "title": "Sales and earnings",
+    "totalGross": "Total gross",
+    "totalCommission": "Total commission",
+    "totalEarned": "Total earned",
+    "saleCount": "Sales",
+    "payoutAccount": "Payout account",
+    "connectActive": "Stripe account active",
+    "connectIncomplete": "Stripe setup incomplete",
+    "openDashboard": "Open Stripe dashboard",
+    "dashboardError": "We could not open Stripe right now. Try again in a moment.",
+    "colDate": "Date",
+    "colListing": "Listing",
+    "colGross": "Gross",
+    "colCommission": "Commission",
+    "colNet": "Net",
+    "colPayout": "Payout",
+    "sentToStripe": "Sent to Stripe",
+    "footnote": "Totals include all paid sales. Bank payout timing follows your Stripe payout schedule.",
+    "emptyTitle": "No sales yet",
+    "emptyBody": "Sales of your listed notes will appear here with your earnings. List a note to start earning.",
+    "emptyCta": "List a note",
+    "loadMore": "Load more",
+    "loadError": "We could not load your sales. Refresh the page; if it keeps happening, contact support."
   },
   "SharedNote": {
     "pageTitle": "Shared note",
