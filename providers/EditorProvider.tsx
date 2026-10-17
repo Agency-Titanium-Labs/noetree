@@ -236,7 +236,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       ? selectedNote.role !== "view" && !previewVersion // view and previewing are read-only
       : false;
     if (editor.isEditable !== isEditable) {
-      editor.setEditable(isEditable);
+      // Tiptap emits "update" by default, which would mark the note unsaved
+      // and autosave right after leaving preview / restoring. Suppress it.
+      editor.setEditable(isEditable, false);
     }
   }, [editor, selectedNote, selectedNote?.role, previewVersion]);
 

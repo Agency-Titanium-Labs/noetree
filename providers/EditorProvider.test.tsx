@@ -168,9 +168,9 @@ describe("preview", () => {
   it("toggles editability around preview", () => {
     mount();
     act(() => ctx.enterPreview(version("old")));
-    expect(h.fake.setEditable).toHaveBeenLastCalledWith(false);
+    expect(h.fake.setEditable).toHaveBeenLastCalledWith(false, false);
     act(() => ctx.exitPreview());
-    expect(h.fake.setEditable).toHaveBeenLastCalledWith(true);
+    expect(h.fake.setEditable).toHaveBeenLastCalledWith(true, false);
   });
 
   it("ignores remote content changes while previewing; exit shows latest", () => {
