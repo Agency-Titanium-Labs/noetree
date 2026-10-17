@@ -1,7 +1,7 @@
 ---
 phase: 11-buyer-seller-history-ui
 plan: 07
-status: partial-awaiting-uat
+status: uat-passed-except-mobile
 ---
 
 # 11-07 Phase gate — partial (Tasks 1-2 done, Task 3 UAT pending)
@@ -13,8 +13,13 @@ status: partial-awaiting-uat
 - Lint: NOT verified — `eslint-plugin-react-hooks` not resolvable from the worktree (node_modules is a junction to the main checkout). Run `npm run lint` from a normal install.
 - `npx convex dev --once` pushed to dev deployment (dev/release-v1-2); added `sellerEarnings.by_sellerId`. Side effect: it removed Phase 15's `noteVersions`/`noteVersionContents` indexes from dev because this branch lacks Phase 15 code; the next Phase 15 push re-adds them.
 
-## Backfill (D-12)
-`sales:backfillEarnings` run twice on dev: `{processed: 0, sellersScheduled: 0, rescheduled: false}` both times; `sellerEarnings` is empty. The dev deployment has no paid purchases, so idempotence is trivially shown; counter correctness is covered by sales.test.ts/purchases.test.ts.
+## Backfill (D-12) and UAT deployment
+The first dev deployment (greedy-ermine-32) had no Stripe/Connect data. UAT was re-run against dev:frugal-echidna-922 (the Phase 10 UAT deployment, which has paid test purchases). Phase 11 functions were pushed there.
+`sales:backfillEarnings` run twice: `{processed: 3, sellersScheduled: 1}` both times; `sellerEarnings` for the seller = 3 sales, gross 1450, commission 145, net 1305, identical after the second run (idempotent).
 
-## Pending
-Task 3 (live UAT, EN/FR, Stripe Express login link) needs the user.
+## Live UAT (Chrome, Google sign-in, localhost:3001, worktree build)
+- Buyer (contact@sevalys.com) /en/purchases: 3 purchases newest first, Copy / Read-only badges, price + date, Open note (copy opens /notes/<deliveredNoteId>) and View listing present, no receipt/refund controls.
+- Seller (anatholyb@gmail.com) /en/sales: cards Total gross 14.50 / commission 1.45 / earned 13.05 / 3 sales equal the row sums; per-row gross, commission with (10%), net, "Sent to Stripe"; no buyer data; payout-schedule footnote; "Stripe account active".
+- "Open Stripe dashboard" (contact@sevalys.com, active seller) redirected to Stripe Express login for the seller account (URL not recorded).
+- Empty states render for accounts with no activity; /fr/sales copy is French; sidebar entries visible for users with no activity.
+- NOT verified: layout below 768px (stacked cards), Open note for a read-only purchase, View listing click-through, /fr/purchases.
