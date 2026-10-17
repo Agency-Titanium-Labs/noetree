@@ -159,9 +159,9 @@ export default function HistoryPanel({
         isPreRestore: v.isPreRestore,
         author: v.author,
       });
-      if (window.matchMedia("(max-width: 639px)").matches) {
-        onOpenChange(false);
-      }
+      // Close on every viewport so the banner's Restore/Back buttons are
+      // never covered by the Sheet (GAP-3).
+      onOpenChange(false);
     } catch (err) {
       toast.error(historyErrorMessage(err, t, "errorLoad"));
     }

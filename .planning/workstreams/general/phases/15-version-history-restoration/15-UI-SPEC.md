@@ -107,7 +107,7 @@ Everything else (History toolbar button, Back to current, Keep current version, 
 
 **Preview (D-10):**
 
-- Selecting a row calls `enterPreview(version)`; the Sheet stays open on desktop. On mobile (< sm, full-width Sheet) selecting a row closes the Sheet so the preview is visible; the History button re-opens it.
+- Selecting a row calls `enterPreview(version)` and closes the Sheet on every viewport so the banner's Restore/Back buttons (right-aligned, otherwise under the 448px panel on desktop) are reachable; the History button re-opens it and the selected row stays highlighted. (amended in 15-06, GAP-3)
 - `VersionPreviewBanner` renders above the editor, full width, `bg-muted`, `border-b`, `px-4 py-2` (8px/16px), 14px text: "Viewing version from {date and time}" (+ title-at-time suffix only if it differs from the current title). Right side: `Back to current` (`variant="outline"`) and `Restore version` (default, accent). On < md the banner stacks: text on top, buttons below as an equal-width row (`min-h-11`).
 - Banner has `role="status"` and is announced on enter; focus moves to the `Back to current` button is NOT forced (focus stays on the selected row).
 - Editor is read-only (`setEditable(false)`), shows no caret or toolbar editing affordances, content area gets `opacity-100` (no dimming, so it stays legible). Autosave and sync suppressed per RESEARCH Pattern 4.

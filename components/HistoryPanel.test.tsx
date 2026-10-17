@@ -320,7 +320,7 @@ describe("history panel", () => {
       isPreRestore: false,
       author: null,
     });
-    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("marks the previewed row aria-pressed", () => {
@@ -333,21 +333,25 @@ describe("history panel", () => {
   it("get returning null toasts errorLoad", async () => {
     pagesByCursor["null"] = page([ver("a", NOW)]);
     getMock.mockResolvedValue(null);
-    renderPanel();
+    const onOpenChange = vi.fn();
+    renderPanel(onOpenChange);
     fireEvent.click(screen.getByRole("button", { pressed: false }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("errorLoad"));
     expect(enterPreview).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
   it("get throwing out-of-window toasts errorOutOfWindow", async () => {
     pagesByCursor["null"] = page([ver("a", NOW)]);
     getMock.mockRejectedValue(new ConvexError("VERSION_OUT_OF_WINDOW"));
-    renderPanel();
+    const onOpenChange = vi.fn();
+    renderPanel(onOpenChange);
     fireEvent.click(screen.getByRole("button", { pressed: false }));
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith("errorOutOfWindow"),
     );
     expect(enterPreview).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
   it("closes the sheet on narrow viewports after a successful select", async () => {
