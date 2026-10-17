@@ -20,7 +20,11 @@ const modules = (
   }
 ).glob("./**/*.*s");
 
-type T = ReturnType<typeof convexTest>;
+// Schema-typed handle so index names and the data model are checked.
+function newTest() {
+  return convexTest(schema, modules);
+}
+type T = ReturnType<typeof newTest>;
 
 async function seedUser(t: T, suffix: string) {
   const tokenIdentifier = "https://clerk.dev|user_" + suffix;
@@ -568,7 +572,7 @@ type ListPage = {
 } | null;
 
 async function pageAll(
-  as: { query: (ref: typeof api.noteVersions.list, args: object) => Promise<unknown> },
+  as: ReturnType<T["withIdentity"]>,
   noteId: Id<"notes">,
   numItems?: number,
 ) {
