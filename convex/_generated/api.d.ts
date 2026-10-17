@@ -24,6 +24,7 @@ import type * as marketplace from "../marketplace.js";
 import type * as notes from "../notes.js";
 import type * as notifications from "../notifications.js";
 import type * as purchases from "../purchases.js";
+import type * as sales from "../sales.js";
 import type * as shareLinks from "../shareLinks.js";
 import type * as shareLinksNode from "../shareLinksNode.js";
 import type * as stripeWebhooks from "../stripeWebhooks.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   notes: typeof notes;
   notifications: typeof notifications;
   purchases: typeof purchases;
+  sales: typeof sales;
   shareLinks: typeof shareLinks;
   shareLinksNode: typeof shareLinksNode;
   stripeWebhooks: typeof stripeWebhooks;
