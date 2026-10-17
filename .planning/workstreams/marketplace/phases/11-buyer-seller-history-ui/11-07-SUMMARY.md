@@ -1,7 +1,7 @@
 ---
 phase: 11-buyer-seller-history-ui
 plan: 07
-status: uat-passed-except-mobile
+status: uat-passed
 ---
 
 # 11-07 Phase gate — partial (Tasks 1-2 done, Task 3 UAT pending)
@@ -22,4 +22,4 @@ The first dev deployment (greedy-ermine-32) had no Stripe/Connect data. UAT was 
 - Seller (anatholyb@gmail.com) /en/sales: cards Total gross 14.50 / commission 1.45 / earned 13.05 / 3 sales equal the row sums; per-row gross, commission with (10%), net, "Sent to Stripe"; no buyer data; payout-schedule footnote; "Stripe account active".
 - "Open Stripe dashboard" (contact@sevalys.com, active seller) redirected to Stripe Express login for the seller account (URL not recorded).
 - Empty states render for accounts with no activity; /fr/sales copy is French; sidebar entries visible for users with no activity.
-- NOT verified: layout below 768px (stacked cards), Open note for a read-only purchase, View listing click-through, /fr/purchases.
+- Follow-up checks, all passed: /en/sales at 390px (iframe) shows a 2x2 summary grid, full-width dashboard button and stacked per-sale cards with no horizontal overflow; /en/purchases at 390px shows full-width Open note / View listing buttons; Open note on the read-only purchase opens the seller's note in read-only view (/fr/notes/<id>); View listing opens /marketplace/<listingId>; /fr/purchases shows "Copie"/"Lecture seule", "Ouvrir la note", "Voir l'annonce" and French date/price formats.
