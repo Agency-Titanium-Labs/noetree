@@ -37,6 +37,9 @@ export default defineSchema({
     isPublic: v.optional(v.boolean()),
     // D-08: set on a purchase copy root so it can be found by its purchase.
     purchaseId: v.optional(v.id("purchases")),
+    // Phase 15: user who last saved the current content (author of the next
+    // snapshot of this content). Optional so no migration is needed.
+    lastEditedBy: v.optional(v.id("users")),
   })
     .index("by_owner", ["owner", "parentNote"])
     .index("by_parent", ["parentNote"])
@@ -179,6 +182,32 @@ export default defineSchema({
     .index("by_recipientId_and_readAt", ["recipientId", "readAt"])
     .index("by_noteId", ["noteId"])
     .index("by_commentId", ["commentId"]),
+
+  // Version history invariants (Phase 15):
+  // - Version rows are immutable (never patched).
+  // - Metadata (noteVersions) and payload (noteVersionContents) are split so
+  //   list queries never read note bodies.
+  // - createdAt (ms) is explicit (not _creationTime) so the gate/window are
+  //   testable.
+  // - The Free 24h window is enforced at READ time only; nothing prunes rows
+  //   (D-05).
+  // - Only content changes snapshot; title is display-only (D-04).
+  // - Snapshot/restore code never touches comments or notifications (D-14).
+  noteVersions: defineTable({
+    noteId: v.id("notes"),
+    title: v.string(),
+    authorId: v.optional(v.id("users")),
+    isPreRestore: v.optional(v.boolean()),
+    createdAt: v.number(),
+  }).index("by_noteId_and_createdAt", ["noteId", "createdAt"]),
+
+  noteVersionContents: defineTable({
+    versionId: v.id("noteVersions"),
+    noteId: v.id("notes"),
+    content: v.string(),
+  })
+    .index("by_versionId", ["versionId"])
+    .index("by_noteId", ["noteId"]),
 
   // Listings invariants (Phase 8):
   // - One listing row per note for life (D-17): unpublish flips status, rows

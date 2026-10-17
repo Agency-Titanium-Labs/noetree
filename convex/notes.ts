@@ -6,6 +6,7 @@ import { unpublishListingForNote } from "./helpers/listings";
 import { deleteShareLinkForNote } from "./helpers/sharing";
 import { deleteCommentsForNote } from "./helpers/commentAccess";
 import { planCopy, writeCopy } from "./helpers/delivery";
+import { deleteVersionsForNote, writeNoteContent } from "./helpers/noteVersions";
 import {
   getInheritedPermission,
   getUserPermission,
@@ -595,14 +596,19 @@ export const updateNote = mutation({
       throw new Error("User not found");
     }
     await requireEditAccess(ctx, args.id, user._id);
-    const note = await ctx.db.patch(args.id, {
+    const note = await ctx.db.get("notes", args.id);
+    if (!note) {
+      throw new ConvexError("NOT_FOUND");
+    }
+    if (typeof args.content !== "string") {
+      throw new ConvexError("INVALID_CONTENT");
+    }
+    await writeNoteContent(ctx, note, args.content, user._id, {
       title: args.title,
-      content: args.content,
       parentNote: args.parentNote,
       childNotes: args.childNotes,
-      updated_at: new Date().toISOString(),
     });
-    return note;
+    return null;
   },
 });
 
@@ -655,11 +661,15 @@ export const updateNoteContent = mutation({
       throw new Error("User not found");
     }
     await requireEditAccess(ctx, args.id, user._id);
-    const note = await ctx.db.patch(args.id, {
-      content: args.content,
-      updated_at: new Date().toISOString(),
-    });
-    return note;
+    const note = await ctx.db.get("notes", args.id);
+    if (!note) {
+      throw new ConvexError("NOT_FOUND");
+    }
+    if (typeof args.content !== "string") {
+      throw new ConvexError("INVALID_CONTENT");
+    }
+    await writeNoteContent(ctx, note, args.content, user._id);
+    return null;
   },
 });
 
@@ -746,6 +756,7 @@ export const deleteNote = mutation({
       await unpublishListingForNote(ctx, noteId);
       await deleteShareLinkForNote(ctx, noteId);
       await deleteCommentsForNote(ctx, noteId);
+      await deleteVersionsForNote(ctx, noteId);
     };
 
     if (rootNote.parentNote) {

@@ -37,11 +37,11 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Version History
 
-- [ ] **HIST-01**: Note content is automatically snapshotted on edit (debounced/periodic, not on every keystroke)
-- [ ] **HIST-02**: User can view a list of past versions of a note with timestamps
-- [ ] **HIST-03**: User can preview a past version's content before restoring it
-- [ ] **HIST-04**: User can restore a note to a past version; the pre-restore state is itself snapshotted first (restore is non-destructive)
-- [ ] **HIST-05**: Free tier retains version history for ~24h; Premium retains full, unlimited history
+- [x] **HIST-01**: Note content is automatically snapshotted on edit (debounced/periodic, not on every keystroke)
+- [x] **HIST-02**: User can view a list of past versions of a note with timestamps
+- [x] **HIST-03**: User can preview a past version's content before restoring it
+- [x] **HIST-04**: User can restore a note to a past version; the pre-restore state is itself snapshotted first (restore is non-destructive)
+- [x] **HIST-05**: Free tier retains version history for ~24h; Premium retains full, unlimited history
 
 ### AI Credits
 
@@ -110,11 +110,11 @@ Explicitly excluded. Documented to prevent scope creep.
 | COMMENT-04  | Phase 14 — Comments & Notifications           | Complete |
 | NOTIF-01    | Phase 14 — Comments & Notifications           | Complete |
 | NOTIF-02    | Phase 14 — Comments & Notifications           | Complete |
-| HIST-01     | Phase 15 — Version History & Restoration      | Pending  |
-| HIST-02     | Phase 15 — Version History & Restoration      | Pending  |
-| HIST-03     | Phase 15 — Version History & Restoration      | Pending  |
-| HIST-04     | Phase 15 — Version History & Restoration      | Pending  |
-| HIST-05     | Phase 15 — Version History & Restoration      | Pending  |
+| HIST-01     | Phase 15 — Version History & Restoration      | Complete |
+| HIST-02     | Phase 15 — Version History & Restoration      | Complete |
+| HIST-03     | Phase 15 — Version History & Restoration      | Complete |
+| HIST-04     | Phase 15 — Version History & Restoration      | Complete |
+| HIST-05     | Phase 15 — Version History & Restoration      | Complete |
 | CRED-05     | Phase 16 — AI Credit System Revision          | Pending  |
 | CRED-06     | Phase 16 — AI Credit System Revision          | Pending  |
 | CRED-07     | Phase 16 — AI Credit System Revision          | Pending  |

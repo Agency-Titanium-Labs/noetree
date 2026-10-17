@@ -35,7 +35,7 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 12: Plan Restructure & Tier Foundation** - Free tier note cap removed, Pro renamed to Premium with new pricing, existing subscribers migrated without billing disruption (completed 2026-10-16)
 - [ ] **Phase 13: Sharing — Links & Public Notes** - Users can share notes via unique view/edit links or make notes fully public, free and unlimited on every plan
 - [x] **Phase 14: Comments & Notifications** - Users can comment on notes they have access to and get notified in-app when someone comments on their notes (completed 2026-10-17)
-- [ ] **Phase 15: Version History & Restoration** - Notes are automatically snapshotted and users can preview/restore past versions, with tiered retention by plan
+- [x] **Phase 15: Version History & Restoration** - Notes are automatically snapshotted and users can preview/restore past versions, with tiered retention by plan (completed 2026-10-17)
 - [ ] **Phase 16: AI Credit System Revision** - AI actions cost differentiated credits with new monthly quotas per tier and three purchasable credit packs
 
 ## Phase Details
@@ -165,8 +165,27 @@ Plans:
 3. User can preview a past version's content before deciding whether to restore it
 4. User can restore a note to a past version, and the pre-restore state is itself snapshotted first so the restore is non-destructive
 5. Free-tier users see version history capped at roughly the last 24 hours, while Premium users see full, unlimited history
-   **Plans**: TBD
+   **Plans**: 5 plans (4 waves)
    **UI hint**: yes
+
+Plans:
+
+**Wave 1**
+
+- [x] 15-01-PLAN.md — Version tables, owner-tier window + edit-level access helpers, shared capture helper wired into all 3 content-write paths, Wave 0 tests (wave 1)
+- [x] 15-02-PLAN.md — EditorProvider read-only preview state with autosave/sync suppression + History en/fr copy (wave 1)
+
+**Wave 2**
+
+- [x] 15-03-PLAN.md — noteVersions list/get (tier-gated) + atomic non-destructive restore + deleteNote cascade (wave 2)
+
+**Wave 3**
+
+- [x] 15-04-PLAN.md — HistoryPanel Sheet, HistoryButton, VersionPreviewBanner + restore dialog + component tests (wave 3)
+
+**Wave 4**
+
+- [x] 15-05-PLAN.md — Mount History in NoteContent (edit roles only), end-to-end human verification (wave 4)
 
 ### Phase 16: AI Credit System Revision
 
@@ -201,7 +220,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
 | 13. Sharing — Links & Public Notes             | v1.2      | 6/7            | In Progress |            |
 | 14. Comments & Notifications                   | v1.2      | 8/8            | Complete    | 2026-10-17 |
-| 15. Version History & Restoration              | v1.2      | 0/TBD          | Not started | -          |
+| 15. Version History & Restoration              | v1.2      | 6/6 | Complete    | 2026-10-17 |
 | 16. AI Credit System Revision                  | v1.2      | 0/TBD          | Not started | -          |
 
 ---

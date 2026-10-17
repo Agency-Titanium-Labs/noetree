@@ -19,17 +19,51 @@ import { useTranslations } from "next-intl";
 
 type saveStatusType = "idle" | "unsaved" | "saving" | "success" | "error";
 
+export type PreviewVersion = {
+  _id: string;
+  content: string;
+  title: string;
+  createdAt: number;
+  isPreRestore: boolean;
+  author: { name: string | null; avatarUrl: string | null } | null;
+};
+
 interface EditorContextType {
   editor: Editor | null;
   saveStatus: saveStatusType;
   getCurrentContent: () => string | null;
+  previewVersion: PreviewVersion | null;
+  enterPreview: (version: PreviewVersion) => void;
+  exitPreview: (contentOverride?: string) => void;
 }
 
 const EditorContext = createContext<EditorContextType>({
   editor: null,
   saveStatus: "idle",
   getCurrentContent: () => null,
+  previewVersion: null,
+  enterPreview: () => {},
+  exitPreview: () => {},
 });
+
+function parseNoteContent(raw: unknown): Content {
+  let content: Content = "";
+  try {
+    if (raw && typeof raw === "string") {
+      if (raw.trim() === "") {
+        content = "";
+      } else {
+        content = JSON.parse(raw) as Content;
+      }
+    } else if (raw) {
+      content = raw as Content;
+    }
+  } catch (error) {
+    console.warn("Failed to parse note content, using empty content:", error);
+    content = "";
+  }
+  return content;
+}
 
 export const useEditorContext = (): EditorContextType => {
   const context = useContext(EditorContext);
@@ -49,16 +83,13 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const [saveStatus, setSaveStatus] = useState<saveStatusType>("idle");
   const lastNoteIdRef = useRef<string | undefined>(undefined);
 
-  let initialContent: Content = "";
-  try {
-    if (selectedNote?.content && typeof selectedNote.content === "string") {
-      initialContent = JSON.parse(selectedNote.content) as Content;
-    } else if (selectedNote?.content) {
-      initialContent = selectedNote.content;
-    }
-  } catch (error) {
-    console.warn("Failed to parse note content, using empty content:", error);
-  }
+  const [previewVersion, setPreviewVersion] = useState<PreviewVersion | null>(
+    null,
+  );
+  const previewRef = useRef<PreviewVersion | null>(null);
+  const latestContentRef = useRef<string | undefined>(selectedNote?.content);
+
+  const initialContent: Content = parseNoteContent(selectedNote?.content);
 
   const editor = useEditor(
     {
@@ -85,6 +116,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     async (content: Content) => {
       if (!selectedNote) return;
       if (selectedNote.role === "view") return; // Do not save if view-only
+      if (previewRef.current) return; // Never save while previewing a version
 
       try {
         setSaveStatus("saving");
@@ -113,6 +145,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       if ((event.ctrlKey || event.metaKey) && event.key === "s") {
         event.preventDefault();
         if (selectedNote?.role === "view") return; // Do not save if view-only
+        if (previewRef.current) return; // Never save while previewing a version
         if (editor && !editor.isDestroyed && saveStatus === "unsaved") {
           debouncedSave.cancel();
           saveContent(editor.getJSON());
@@ -126,6 +159,12 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     };
   }, [editor, saveStatus, debouncedSave, saveContent, selectedNote?.role]);
 
+  // Track the newest stored content (also while previewing) so exitPreview
+  // can show it. Declared before the sync effect so it runs first.
+  useEffect(() => {
+    latestContentRef.current = selectedNote?.content;
+  }, [selectedNote?._id, selectedNote?.content]);
+
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
 
@@ -136,6 +175,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
     if (isNoteChanged) {
       setSaveStatus("idle");
+      // The editor is re-created on note switch, so just drop preview state.
+      previewRef.current = null;
+      setPreviewVersion(null);
     }
 
     if (!selectedNote) {
@@ -145,21 +187,10 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       return;
     }
 
-    let content = "";
-    try {
-      if (selectedNote.content && typeof selectedNote.content === "string") {
-        if (selectedNote.content.trim() === "") {
-          content = "";
-        } else {
-          content = JSON.parse(selectedNote.content);
-        }
-      } else if (selectedNote.content) {
-        content = selectedNote.content;
-      }
-    } catch (error) {
-      console.warn("Failed to parse note content, using empty content:", error);
-      content = "";
-    }
+    // While previewing, remote changes must not touch the editor.
+    if (previewRef.current && !isNoteChanged) return;
+
+    const content = parseNoteContent(latestContentRef.current);
 
     const currentJSON = JSON.stringify(editor.getJSON());
     const incomingJSON =
@@ -171,12 +202,19 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
     setSaveStatus("idle");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, selectedNote?._id, selectedNote?.content, debouncedSave]);
+  }, [
+    editor,
+    selectedNote?._id,
+    selectedNote?.content,
+    debouncedSave,
+    previewVersion,
+  ]);
 
   useEffect(() => {
     if (!editor || editor.isDestroyed || !selectedNote) return;
 
     const updateListener = ({ editor }: { editor: Editor }) => {
+      if (previewRef.current) return; // Never save while previewing a version
       if (!editor.isEditable || selectedNote.role === "view") return; // Do not save if view-only
       setSaveStatus("unsaved");
       debouncedSave(editor.getJSON());
@@ -195,14 +233,48 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     const isEditable = selectedNote
-      ? selectedNote.role !== "view" // owner, admin, and edit are editable; view is not
+      ? selectedNote.role !== "view" && !previewVersion // view and previewing are read-only
       : false;
     if (editor.isEditable !== isEditable) {
-      editor.setEditable(isEditable);
+      // Tiptap emits "update" by default, which would mark the note unsaved
+      // and autosave right after leaving preview / restoring. Suppress it.
+      editor.setEditable(isEditable, false);
     }
-  }, [editor, selectedNote, selectedNote?.role]);
+  }, [editor, selectedNote, selectedNote?.role, previewVersion]);
+
+  const enterPreview = useCallback(
+    (version: PreviewVersion) => {
+      if (!editor || editor.isDestroyed) return;
+      // Persist any pending edit first so nothing is lost / snapshotted late.
+      debouncedSave.flush();
+      previewRef.current = version;
+      setPreviewVersion(version);
+      editor.commands.setContent(parseNoteContent(version.content), {
+        emitUpdate: false,
+      });
+    },
+    [editor, debouncedSave],
+  );
+
+  const exitPreview = useCallback(
+    (contentOverride?: string) => {
+      previewRef.current = null;
+      setPreviewVersion(null);
+      if (contentOverride !== undefined) {
+        latestContentRef.current = contentOverride;
+      }
+      if (editor && !editor.isDestroyed) {
+        editor.commands.setContent(parseNoteContent(latestContentRef.current), {
+          emitUpdate: false,
+        });
+        setSaveStatus("idle");
+      }
+    },
+    [editor],
+  );
 
   const getCurrentContent = () => {
+    if (previewRef.current) return null;
     if (!editor || editor.isDestroyed) return null;
     return JSON.stringify(editor.getJSON());
   };
@@ -211,6 +283,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     editor,
     saveStatus,
     getCurrentContent,
+    previewVersion,
+    enterPreview,
+    exitPreview,
   };
 
   return (

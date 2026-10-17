@@ -27,6 +27,18 @@ export type UserTier = "free" | "premium";
 // clerkUserId is derived exclusively from identity.subject — never a
 // client-supplied argument (D-05, mirrors the IDOR fix in subscriptions.ts
 // getSubscription).
+export async function tierFromClerkUserId(
+  ctx: GenericQueryCtx<DataModel>,
+  clerkUserId: string,
+): Promise<UserTier> {
+  const subscription = await ctx.db
+    .query("subscriptions")
+    .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))
+    .unique();
+
+  return subscription?.status === "active" ? "premium" : "free";
+}
+
 export const getUserTier = async (
   ctx: GenericQueryCtx<DataModel>,
 ): Promise<UserTier> => {
@@ -35,10 +47,5 @@ export const getUserTier = async (
     return "free";
   }
 
-  const subscription = await ctx.db
-    .query("subscriptions")
-    .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
-    .unique();
-
-  return subscription?.status === "active" ? "premium" : "free";
+  return await tierFromClerkUserId(ctx, identity.subject);
 };
