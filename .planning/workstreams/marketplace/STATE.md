@@ -2,23 +2,23 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Marketplace de notes
-status: executing
-stopped_at: Phase 10 context gathered
-last_updated: "2026-10-17T01:52:42.554Z"
+status: ready_to_plan
+stopped_at: Phase 10 complete (8/8) — ready to discuss Phase 11
+last_updated: 2026-10-17T02:34:16.603Z
 last_activity: 2026-10-17
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 29
-  completed_plans: 28
-  percent: 60
+  completed_plans: 29
+  percent: 80
 ---
 
 ## Current Position
 
-Phase: 10 (Purchase Fulfillment (Copy & Access Grants)) — EXECUTING
-Plan: 8 of 8
-Status: Ready to execute
+Phase: 11
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-10-17
 
 ## Project Reference
@@ -26,13 +26,13 @@ Last activity: 2026-10-17
 See: .planning/PROJECT.md (updated 2026-10-16)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente.
-**Current focus:** Phase 10 — Purchase Fulfillment (Copy & Access Grants)
+**Current focus:** Phase 11 — buyer & seller history ui
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 33
+- Total plans completed: 41
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -47,6 +47,7 @@ See: .planning/PROJECT.md (updated 2026-10-16)
 | 06.1  | 1     | -     | -        |
 | 7     | 6     | -     | -        |
 | 9     | 6     | -     | -        |
+| 10    | 8     | -     | -        |
 
 **Recent Trend:**
 
