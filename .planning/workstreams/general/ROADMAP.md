@@ -38,7 +38,7 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 14: Comments & Notifications** - Users can comment on notes they have access to and get notified in-app when someone comments on their notes (completed 2026-10-17)
 - [x] **Phase 15: Version History & Restoration** - Notes are automatically snapshotted and users can preview/restore past versions, with tiered retention by plan
       (completed 2026-10-17)
-- [ ] **Phase 16: AI Credit System Revision** - AI actions cost differentiated credits with new monthly quotas per tier and three purchasable credit packs
+- [x] **Phase 16: AI Credit System Revision** - AI actions cost differentiated credits with new monthly quotas per tier and three purchasable credit packs (completed 2026-10-18)
 
 ## Phase Details
 
@@ -232,20 +232,20 @@ Plans:
 **Execution Order:**
 v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 may run in parallel with each other once 12 is done; 14 requires 13 complete first)
 
-| Phase                                          | Milestone | Plans Complete | Status      | Completed  |
-| ---------------------------------------------- | --------- | -------------- | ----------- | ---------- |
-| 1. Schema + Infrastructure Foundation          | v1.0      | 4/4            | Complete    | 2026-07-08 |
-| 2. Webhook Handler + Convex Internal Mutations | v1.0      | 6/6            | Complete    | 2026-07-08 |
-| 3. Checkout Flow + Pricing Page                | v1.0      | 7/7            | Complete    | 2026-07-10 |
-| 4. Plan Enforcement                            | v1.0      | 4/4            | Complete    | 2026-07-10 |
-| 5. AI Credits System                           | v1.0      | 5/5            | Complete    | 2026-07-10 |
-| 6. Settings Page                               | v1.0      | 5/5            | Complete    | 2026-07-11 |
-| 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
-| 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
-| 13. Sharing — Links & Public Notes             | v1.2      | 7/7            | Complete    | 2026-10-18 |
-| 14. Comments & Notifications                   | v1.2      | 8/8            | Complete    | 2026-10-17 |
-| 15. Version History & Restoration              | v1.2      | 6/6            | Complete    | 2026-10-17 |
-| 16. AI Credit System Revision                  | v1.2      | 7/8            | In Progress |            |
+| Phase                                          | Milestone | Plans Complete | Status   | Completed  |
+| ---------------------------------------------- | --------- | -------------- | -------- | ---------- |
+| 1. Schema + Infrastructure Foundation          | v1.0      | 4/4            | Complete | 2026-07-08 |
+| 2. Webhook Handler + Convex Internal Mutations | v1.0      | 6/6            | Complete | 2026-07-08 |
+| 3. Checkout Flow + Pricing Page                | v1.0      | 7/7            | Complete | 2026-07-10 |
+| 4. Plan Enforcement                            | v1.0      | 4/4            | Complete | 2026-07-10 |
+| 5. AI Credits System                           | v1.0      | 5/5            | Complete | 2026-07-10 |
+| 6. Settings Page                               | v1.0      | 5/5            | Complete | 2026-07-11 |
+| 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete | 2026-07-12 |
+| 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete | 2026-10-16 |
+| 13. Sharing — Links & Public Notes             | v1.2      | 7/7            | Complete | 2026-10-18 |
+| 14. Comments & Notifications                   | v1.2      | 8/8            | Complete | 2026-10-17 |
+| 15. Version History & Restoration              | v1.2      | 6/6            | Complete | 2026-10-17 |
+| 16. AI Credit System Revision                  | v1.2      | 7/8            | Complete | 2026-10-18 |
 
 ---
 
