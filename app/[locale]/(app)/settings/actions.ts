@@ -6,6 +6,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { redirect } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { isPackKey, PACKS } from "@/convex/helpers/creditCatalog";
+import { getAppUrl } from "@/lib/appUrl";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -142,7 +143,7 @@ export async function createCreditPackCheckoutSession(
 
   // Open-redirect allow-list: only these two keys ever reach the URL.
   const returnTo = formData.get("returnTo") === "notes" ? "notes" : "settings";
-  const baseUrl = process.env.APP_URL;
+  const baseUrl = getAppUrl();
 
   let sessionUrl: string | null;
   try {
