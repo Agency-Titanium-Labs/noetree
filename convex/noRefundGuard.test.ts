@@ -30,7 +30,9 @@ describe("no refund (D-14 / BUY-05)", () => {
     const patterns = [
       /refunds\.create/,
       /stripe\.refunds/,
-      /export\s+(const|async function|function)\s+\w*refund\w*/i,
+      // refundDraw (Phase 16, D-06) is a plain internal helper restoring
+      // credit buckets after a failed AI action; it is not a monetary refund.
+      /export\s+(const|async function|function)\s+(?!refundDraw\b)\w*refund\w*/i,
     ];
     const offenders: string[] = [];
     for (const f of files) {
