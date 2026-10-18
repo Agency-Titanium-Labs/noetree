@@ -105,17 +105,22 @@ describe("aiCredits.resetCredits / getCredits", () => {
     expect(resetTransactions.length).toBe(1);
   });
 
-  it("returns an anomaly sentinel and does not throw when stripeSubscriptionId matches no subscriptions row", async () => {
+  it("throws SUBSCRIPTION_NOT_FOUND (so Stripe retries) and records nothing when stripeSubscriptionId matches no subscriptions row", async () => {
     const t = convexTest(schema, modules);
 
-    const result = await t.mutation(internal.aiCredits.resetCredits, {
-      stripeEventId: "evt_6",
-      eventType: "invoice.paid",
-      stripeSubscriptionId: "sub_nonexistent",
-    });
-    expect(result).toEqual({
-      anomaly: "no subscription for stripeSubscriptionId",
-    });
+    await expect(
+      t.mutation(internal.aiCredits.resetCredits, {
+        stripeEventId: "evt_6",
+        eventType: "invoice.paid",
+        stripeSubscriptionId: "sub_nonexistent",
+      }),
+    ).rejects.toThrow(/SUBSCRIPTION_NOT_FOUND/);
+
+    // The event must not be marked processed, otherwise the retry would no-op.
+    const processed = await t.run(async ctx =>
+      ctx.db.query("processedStripeEvents").collect(),
+    );
+    expect(processed.length).toBe(0);
 
     const aiCreditsRows = await t.run(async ctx =>
       ctx.db.query("aiCredits").collect(),

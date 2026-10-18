@@ -307,10 +307,13 @@ export const resetCredits = internalMutation({
       )
       .unique();
     if (!subscription) {
+      // Throw (not an anomaly return) so the webhook responds 500 and Stripe
+      // retries: the subscription row may simply not have landed yet. Returning
+      // 200 here would drop this renewal permanently.
       console.error(
-        `resetCredits anomaly: no subscription found for stripeSubscriptionId=${args.stripeSubscriptionId} (stripeEventId=${args.stripeEventId})`,
+        `resetCredits: no subscription found for stripeSubscriptionId=${args.stripeSubscriptionId} (stripeEventId=${args.stripeEventId}) — failing so Stripe retries`,
       );
-      return { anomaly: "no subscription for stripeSubscriptionId" };
+      throw new ConvexError("SUBSCRIPTION_NOT_FOUND");
     }
 
     const { clerkUserId } = subscription;

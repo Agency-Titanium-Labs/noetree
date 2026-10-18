@@ -63,6 +63,14 @@ export async function createCheckoutSession(
     return;
   }
 
+  // A past_due subscriber still has a live Stripe subscription that is retrying
+  // payment. A second Checkout would create a duplicate subscription on the same
+  // customer and orphan the first one, so send them to Settings to fix payment.
+  if (existing?.status === "past_due") {
+    localeRedirect({ href: "/settings", locale: safeLocale });
+    return;
+  }
+
   const baseUrl = getAppUrl()!;
   // T-12-05-01/T-12-05-02: the price ID is resolved server-side from a
   // closed monthly/annual allowlist just before the Stripe call, gated
