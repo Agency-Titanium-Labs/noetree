@@ -56,6 +56,24 @@ export async function POST(req: Request): Promise<Response> {
         currentPeriodEnd: subscription.items.data[0]?.current_period_end ?? 0,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
       };
+    } else if (
+      session.mode === "payment" &&
+      session.metadata?.type !== "marketplace_purchase"
+    ) {
+      // Credit purchases: the purchased price IDs/quantities decide the grant
+      // (CRED-10). Deliberately NOT wrapped in try/catch: a Stripe failure
+      // must surface as a 500 so Stripe retries the delivery.
+      const items = await stripe.checkout.sessions.listLineItems(session.id, {
+        limit: 10,
+      });
+      const snapshot = event.data.object as Stripe.Checkout.Session & {
+        lineItemPriceIds?: string[];
+        lineItemQuantities?: number[];
+      };
+      snapshot.lineItemPriceIds = items.data
+        .map(item => item.price?.id)
+        .filter((id): id is string => typeof id === "string");
+      snapshot.lineItemQuantities = items.data.map(item => item.quantity ?? 0);
     }
   }
 
