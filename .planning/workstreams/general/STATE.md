@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: ready_to_plan
-stopped_at: Phase 13 complete (7/7) — ready to discuss Phase 14
-last_updated: 2026-10-18T13:15:36.870Z
-last_activity: 2026-10-17
+status: planning
+stopped_at: Phase 16 context gathered
+last_updated: "2026-10-18T13:25:29.238Z"
+last_activity: 2026-10-18
 progress:
   total_phases: 5
   completed_phases: 4
@@ -99,9 +99,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-10-17T13:13:50.496Z
-Stopped at: Phase 15 UI-SPEC approved
-Resume file: None
+Last session: 2026-10-18T13:25:29.197Z
+Stopped at: Phase 16 context gathered
+Resume file: .planning/workstreams/general/phases/16-ai-credit-system-revision/16-CONTEXT.md
 
 ## Operator Next Steps
 
