@@ -4,24 +4,24 @@ milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
 status: executing
 stopped_at: Phase 16 planned (8 plans)
-last_updated: "2026-10-18T15:06:41.115Z"
+last_updated: "2026-10-18T15:30:24.252Z"
 last_activity: 2026-10-18
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 35
-  completed_plans: 31
+  completed_plans: 32
   percent: 80
 ---
 
 ## Current Position
 
 Phase: 16 (AI Credit System Revision) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 Status: Ready to execute
 Last activity: 2026-10-18
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 91%
 
 ## Project Reference
 
@@ -61,6 +61,7 @@ _Updated after each plan completion_
 | Phase 15 P03 | 25min | 2 tasks | 5 files |
 | Phase 16 P02 | 5min | 2 tasks | 4 files |
 | Phase 16 P03 | 20min | 2 tasks | 2 files |
+| Phase 16 P04 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,7 @@ Decisions relevant to v1.2 planning (from research, to be confirmed during phase
 - Version restore never deletes/hides comments as a side effect — per COMMENT-04.
 - [Phase 14]: [14-02] D-12 trade-off: link-only/lost-access root authors get no reply notification; owner always notified
 - [Phase 15]: Phase 15-01: history window owner is note.owner literally (D-06); version author = notes.lastEditedBy
+- [Phase ?]: 16-04: Pack credits resolved from Stripe price ID via Convex env map; legacy topup gated on STRIPE_TOPUP_PRICE_ID
 
 ### Pending Todos
 
@@ -101,7 +103,7 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-10-18T15:06:41.098Z
+Last session: 2026-10-18T15:30:03.080Z
 Stopped at: Phase 16 planned (8 plans)
 Resume file: None
 
