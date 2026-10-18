@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
 status: ready_to_plan
-stopped_at: Phase 15 complete (6/6) — ready to discuss Phase 16
-last_updated: 2026-10-17T16:17:03.321Z
+stopped_at: Phase 13 complete (7/7) — ready to discuss Phase 14
+last_updated: 2026-10-18T13:15:36.870Z
 last_activity: 2026-10-17
 progress:
   total_phases: 5
@@ -16,10 +16,10 @@ progress:
 
 ## Current Position
 
-Phase: 16
+Phase: 14
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-17
+Last activity: 2026-10-18
 
 Progress: [██████████] 96%
 
@@ -28,13 +28,13 @@ Progress: [██████████] 96%
 See: .planning/PROJECT.md (updated 2026-08-25)
 
 **Core value:** Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
-**Current focus:** Phase 16 — ai credit system revision
+**Current focus:** Phase 14 — comments notifications
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 41 (from v1.0; v1.2 has not started execution)
+- Total plans completed: 48 (from v1.0; v1.2 has not started execution)
 - Average duration: —
 - Total execution time: 0 hours (v1.2)
 
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-08-25)
 | 12    | 6     | -     | -        |
 | 13    | TBD   | -     | -        |
 | 14    | 8     | -     | -        |
-| 15 | 6 | - | - |
+| 15    | 6     | -     | -        |
 | 16    | TBD   | -     | -        |
 
 **Recent Trend:**

@@ -33,9 +33,11 @@ Full phase details archived: `.planning/milestones/v1.0-ROADMAP.md`
 **Milestone Goal:** Passer à un modèle freemium sans limite de notes, avec de nouvelles fonctionnalités sociales (partage, commentaires, historique de versions) et un système de crédits IA revu.
 
 - [x] **Phase 12: Plan Restructure & Tier Foundation** - Free tier note cap removed, Pro renamed to Premium with new pricing, existing subscribers migrated without billing disruption (completed 2026-10-16)
-- [ ] **Phase 13: Sharing — Links & Public Notes** - Users can share notes via unique view/edit links or make notes fully public, free and unlimited on every plan
+- [x] **Phase 13: Sharing — Links & Public Notes** - Users can share notes via unique view/edit links or make notes fully public, free and unlimited on every plan
+      (completed 2026-10-18)
 - [x] **Phase 14: Comments & Notifications** - Users can comment on notes they have access to and get notified in-app when someone comments on their notes (completed 2026-10-17)
-- [x] **Phase 15: Version History & Restoration** - Notes are automatically snapshotted and users can preview/restore past versions, with tiered retention by plan (completed 2026-10-17)
+- [x] **Phase 15: Version History & Restoration** - Notes are automatically snapshotted and users can preview/restore past versions, with tiered retention by plan
+      (completed 2026-10-17)
 - [ ] **Phase 16: AI Credit System Revision** - AI actions cost differentiated credits with new monthly quotas per tier and three purchasable credit packs
 
 ## Phase Details
@@ -111,7 +113,7 @@ Plans:
 
 **Wave 5** _(blocked on Wave 4 completion)_
 
-- [ ] 13-07-PLAN.md — Phase gates and manual browser verification
+- [x] 13-07-PLAN.md — Phase gates and manual browser verification
 
   **UI hint**: yes
 
@@ -218,9 +220,9 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 6. Settings Page                               | v1.0      | 5/5            | Complete    | 2026-07-11 |
 | 06.1. Close gap — initial AI credits grant     | v1.0      | 1/1            | Complete    | 2026-07-12 |
 | 12. Plan Restructure & Tier Foundation         | v1.2      | 6/6            | Complete    | 2026-10-16 |
-| 13. Sharing — Links & Public Notes             | v1.2      | 6/7            | In Progress |            |
+| 13. Sharing — Links & Public Notes             | v1.2      | 7/7            | Complete    | 2026-10-18 |
 | 14. Comments & Notifications                   | v1.2      | 8/8            | Complete    | 2026-10-17 |
-| 15. Version History & Restoration              | v1.2      | 6/6 | Complete    | 2026-10-17 |
+| 15. Version History & Restoration              | v1.2      | 6/6            | Complete    | 2026-10-17 |
 | 16. AI Credit System Revision                  | v1.2      | 0/TBD          | Not started | -          |
 
 ---
