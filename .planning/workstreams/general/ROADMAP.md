@@ -213,7 +213,7 @@ Plans:
 
 **Wave 2**
 
-- [ ] 16-03-PLAN.md — aiCredits rework: action-keyed costs, two-bucket deduction, lazy Free UTC reset, refund-to-origin, Premium 500, purchased-bucket addCredits, new getMyCredits shape
+- [x] 16-03-PLAN.md — aiCredits rework: action-keyed costs, two-bucket deduction, lazy Free UTC reset, refund-to-origin, Premium 500, purchased-bucket addCredits, new getMyCredits shape
 - [ ] 16-05-PLAN.md — Stripe pack price setup script (stripe:setup-packs) + createCreditPackCheckoutSession server action
 
 **Wave 3**
@@ -245,7 +245,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 13. Sharing — Links & Public Notes             | v1.2      | 7/7            | Complete    | 2026-10-18 |
 | 14. Comments & Notifications                   | v1.2      | 8/8            | Complete    | 2026-10-17 |
 | 15. Version History & Restoration              | v1.2      | 6/6            | Complete    | 2026-10-17 |
-| 16. AI Credit System Revision                  | v1.2      | 2/8            | In Progress |            |
+| 16. AI Credit System Revision                  | v1.2      | 3/8            | In Progress |            |
 
 ---
 
