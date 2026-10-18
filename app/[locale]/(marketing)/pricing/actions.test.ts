@@ -102,6 +102,27 @@ describe("createCheckoutSession", () => {
     expect(mockSessionsCreate).not.toHaveBeenCalled();
   });
 
+  it("past_due subscription is sent to Settings and never starts a second Stripe Checkout", async () => {
+    mockAuth.mockResolvedValue({
+      userId: "user_past_due_1",
+      redirectToSignIn: vi.fn(),
+      getToken: vi.fn().mockResolvedValue("mock_convex_token"),
+    });
+    mockConvexQuery.mockResolvedValue({
+      status: "past_due",
+      stripeCustomerId: "cus_past_due_1",
+    });
+
+    await expect(createCheckoutSession("en", "monthly")).rejects.toThrow(
+      /REDIRECT:/,
+    );
+
+    expect(mockRedirectNav).toHaveBeenCalledWith(
+      expect.stringContaining("/en/settings"),
+    );
+    expect(mockSessionsCreate).not.toHaveBeenCalled();
+  });
+
   it("no/inactive subscription creates a Checkout Session with correct metadata + conditional customer reuse (D-06/D-07)", async () => {
     mockAuth.mockResolvedValue({
       userId: "user_new_1",

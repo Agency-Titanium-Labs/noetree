@@ -2,8 +2,8 @@
 phase: 16
 slug: ai-credit-system-revision
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-10-18
 ---
 
@@ -30,21 +30,21 @@ created: 2026-10-18
 
 ## Per-Task Verification Map
 
-| Req     | Behavior                                                                 | Test Type | Automated Command                                                         | Status     |
-| ------- | ------------------------------------------------------------------------ | --------- | ------------------------------------------------------------------------- | ---------- |
-| CRED-05 | cost 1/3/5 by action key; unknown key → ConvexError; spend spans buckets | unit      | `pnpm vitest run convex/aiCredits.test.ts -t runAiAction`                 | ⬜ pending |
-| CRED-06 | cost catalog + en/fr i18n parity                                         | unit      | `pnpm vitest run convex/helpers/creditCatalog.test.ts`                    | ⬜ pending |
-| CRED-07 | Free lazy reset to 30, non-cumulative, UTC, concurrency-safe             | unit      | `pnpm vitest run convex/aiCredits.test.ts -t lazy`                        | ⬜ pending |
-| CRED-08 | Premium reset/grant 500, purchased preserved                             | unit      | `pnpm vitest run convex/aiCredits.test.ts`                                | ⬜ pending |
-| CRED-09 | price ID → 100/300/700 purchased credits; idempotent; pack script        | unit      | `pnpm vitest run convex/stripeWebhooks.test.ts scripts/stripeOps.test.ts` | ⬜ pending |
-| CRED-10 | amounts never from client; unknown price/metadata → anomaly              | unit      | stripeWebhooks + settings actions tests                                   | ⬜ pending |
+| Req     | Behavior                                                                 | Test Type | Automated Command                                                         | Status                                                              |
+| ------- | ------------------------------------------------------------------------ | --------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| CRED-05 | cost 1/3/5 by action key; unknown key → ConvexError; spend spans buckets | unit      | `pnpm vitest run convex/aiCredits.test.ts -t runAiAction`                 | ✅ green (convex/aiCredits.test.ts)                                 |
+| CRED-06 | cost catalog + en/fr i18n parity                                         | unit      | `pnpm vitest run convex/helpers/creditCatalog.test.ts`                    | ✅ green (convex/helpers/creditCatalog.test.ts)                     |
+| CRED-07 | Free lazy reset to 30, non-cumulative, UTC, concurrency-safe             | unit      | `pnpm vitest run convex/aiCredits.test.ts -t lazy`                        | ✅ green (convex/aiCredits.test.ts)                                 |
+| CRED-08 | Premium reset/grant 500, purchased preserved                             | unit      | `pnpm vitest run convex/aiCredits.test.ts`                                | ✅ green (convex/aiCredits.test.ts)                                 |
+| CRED-09 | price ID → 100/300/700 purchased credits; idempotent; pack script        | unit      | `pnpm vitest run convex/stripeWebhooks.test.ts scripts/stripeOps.test.ts` | ✅ green (convex/stripeWebhooks.test.ts, scripts/stripeOps.test.ts) |
+| CRED-10 | amounts never from client; unknown price/metadata → anomaly              | unit      | stripeWebhooks + settings actions tests                                   | ✅ green (convex/stripeWebhooks.test.ts)                            |
 
 ## Wave 0 Requirements
 
-- [ ] `convex/helpers/creditCatalog.test.ts`
-- [ ] i18n parity test for `messages/*.json`
-- [ ] settings `createCreditPackCheckoutSession` action test
-- [ ] `stripeWebhooks.test.ts` fixtures supply `lineItemPriceIds`
+- [x] `convex/helpers/creditCatalog.test.ts`
+- [x] i18n parity test for `messages/*.json`
+- [x] settings `createCreditPackCheckoutSession` action test
+- [x] `stripeWebhooks.test.ts` fixtures supply `lineItemPriceIds`
 
 ## Manual-Only Verifications
 
@@ -55,9 +55,9 @@ created: 2026-10-18
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify or Wave 0 dependencies
-- [ ] Sampling continuity maintained
-- [ ] Wave 0 covers all MISSING references
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have automated verify or Wave 0 dependencies
+- [x] Sampling continuity maintained
+- [x] Wave 0 covers all MISSING references
+- [x] nyquist flag set in frontmatter
 
-**Approval:** pending
+**Approval:** automated gate green 2026-10-18 (manual-only items pending human checkpoints in 16-08)

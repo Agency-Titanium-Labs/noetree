@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "convex": "npx convex dev",
     "stripe:setup-premium": "ts-node --project scripts/tsconfig.json scripts/setup-premium-prices.ts",
+    "stripe:setup-packs": "ts-node --project scripts/tsconfig.json scripts/setup-credit-packs.ts",
     "stripe:migrate-premium": "ts-node --project scripts/tsconfig.json scripts/migrate-pro-to-premium.ts",
     "stripe:archive-old-price": "ts-node --project scripts/tsconfig.json scripts/archive-old-pro-price.ts",
     "test": "prettier --write . && eslint app/ --fix ",

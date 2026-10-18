@@ -3,11 +3,14 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 const mockSubscriptionsUpdate = vi.fn();
 const mockConvexQuery = vi.fn();
 const mockAuth = vi.fn();
+const mockSessionsCreate = vi.fn();
+const mockRedirect = vi.fn();
 
 vi.mock("stripe", () => ({
   default: vi.fn().mockImplementation(function StripeMock() {
     return {
       subscriptions: { update: mockSubscriptionsUpdate },
+      checkout: { sessions: { create: mockSessionsCreate } },
     };
   }),
 }));
@@ -23,18 +26,29 @@ vi.mock("convex/browser", () => ({
   }),
 }));
 
+vi.mock("next/navigation", () => ({
+  redirect: mockRedirect,
+}));
+
 vi.mock("@clerk/nextjs/server", () => ({
   auth: mockAuth,
 }));
 
 let cancelSubscription: () => Promise<void>;
 let resumeSubscription: () => Promise<void>;
+let createCreditPackCheckoutSession: (
+  prev: { error: "checkoutError" | null },
+  formData: FormData,
+) => Promise<{ error: "checkoutError" | null }>;
 
 beforeAll(async () => {
   process.env.STRIPE_SECRET_KEY = "sk_test_123";
   process.env.NEXT_PUBLIC_CONVEX_URL = "https://example.convex.cloud";
 
-  ({ cancelSubscription, resumeSubscription } = await import("./actions"));
+  process.env.APP_URL = "https://app.test";
+
+  ({ cancelSubscription, resumeSubscription, createCreditPackCheckoutSession } =
+    await import("./actions"));
 });
 
 describe("cancelSubscription", () => {
@@ -202,5 +216,126 @@ describe("resumeSubscription", () => {
       "subscriptionLookupFailed",
     );
     expect(mockSubscriptionsUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("createCreditPackCheckoutSession", () => {
+  const initial = { error: null } as const;
+  const redirectToSignIn = vi.fn();
+
+  function form(fields: Record<string, string>) {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) fd.set(k, v);
+    return fd;
+  }
+
+  beforeEach(() => {
+    mockSessionsCreate.mockReset();
+    mockRedirect.mockReset();
+    mockAuth.mockReset();
+    mockConvexQuery.mockReset();
+    redirectToSignIn.mockReset();
+    mockAuth.mockResolvedValue({ userId: "user_1", redirectToSignIn });
+    process.env.STRIPE_PACK_DECOUVERTE_PRICE_ID = "price_dec";
+    process.env.STRIPE_PACK_BOOST_PRICE_ID = "price_boost";
+    process.env.STRIPE_PACK_PRO_PRICE_ID = "price_pro";
+    mockSessionsCreate.mockResolvedValue({ url: "https://checkout.test/s" });
+  });
+
+  it("signed-out redirects to sign-in and never calls Stripe", async () => {
+    mockAuth.mockResolvedValue({ userId: null, redirectToSignIn });
+    await createCreditPackCheckoutSession(initial, form({ pack: "boost" }));
+    expect(redirectToSignIn).toHaveBeenCalled();
+    expect(mockSessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates a payment session with env price, auth userId metadata and redirects", async () => {
+    await createCreditPackCheckoutSession(
+      initial,
+      form({ pack: "boost", returnTo: "notes" }),
+    );
+    expect(mockSessionsCreate).toHaveBeenCalledTimes(1);
+    expect(mockSessionsCreate).toHaveBeenCalledWith({
+      mode: "payment",
+      line_items: [{ price: "price_boost", quantity: 1 }],
+      metadata: {
+        clerkUserId: "user_1",
+        type: "ai_credit_pack",
+        pack: "boost",
+      },
+      success_url: "https://app.test/notes",
+      cancel_url: "https://app.test/notes",
+    });
+    expect(mockRedirect).toHaveBeenCalledWith("https://checkout.test/s");
+    expect(mockConvexQuery).not.toHaveBeenCalled();
+  });
+
+  it("falls back to settings for a foreign or missing returnTo", async () => {
+    await createCreditPackCheckoutSession(
+      initial,
+      form({ pack: "pro", returnTo: "https://evil.example" }),
+    );
+    await createCreditPackCheckoutSession(initial, form({ pack: "pro" }));
+    expect(mockSessionsCreate).toHaveBeenCalledTimes(2);
+    for (const call of mockSessionsCreate.mock.calls) {
+      expect(call[0].success_url).toBe("https://app.test/settings");
+      expect(call[0].cancel_url).toBe("https://app.test/settings");
+    }
+  });
+
+  it.each(["toString", "", "gold"])(
+    "unknown pack %j returns checkoutError without calling Stripe",
+    async pack => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const result = await createCreditPackCheckoutSession(
+        initial,
+        form({ pack }),
+      );
+      expect(result).toEqual({ error: "checkoutError" });
+      expect(mockSessionsCreate).not.toHaveBeenCalled();
+      spy.mockRestore();
+    },
+  );
+
+  it("ignores forged price/amount/clerkUserId fields", async () => {
+    await createCreditPackCheckoutSession(
+      initial,
+      form({
+        pack: "decouverte",
+        price: "price_evil",
+        amount: "1",
+        clerkUserId: "user_evil",
+      }),
+    );
+    const args = mockSessionsCreate.mock.calls[0][0];
+    expect(args.line_items[0].price).toBe("price_dec");
+    expect(args.metadata.clerkUserId).toBe("user_1");
+  });
+
+  it("missing price env returns checkoutError and logs the env var name", async () => {
+    delete process.env.STRIPE_PACK_PRO_PRICE_ID;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await createCreditPackCheckoutSession(
+      initial,
+      form({ pack: "pro" }),
+    );
+    expect(result).toEqual({ error: "checkoutError" });
+    expect(spy.mock.calls.flat().join(" ")).toContain(
+      "STRIPE_PACK_PRO_PRICE_ID",
+    );
+    expect(mockSessionsCreate).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("Stripe failure returns checkoutError and does not redirect", async () => {
+    mockSessionsCreate.mockRejectedValue(new Error("stripe down"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await createCreditPackCheckoutSession(
+      initial,
+      form({ pack: "boost" }),
+    );
+    expect(result).toEqual({ error: "checkoutError" });
+    expect(mockRedirect).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

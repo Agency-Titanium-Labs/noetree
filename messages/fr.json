@@ -37,11 +37,11 @@
     "subheading": "Commencez gratuitement. Passez à Premium à tout moment pour des notes illimitées et des crédits IA.",
     "freeName": "Gratuit",
     "freePrice": "Gratuit",
-    "freeDetail": "Notes illimitées",
+    "freeDetail": "Notes illimitées · 30 crédits IA/mois",
     "premiumName": "Premium",
     "premiumPriceMonthly": "6,99€ / mois",
     "premiumPriceAnnual": "59€ / an",
-    "premiumDetail": "Notes illimitées · 100 crédits IA/mois",
+    "premiumDetail": "Notes illimitées · 500 crédits IA/mois",
     "upgradeCta": "Passer à Premium",
     "intervalMonthly": "Mensuel",
     "intervalAnnual": "Annuel",
@@ -56,7 +56,7 @@
     "timeoutBody": "Votre paiement a réussi — la synchronisation peut parfois prendre un peu plus de temps. Essayez d'actualiser pour vérifier à nouveau.",
     "timeoutAction": "Actualiser le statut",
     "confirmedHeading": "Abonnement actif",
-    "confirmedBody": "Vous êtes prêt — profitez de notes illimitées et de 100 crédits IA chaque mois.",
+    "confirmedBody": "Vous êtes prêt — profitez de notes illimitées et de 500 crédits IA chaque mois.",
     "goToNotes": "Aller aux notes"
   },
   "Notes": {
@@ -204,12 +204,35 @@
   },
   "AiCredits": {
     "dialogTitle": "Vous n'avez plus de crédits IA",
-    "dialogBodyFree": "Les plans Gratuits n'incluent pas de crédits IA. Passez à Premium pour 100 crédits IA par mois, avec la possibilité d'en racheter à tout moment.",
-    "dialogBodyPremium": "Vous avez utilisé tous vos crédits IA pour ce cycle. Achetez 50 crédits supplémentaires pour 2€, ou attendez la réinitialisation de votre prochain cycle de facturation.",
+    "dialogBodyFree": "Vous avez utilisé vos 30 crédits gratuits ce mois-ci. Ils sont réinitialisés le 1er (UTC). Achetez un pack de crédits dès maintenant (les packs n'expirent jamais) ou passez à Premium pour 500 crédits par mois.",
+    "dialogBodyPremium": "Vous avez utilisé tous vos crédits mensuels. Ils sont réinitialisés à votre prochain cycle de facturation. Achetez un pack de crédits pour continuer ; les packs n'expirent jamais.",
     "upgradeCta": "Passer à Premium",
-    "topupCta": "Acheter 50 crédits",
     "dismiss": "Plus tard",
-    "badgeTooltip": "{count, plural, =0 {0 crédit IA restant} one {# crédit IA restant} other {# crédits IA restants}}"
+    "badgeTooltip": "{count, plural, =0 {0 crédit IA restant} one {# crédit IA restant} other {# crédits IA restants}}",
+    "menuAria": "Actions IA",
+    "actions": {
+      "basic": "Générer une suggestion",
+      "semantic": "Analyser la sémantique",
+      "linking": "Générer des liens entre notes"
+    },
+    "costAria": "{count, plural, one {# crédit} other {# crédits}}",
+    "insufficientTooltip": "Crédits insuffisants : {cost} requis, vous avez {balance}.",
+    "actionSuccess": "Terminé. {count, plural, one {# crédit utilisé} other {# crédits utilisés}}.",
+    "actionError": "Impossible d'exécuter cette action. Vous n'avez pas été débité ; réessayez.",
+    "packsHeading": "Acheter des crédits",
+    "packsHelper": "Achat unique. Les crédits achetés n'expirent jamais.",
+    "packsGroupAria": "Packs de crédits",
+    "bestValue": "Meilleure offre",
+    "buyCta": "Acheter",
+    "buyAria": "Acheter {name}, {credits} crédits pour {price}",
+    "packCredits": "{count} crédits",
+    "packPrice": "{price} €",
+    "checkoutError": "Impossible de démarrer le paiement. Vérifiez votre connexion et réessayez.",
+    "packs": {
+      "decouverte": "Découverte",
+      "boost": "Boost",
+      "pro": "Pro"
+    }
   },
   "Editor": {
     "placeholder": "Écrivez quelque chose...",
@@ -234,7 +257,7 @@
       "horizontalRule": "Règle horizontale",
       "link": "Insérer un lien (Ctrl+K)",
       "image": "Insérer une image",
-      "aiAction": "Action IA (1 crédit)"
+      "aiAction": "Actions IA"
     },
     "dialogs": {
       "linkTitle": "Insérer un lien",
@@ -267,10 +290,10 @@
     "cancelConfirmDesc": "Vous conserverez l'accès Premium jusqu'au {date}. Vous pouvez reprendre à tout moment avant cette date.",
     "cancelConfirmKeep": "Conserver l'abonnement",
     "cancelConfirmConfirm": "Résilier l'abonnement",
-    "creditsBalance": "{count} crédits",
-    "topupHistoryTitle": "Historique des recharges",
-    "topupHistoryEmptyTitle": "Aucune recharge pour le moment",
-    "topupHistoryEmptyBody": "Vos achats de crédits IA apparaîtront ici une fois que vous aurez effectué une recharge.",
+    "creditsBalance": "{count, plural, one {# crédit IA} other {# crédits IA}}",
+    "topupHistoryTitle": "Historique des achats",
+    "topupHistoryEmptyTitle": "Aucun achat de crédits pour le moment",
+    "topupHistoryEmptyBody": "Achetez un pack de crédits ci-dessus pour compléter vos crédits mensuels.",
     "actionError": "Une erreur est survenue lors de la mise à jour de votre abonnement. Veuillez réessayer, ou contacter le support si le problème persiste.",
     "sellerCardTitle": "Vente",
     "sellerNotStartedBody": "Vendez vos notes et gagnez de l'argent.",
@@ -284,7 +307,10 @@
     "sellerRestrictedBody": "Stripe a besoin d'informations supplémentaires avant que vous puissiez continuer à vendre.",
     "updateDetailsCta": "Mettre à jour vos informations",
     "sellerActionError": "Une erreur est survenue lors du démarrage de l'inscription. Veuillez réessayer, ou contacter le support si le problème persiste.",
-    "manageListings": "Gérer les annonces"
+    "manageListings": "Gérer les annonces",
+    "creditsSplit": "{monthly} mensuels · {purchased} achetés",
+    "creditsSplitCaption": "Les crédits mensuels sont réinitialisés le {date}. Les crédits achetés n'expirent jamais.",
+    "creditsSplitCaptionNoDate": "Les crédits achetés n'expirent jamais."
   },
   "Marketplace": {
     "headerLabel": "Marketplace",

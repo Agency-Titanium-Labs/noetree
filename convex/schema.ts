@@ -89,7 +89,10 @@ export default defineSchema({
 
   aiCredits: defineTable({
     clerkUserId: v.string(),
+    // MONTHLY bucket (D-01)
     balance: v.number(),
+    // PURCHASED bucket (D-01); absent == 0; never touched by monthly resets
+    purchasedBalance: v.optional(v.number()),
     lastResetAt: v.number(),
   }).index("by_clerkUserId", ["clerkUserId"]),
 
@@ -104,7 +107,16 @@ export default defineSchema({
     amount: v.number(),
     createdAt: v.number(),
     stripePaymentIntentId: v.optional(v.string()),
-  }).index("by_clerkUserId", ["clerkUserId"]),
+    // Signed change to the monthly bucket (amount stays the signed total)
+    monthlyDelta: v.optional(v.number()),
+    // Signed change to the purchased bucket
+    purchasedDelta: v.optional(v.number()),
+    actionKey: v.optional(v.string()),
+    packKey: v.optional(v.string()),
+    refundsTransactionId: v.optional(v.id("creditTransactions")),
+  })
+    .index("by_clerkUserId", ["clerkUserId"])
+    .index("by_clerkUserId_and_type", ["clerkUserId", "type"]),
 
   processedStripeEvents: defineTable({
     stripeEventId: v.string(),

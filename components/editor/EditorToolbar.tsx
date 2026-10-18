@@ -1,14 +1,13 @@
 "use client";
 
 import { Button } from "../ui/button";
-import {
-  Link as LinkIcon,
-  Image as ImageIcon,
-  Check,
-  Sparkles,
-} from "lucide-react";
+import { Link as LinkIcon, Image as ImageIcon, Check } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { Badge } from "../ui/badge";
+import { Skeleton } from "../ui/skeleton";
+import AiActionsMenu from "./AiActionsMenu";
+import { toast } from "sonner";
+import type { ActionKey } from "@/convex/helpers/creditCatalog";
 import {
   Tooltip,
   TooltipContent,
@@ -54,25 +53,32 @@ export default function EditorToolbar() {
   const [imageAlt, setImageAlt] = useState("");
   const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
 
-  // D-09: balance defaults to 0 when the user has no aiCredits row yet.
+  // D-03: total = monthly + purchased. undefined while loading (skeleton),
+  // null (signed out / no row) is treated as 0.
   const { data: credits } = useQuery(
     convexQuery(api.aiCredits.getMyCredits, {}),
   );
-  const balance = credits?.balance ?? 0;
+  const total = credits === undefined ? undefined : (credits?.total ?? 0);
 
-  // T-05-02: the client never gates the click on balance — runAiAction
-  // enforces the balance check server-side and throws INSUFFICIENT_CREDITS,
-  // which opens the blocking dialog below.
+  // T-05-02 / CRED-10: the client shows insufficiency visually but never
+  // gates; runAiAction resolves the cost and enforces the balance
+  // server-side, throwing INSUFFICIENT_CREDITS, which opens the dialog below.
   const runAiActionMutate = useConvexMutation(api.aiCredits.runAiAction);
   const runAiAction = useMutation({
     mutationFn: runAiActionMutate,
+    onSuccess: result => {
+      toast.success(tCredits("actionSuccess", { count: result.cost }));
+    },
     onError: err => {
       if (err instanceof ConvexError && err.data === "INSUFFICIENT_CREDITS") {
         setCreditsDialogOpen(true);
+        return;
       }
+      toast.error(tCredits("actionError"));
     },
   });
-  const handleAiAction = () => runAiAction.mutate({});
+  const handleAiAction = (actionKey: ActionKey) =>
+    runAiAction.mutate({ actionKey });
 
   if (!editor || !editor.isEditable) return null;
 
@@ -188,17 +194,19 @@ export default function EditorToolbar() {
         <Separator orientation="vertical" className="h-auto!" />
 
         {/* AI action + credits balance */}
-        <ToolbarButton
-          onClick={handleAiAction}
-          tooltip={t("tooltips.aiAction")}
-          icon={<Sparkles className="h-4 w-4" />}
+        <AiActionsMenu
+          balance={total}
+          pending={runAiAction.isPending}
+          onSelect={handleAiAction}
         />
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge variant="secondary">{balance}</Badge>
+            <Badge variant="secondary">
+              {total === undefined ? <Skeleton className="h-5 w-6" /> : total}
+            </Badge>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            {tCredits("badgeTooltip", { count: balance })}
+            {tCredits("badgeTooltip", { count: total ?? 0 })}
           </TooltipContent>
         </Tooltip>
 

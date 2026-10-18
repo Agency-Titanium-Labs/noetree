@@ -6,6 +6,7 @@ import Stripe from "stripe";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { redirect as localeRedirect, routing } from "@/i18n/routing";
+import { getAppUrl } from "@/lib/appUrl";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -62,7 +63,15 @@ export async function createCheckoutSession(
     return;
   }
 
-  const baseUrl = process.env.APP_URL!;
+  // A past_due subscriber still has a live Stripe subscription that is retrying
+  // payment. A second Checkout would create a duplicate subscription on the same
+  // customer and orphan the first one, so send them to Settings to fix payment.
+  if (existing?.status === "past_due") {
+    localeRedirect({ href: "/settings", locale: safeLocale });
+    return;
+  }
+
+  const baseUrl = getAppUrl()!;
   // T-12-05-01/T-12-05-02: the price ID is resolved server-side from a
   // closed monthly/annual allowlist just before the Stripe call, gated
   // exclusively on safeInterval — never accepted as a parameter, never

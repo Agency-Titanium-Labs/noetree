@@ -54,9 +54,8 @@ beforeAll(async () => {
   process.env.APP_URL = "https://noetree.app";
   process.env.INTERNAL_WEBHOOK_SECRET = "shared-secret";
 
-  ({ createConnectOnboardingLink, createConnectLoginLink } = await import(
-    "./connect-actions"
-  ));
+  ({ createConnectOnboardingLink, createConnectLoginLink } =
+    await import("./connect-actions"));
 });
 
 describe("createConnectOnboardingLink", () => {

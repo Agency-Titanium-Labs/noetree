@@ -3,7 +3,10 @@
 import { auth } from "@clerk/nextjs/server";
 import Stripe from "stripe";
 import { ConvexHttpClient } from "convex/browser";
+import { redirect } from "next/navigation";
 import { api } from "@/convex/_generated/api";
+import { isPackKey, PACKS } from "@/convex/helpers/creditCatalog";
+import { getAppUrl } from "@/lib/appUrl";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -16,7 +19,7 @@ export async function cancelSubscription(): Promise<void> {
   const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
   // Security: authenticate this server-side Convex call with the caller's
   // own Clerk session token so getSubscription's ctx.auth.getUserIdentity()
-  // resolves to this same user (same pattern as notes/actions.ts,
+  // resolves to this same user (same pattern as the other server actions,
   // pricing/actions.ts).
   let existing: Awaited<
     ReturnType<typeof convex.query<typeof api.subscriptions.getSubscription>>
@@ -38,7 +41,7 @@ export async function cancelSubscription(): Promise<void> {
 
   // T-06-01 defense-in-depth: never trust the UI only shows this button to
   // an active Pro user — re-verify server-side before any Stripe call
-  // (mirrors notes/actions.ts's TOPUP_REQUIRES_PRO guard).
+  // (defense-in-depth server-side re-check).
   if (existing?.status !== "active" || !existing.stripeSubscriptionId) {
     throw new Error("CANCEL_REQUIRES_ACTIVE_SUBSCRIPTION");
   }
@@ -105,4 +108,62 @@ export async function resumeSubscription(): Promise<void> {
 
   // No navigation and no direct Convex write here — same webhook round-trip
   // as cancelSubscription above.
+}
+
+export type CheckoutActionState = { error: "checkoutError" | null };
+
+/**
+ * Starts a one-time Stripe Checkout for a credit pack (CRED-09, CRED-10).
+ * Only the pack key and returnTo key are read from FormData; the price comes
+ * from server env and clerkUserId only from auth(). Available to Free and
+ * Premium users alike (D-11), so there is no subscription lookup.
+ */
+export async function createCreditPackCheckoutSession(
+  _prevState: CheckoutActionState,
+  formData: FormData,
+): Promise<CheckoutActionState> {
+  const { userId, redirectToSignIn } = await auth();
+  if (!userId) {
+    await redirectToSignIn();
+    return { error: null };
+  }
+
+  const pack = formData.get("pack");
+  if (!isPackKey(pack)) {
+    console.error("createCreditPackCheckoutSession: unknown pack key");
+    return { error: "checkoutError" };
+  }
+
+  const envVar = PACKS[pack].envVar;
+  const priceId = process.env[envVar];
+  if (!priceId) {
+    console.error(`createCreditPackCheckoutSession: missing env var ${envVar}`);
+    return { error: "checkoutError" };
+  }
+
+  // Open-redirect allow-list: only these two keys ever reach the URL.
+  const returnTo = formData.get("returnTo") === "notes" ? "notes" : "settings";
+  const baseUrl = getAppUrl();
+
+  let sessionUrl: string | null;
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { clerkUserId: userId, type: "ai_credit_pack", pack },
+      success_url: `${baseUrl}/${returnTo}`,
+      cancel_url: `${baseUrl}/${returnTo}`,
+    });
+    sessionUrl = session.url;
+  } catch (err) {
+    console.error("createCreditPackCheckoutSession: checkout failed", err);
+    return { error: "checkoutError" };
+  }
+
+  if (!sessionUrl) {
+    console.error("createCreditPackCheckoutSession: session has no url");
+    return { error: "checkoutError" };
+  }
+  // redirect() throws; keep it outside the try/catch.
+  redirect(sessionUrl);
 }

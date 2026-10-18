@@ -4,12 +4,14 @@ import { ConvexError } from "convex/values";
 const mockConstructEvent = vi.fn();
 const mockRetrieve = vi.fn();
 const mockAction = vi.fn();
+const mockListLineItems = vi.fn();
 
 vi.mock("stripe", () => ({
   default: vi.fn().mockImplementation(function StripeMock() {
     return {
       webhooks: { constructEvent: mockConstructEvent },
       subscriptions: { retrieve: mockRetrieve },
+      checkout: { sessions: { listLineItems: mockListLineItems } },
     };
   }),
 }));
@@ -46,6 +48,76 @@ describe("POST /api/webhooks/stripe", () => {
     mockConstructEvent.mockReset();
     mockRetrieve.mockReset();
     mockAction.mockReset();
+    mockListLineItems.mockReset();
+  });
+
+  describe("payment-mode line item snapshot", () => {
+    const paymentEvent = (type: string | undefined) => ({
+      id: "evt_pay",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_1",
+          mode: "payment",
+          metadata: type ? { type } : {},
+        },
+      },
+    });
+
+    it("attaches lineItemPriceIds and lineItemQuantities for ai_credit_pack", async () => {
+      mockConstructEvent.mockReturnValue(paymentEvent("ai_credit_pack"));
+      mockListLineItems.mockResolvedValue({
+        data: [{ price: { id: "price_boost" }, quantity: 1 }],
+      });
+      mockAction.mockResolvedValue({});
+
+      const res = await POST(makeRequest("{}"));
+
+      expect(res.status).toBe(200);
+      expect(mockListLineItems).toHaveBeenCalledWith("cs_1", { limit: 10 });
+      const forwarded = mockAction.mock.calls[0][1].event.data.object;
+      expect(forwarded.lineItemPriceIds).toEqual(["price_boost"]);
+      expect(forwarded.lineItemQuantities).toEqual([1]);
+    });
+
+    it("does not fetch line items for marketplace_purchase", async () => {
+      mockConstructEvent.mockReturnValue(paymentEvent("marketplace_purchase"));
+      mockAction.mockResolvedValue({});
+
+      await POST(makeRequest("{}"));
+
+      expect(mockListLineItems).not.toHaveBeenCalled();
+    });
+
+    it("does not fetch line items for subscription-mode sessions", async () => {
+      mockConstructEvent.mockReturnValue({
+        id: "evt_sub",
+        type: "checkout.session.completed",
+        data: {
+          object: { id: "cs_2", mode: "subscription", subscription: "sub_1" },
+        },
+      });
+      mockRetrieve.mockResolvedValue({
+        status: "active",
+        items: { data: [{ current_period_end: 5 }] },
+        cancel_at_period_end: false,
+      });
+      mockAction.mockResolvedValue({});
+
+      await POST(makeRequest("{}"));
+
+      expect(mockListLineItems).not.toHaveBeenCalled();
+      const forwarded = mockAction.mock.calls[0][1].event.data.object;
+      expect(forwarded.subscriptionSnapshot.status).toBe("active");
+    });
+
+    it("propagates a listLineItems failure (route rejects, Convex not called)", async () => {
+      mockConstructEvent.mockReturnValue(paymentEvent("ai_credit_pack"));
+      mockListLineItems.mockRejectedValue(new Error("stripe down"));
+
+      await expect(POST(makeRequest("{}"))).rejects.toThrow("stripe down");
+      expect(mockAction).not.toHaveBeenCalled();
+    });
   });
 
   it("returns 400 when the Stripe signature is invalid, and never calls Convex", async () => {

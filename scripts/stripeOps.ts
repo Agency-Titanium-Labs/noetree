@@ -1,4 +1,10 @@
 import type Stripe from "stripe";
+import {
+  PACKS,
+  PACK_KEYS,
+  packLookupKey,
+  type PackKey,
+} from "../convex/helpers/creditCatalog";
 
 // Pure, dependency-injected Stripe operations module — never constructs its
 // own client, never reads environment variables, no top-level side effects.
@@ -9,7 +15,7 @@ import type Stripe from "stripe";
 export const PREMIUM_PRODUCT_NAME = "Premium";
 // Shown by Stripe Checkout under the product title — must not say "Pro".
 export const PREMIUM_PRODUCT_DESCRIPTION =
-  "Premium subscription - 100 AI credits/month";
+  "Premium subscription - 500 AI credits/month";
 export const PREMIUM_CURRENCY = "eur";
 export const PREMIUM_MONTHLY_AMOUNT_CENTS = 699;
 export const PREMIUM_ANNUAL_AMOUNT_CENTS = 5900;
@@ -103,6 +109,82 @@ export async function setupPremiumPrices(
     createdMonthly,
     createdAnnual,
   };
+}
+
+export const CREDIT_PACK_CURRENCY = "eur";
+
+const PACK_DISPLAY_NAMES: Record<PackKey, string> = {
+  decouverte: "Découverte",
+  boost: "Boost",
+  pro: "Pro",
+};
+
+export type SetupCreditPackPricesResult = Record<
+  PackKey,
+  { productId: string; priceId: string; created: boolean }
+>;
+
+/**
+ * Idempotent one-time-Price setup for the AI credit packs. Each pack is
+ * identified by a Stripe lookup key (credit_pack_<pack>): an existing active
+ * price with that key is reused if its amount matches, and an amount mismatch
+ * throws (Price amounts are immutable; this never mutates existing prices).
+ */
+export async function setupCreditPackPrices(
+  stripe: Stripe,
+): Promise<SetupCreditPackPricesResult> {
+  const result = {} as SetupCreditPackPricesResult;
+
+  for (const pack of PACK_KEYS) {
+    const { credits, priceCents } = PACKS[pack];
+    const lookupKey = packLookupKey(pack);
+
+    let existing: Stripe.Price | undefined;
+    for await (const price of stripe.prices.list({
+      lookup_keys: [lookupKey],
+      active: true,
+      limit: 1,
+    })) {
+      existing = price;
+      break;
+    }
+
+    if (existing) {
+      if (
+        existing.unit_amount !== priceCents ||
+        existing.currency !== CREDIT_PACK_CURRENCY
+      ) {
+        throw new Error(
+          `setupCreditPackPrices: ${pack} price ${existing.id} has unit_amount ${existing.unit_amount}, expected ${priceCents}`,
+        );
+      }
+      result[pack] = {
+        productId:
+          typeof existing.product === "string"
+            ? existing.product
+            : existing.product.id,
+        priceId: existing.id,
+        created: false,
+      };
+      continue;
+    }
+
+    const metadata = { pack, credits: String(credits) };
+    const product = await stripe.products.create({
+      name: `AI credits - ${PACK_DISPLAY_NAMES[pack]} (${credits})`,
+      metadata,
+    });
+    const price = await stripe.prices.create({
+      product: product.id,
+      currency: CREDIT_PACK_CURRENCY,
+      unit_amount: priceCents,
+      lookup_key: lookupKey,
+      metadata,
+    });
+    result[pack] = { productId: product.id, priceId: price.id, created: true };
+  }
+
+  return result;
 }
 
 export interface MigrationResult {

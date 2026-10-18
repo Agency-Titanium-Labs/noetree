@@ -8,6 +8,7 @@ import { ConvexError } from "convex/values";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { routing } from "@/i18n/routing";
+import { getAppUrl } from "@/lib/appUrl";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -101,7 +102,7 @@ export async function createMarketplaceCheckout(
   }
 
   const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-  const baseUrl = process.env.APP_URL!;
+  const baseUrl = getAppUrl()!;
   let url: string | null = null;
 
   try {

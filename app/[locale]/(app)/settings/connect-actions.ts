@@ -6,6 +6,7 @@ import Stripe from "stripe";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { routing } from "@/i18n/routing";
+import { getAppUrl } from "@/lib/appUrl";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -114,7 +115,7 @@ export async function createConnectOnboardingLink(
     }
   }
 
-  const baseUrl = process.env.APP_URL!;
+  const baseUrl = getAppUrl()!;
   let accountLink: Stripe.Response<Stripe.AccountLink>;
   try {
     // D-07: the link is regenerated on every click and never persisted or
