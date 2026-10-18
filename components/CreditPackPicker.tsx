@@ -40,7 +40,8 @@ function PackCard({
   }, [isPending, state, onError]);
 
   const { credits, priceCents } = PACKS[pack];
-  const recommended = "recommended" in PACKS[pack] && PACKS[pack].recommended;
+  const recommended =
+    "recommended" in PACKS[pack] && PACKS[pack].recommended === true;
   const price = priceCents / 100;
   const name = t(`packs.${pack}`);
 

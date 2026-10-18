@@ -5,11 +5,14 @@ import { useTranslations, useLocale } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@/convex/_generated/api";
+import { isPackKey } from "@/convex/helpers/creditCatalog";
+import CreditPackPicker from "@/components/CreditPackPicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SettingsCreditsCard() {
   const t = useTranslations("Settings");
+  const tCredits = useTranslations("AiCredits");
   const locale = useLocale();
   const { isSignedIn } = useUser();
 
@@ -25,6 +28,14 @@ export default function SettingsCreditsCard() {
 
   const showSkeleton = isSignedIn && (isCreditsPending || isTopupsPending);
 
+  const resetDate =
+    credits?.nextResetAt != null
+      ? new Intl.DateTimeFormat(locale, {
+          dateStyle: "medium",
+          timeZone: "UTC",
+        }).format(new Date(credits.nextResetAt))
+      : null;
+
   return (
     <Card>
       <CardHeader>
@@ -34,12 +45,42 @@ export default function SettingsCreditsCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {showSkeleton ? (
-          <Skeleton className="h-6 w-40" />
+          <>
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-24" />
+          </>
         ) : (
           <>
-            <p className="text-base">
-              {t("creditsBalance", { count: credits?.balance ?? 0 })}
-            </p>
+            <div className="space-y-1">
+              <p className="text-base font-semibold">
+                {t("creditsBalance", { count: credits?.total ?? 0 })}
+              </p>
+              {credits ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {t("creditsSplit", {
+                      monthly: credits.monthly,
+                      purchased: credits.purchased,
+                    })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {resetDate
+                      ? t("creditsSplitCaption", { date: resetDate })
+                      : t("creditsSplitCaptionNoDate")}
+                  </p>
+                </>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">
+                {tCredits("packsHeading")}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {tCredits("packsHelper")}
+              </p>
+              <CreditPackPicker returnTo="settings" />
+            </div>
 
             <div className="space-y-2">
               <p className="text-sm font-medium">{t("topupHistoryTitle")}</p>
@@ -61,7 +102,12 @@ export default function SettingsCreditsCard() {
                           day: "numeric",
                         })}
                       </span>
-                      <span>{row.amount}</span>
+                      <span>
+                        {isPackKey(row.packKey)
+                          ? `${tCredits(`packs.${row.packKey}`)} `
+                          : ""}
+                        +{row.amount}
+                      </span>
                     </li>
                   ))}
                 </ul>

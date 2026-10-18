@@ -14,9 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import CreditPackPicker from "@/components/CreditPackPicker";
 import { Link } from "@/i18n/routing";
 import { api } from "@/convex/_generated/api";
-import { createTopupCheckoutSession } from "@/app/[locale]/(app)/notes/actions";
 
 interface CreditsExhaustedDialogProps {
   open: boolean;
@@ -29,10 +29,9 @@ export default function CreditsExhaustedDialog({
 }: CreditsExhaustedDialogProps) {
   const t = useTranslations("AiCredits");
 
-  // D-11: tier branches the dialog's CTA between "Upgrade to Premium" (Free)
-  // and "Buy 50 credits" (Premium-at-zero). Sourced from getSubscriptionTier
-  // (D-03) — the single server-derived source of truth, not a local
-  // subscription-status recomputation (RESEARCH.md Pitfall 4).
+  // D-11: tier only branches the body copy and the Upgrade button; the
+  // three-pack picker is shown to both tiers. Sourced from
+  // getSubscriptionTier (single server-derived source of truth).
   const { data: tier } = useQuery(
     convexQuery(api.subscriptions.getSubscriptionTier, {}),
   );
@@ -40,26 +39,23 @@ export default function CreditsExhaustedDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("dialogTitle")}</DialogTitle>
           <DialogDescription>
             {isPremium ? t("dialogBodyPremium") : t("dialogBodyFree")}
           </DialogDescription>
         </DialogHeader>
+        <CreditPackPicker returnTo="notes" />
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="secondary">{t("dismiss")}</Button>
           </DialogClose>
-          {isPremium ? (
-            <form action={createTopupCheckoutSession}>
-              <Button type="submit">{t("topupCta")}</Button>
-            </form>
-          ) : (
-            <Button asChild>
+          {!isPremium ? (
+            <Button variant="outline" asChild>
               <Link href="/pricing">{t("upgradeCta")}</Link>
             </Button>
-          )}
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
