@@ -209,7 +209,7 @@ Plans:
 **Wave 1**
 
 - [x] 16-01-PLAN.md — Shared pure credit catalog (costs, quotas, packs, UTC month math, price-ID map) + schema widening for two buckets
-- [ ] 16-02-PLAN.md — en/fr copy for costs, packs, quotas (30/500) + i18n key parity test
+- [x] 16-02-PLAN.md — en/fr copy for costs, packs, quotas (30/500) + i18n key parity test
 
 **Wave 2**
 
@@ -245,7 +245,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 13. Sharing — Links & Public Notes             | v1.2      | 7/7            | Complete    | 2026-10-18 |
 | 14. Comments & Notifications                   | v1.2      | 8/8            | Complete    | 2026-10-17 |
 | 15. Version History & Restoration              | v1.2      | 6/6            | Complete    | 2026-10-17 |
-| 16. AI Credit System Revision                  | v1.2      | 1/8            | In Progress |            |
+| 16. AI Credit System Revision                  | v1.2      | 2/8            | In Progress |            |
 
 ---
 

@@ -46,7 +46,7 @@ Requirements for this milestone. Each maps to a roadmap phase.
 ### AI Credits
 
 - [x] **CRED-05**: Each AI action has a defined credit cost (1 credit for basic generation/suggestions, 3-5 credits for complex semantic analysis / note-linking generation)
-- [ ] **CRED-06**: User sees the credit cost of an action before triggering it
+- [x] **CRED-06**: User sees the credit cost of an action before triggering it
 - [x] **CRED-07**: Free tier receives a monthly credit grant (~30 credits, non-cumulative, reset on the 1st of the month) — new mechanism, Free tier receives no grant today
 - [x] **CRED-08**: Premium tier's monthly credit grant is ~500 credits, auto-renewing
 - [x] **CRED-09**: User can purchase one of three one-time credit packs via Stripe Checkout — Découverte (2€/100cr), Boost (5€/300cr), Pro (10€/700cr)
@@ -116,7 +116,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | HIST-04     | Phase 15 — Version History & Restoration      | Complete |
 | HIST-05     | Phase 15 — Version History & Restoration      | Complete |
 | CRED-05     | Phase 16 — AI Credit System Revision          | Complete |
-| CRED-06     | Phase 16 — AI Credit System Revision          | Pending  |
+| CRED-06     | Phase 16 — AI Credit System Revision          | Complete |
 | CRED-07     | Phase 16 — AI Credit System Revision          | Complete |
 | CRED-08     | Phase 16 — AI Credit System Revision          | Complete |
 | CRED-09     | Phase 16 — AI Credit System Revision          | Complete |
