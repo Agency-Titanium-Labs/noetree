@@ -31,7 +31,7 @@ const checkoutSuccessMessages: Record<string, string> = {
   timeoutAction: "Refresh status",
   confirmedHeading: "Subscription active",
   confirmedBody:
-    "You're all set — enjoy unlimited notes and 100 AI credits every month.",
+    "You're all set — enjoy unlimited notes and 500 AI credits every month.",
   goToNotes: "Go to notes",
 };
 
