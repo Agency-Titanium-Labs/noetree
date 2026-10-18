@@ -108,6 +108,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
         },
       },
       immediatelyRender: false,
+      shouldRerenderOnTransaction: true,
     },
     [selectedNote?._id, t],
   );
