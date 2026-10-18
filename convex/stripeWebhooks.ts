@@ -1,6 +1,13 @@
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v, ConvexError } from "convex/values";
+import {
+  PACKS,
+  PACK_KEYS,
+  LEGACY_TOPUP_CREDITS,
+  LEGACY_TOPUP_PRICE_ENV,
+  packForPriceId,
+} from "./helpers/creditCatalog";
 
 /**
  * Maps Stripe's richer subscription status union down to this app's 3-value
@@ -92,27 +99,26 @@ export const processWebhookEvent = action({
         }
 
         if (session.mode === "payment") {
-          // Legacy fallback: sessions created before this phase have no
-          // metadata.type (Checkout sessions live at most 24 h). Anything
-          // that looks marketplace-ish (purchaseId) or has an unknown type
-          // must never grant credits.
-          const isTopup =
+          // Credit kinds: the Phase 16 pack, plus the legacy single top-up.
+          // Anything that looks marketplace-ish (purchaseId) or has an
+          // unknown type must never grant credits.
+          const isPack = type === "ai_credit_pack";
+          // Legacy branch exists for in-flight pre-Phase-16 Checkout sessions
+          // (they expire within 24 h); safe to delete once
+          // STRIPE_TOPUP_PRICE_ID is retired.
+          const isLegacy =
             type === "ai_credit_topup" ||
             (type === undefined && purchaseId === undefined);
-          if (!isTopup) {
+          if (!isPack && !isLegacy) {
             console.error(
               `checkout.session.completed (payment) anomaly: unknown checkout type for stripeEventId ${args.event.id}`,
             );
             return { anomaly: "unknown checkout type" };
           }
 
-          // Mirrors the D-12 missing-clerkUserId anomaly guard used by
-          // upsertSubscription/deleteSubscription: addCredits' clerkUserId
-          // arg is a required v.string() (per this plan's interface
-          // contract), so an unguarded call here would throw an uncaught
-          // ArgumentValidationError — surfacing as a 500 to Stripe and
-          // triggering endless webhook retries — instead of a clean anomaly
-          // return when session.metadata is null/missing.
+          // Mirrors the D-12 missing-clerkUserId anomaly guard: addCredits'
+          // clerkUserId arg is a required v.string(), so an unguarded call
+          // would throw and trigger endless webhook retries.
           if (!clerkUserId) {
             console.error(
               `checkout.session.completed (payment) anomaly: missing clerkUserId for stripeEventId ${args.event.id}`,
@@ -120,15 +126,81 @@ export const processWebhookEvent = action({
             return { anomaly: "missing clerkUserId" };
           }
 
+          // Line items are attached by the Next route (event fields are
+          // v.any()); validate shape before trusting them.
+          const rawPrices: unknown = session.lineItemPriceIds;
+          const rawQuantities: unknown = session.lineItemQuantities;
+          const priceIds =
+            Array.isArray(rawPrices) &&
+            rawPrices.every((p: unknown) => typeof p === "string")
+              ? (rawPrices as string[])
+              : null;
+          const quantities =
+            Array.isArray(rawQuantities) &&
+            rawQuantities.every((q: unknown) => typeof q === "number")
+              ? (rawQuantities as number[])
+              : null;
+          if (
+            priceIds === null ||
+            quantities === null ||
+            priceIds.length !== 1 ||
+            quantities.length !== 1 ||
+            quantities[0] !== 1
+          ) {
+            console.error(
+              `checkout.session.completed (payment) anomaly: invalid line items for stripeEventId ${args.event.id}`,
+            );
+            return { anomaly: "invalid line items" };
+          }
+          const priceId = priceIds[0];
+
+          const stripePaymentIntentId: string | undefined =
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : session.payment_intent?.id;
+
+          if (isPack) {
+            const pack = packForPriceId(priceId, process.env);
+            if (pack === null) {
+              console.error(
+                `checkout.session.completed (payment) anomaly: unknown credit pack price ${priceId} for stripeEventId ${args.event.id}; expected one of ${PACK_KEYS.map(k => PACKS[k].envVar).join(", ")}`,
+              );
+              return { anomaly: "unknown credit pack price" };
+            }
+            const metaPack: unknown = session.metadata?.pack;
+            if (metaPack !== undefined && metaPack !== pack) {
+              console.error(
+                `checkout.session.completed (payment) anomaly: metadata pack mismatch for stripeEventId ${args.event.id}`,
+              );
+              return { anomaly: "credit pack metadata mismatch" };
+            }
+            return await ctx.runMutation(internal.aiCredits.addCredits, {
+              stripeEventId: args.event.id,
+              eventType: args.event.type,
+              clerkUserId,
+              amount: PACKS[pack].credits,
+              packKey: pack,
+              stripePaymentIntentId,
+            });
+          }
+
+          const legacyPrice = process.env[LEGACY_TOPUP_PRICE_ENV];
+          if (
+            typeof legacyPrice !== "string" ||
+            legacyPrice === "" ||
+            legacyPrice !== priceId
+          ) {
+            console.error(
+              `checkout.session.completed (payment) anomaly: unknown legacy topup price ${priceId} for stripeEventId ${args.event.id}`,
+            );
+            return { anomaly: "unknown legacy topup price" };
+          }
           return await ctx.runMutation(internal.aiCredits.addCredits, {
             stripeEventId: args.event.id,
             eventType: args.event.type,
             clerkUserId,
-            amount: 50,
-            stripePaymentIntentId:
-              typeof session.payment_intent === "string"
-                ? session.payment_intent
-                : session.payment_intent?.id,
+            amount: LEGACY_TOPUP_CREDITS,
+            stripePaymentIntentId,
           });
         }
 

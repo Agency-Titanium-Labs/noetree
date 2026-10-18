@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 
@@ -45,8 +45,66 @@ const seedTopupCheckoutEvent = (
       mode: "payment",
       metadata: { clerkUserId },
       payment_intent: paymentIntentId,
+      lineItemPriceIds: ["price_legacy"],
+      lineItemQuantities: [1],
     },
   },
+});
+
+const PACK_PRICES = {
+  decouverte: "price_dec",
+  boost: "price_boost",
+  pro: "price_pro",
+} as const;
+
+const seedPackCheckoutEvent = (
+  id: string,
+  clerkUserId: string | undefined,
+  pack: string,
+  priceId: string,
+  opts: {
+    type?: string;
+    prices?: unknown;
+    quantities?: unknown;
+    paymentIntent?: string;
+  } = {},
+) => ({
+  id,
+  type: "checkout.session.completed",
+  data: {
+    object: {
+      mode: "payment",
+      metadata: {
+        ...(clerkUserId ? { clerkUserId } : {}),
+        type: opts.type ?? "ai_credit_pack",
+        pack,
+      },
+      payment_intent: opts.paymentIntent ?? "pi_" + id,
+      lineItemPriceIds: "prices" in opts ? opts.prices : [priceId],
+      lineItemQuantities: "quantities" in opts ? opts.quantities : [1],
+    },
+  },
+});
+
+const ENV_KEYS = [
+  "STRIPE_PACK_DECOUVERTE_PRICE_ID",
+  "STRIPE_PACK_BOOST_PRICE_ID",
+  "STRIPE_PACK_PRO_PRICE_ID",
+  "STRIPE_TOPUP_PRICE_ID",
+] as const;
+const savedEnv: Record<string, string | undefined> = {};
+beforeEach(() => {
+  for (const k of ENV_KEYS) savedEnv[k] = process.env[k];
+  process.env.STRIPE_PACK_DECOUVERTE_PRICE_ID = PACK_PRICES.decouverte;
+  process.env.STRIPE_PACK_BOOST_PRICE_ID = PACK_PRICES.boost;
+  process.env.STRIPE_PACK_PRO_PRICE_ID = PACK_PRICES.pro;
+  process.env.STRIPE_TOPUP_PRICE_ID = "price_legacy";
+});
+afterEach(() => {
+  for (const k of ENV_KEYS) {
+    if (savedEnv[k] === undefined) delete process.env[k];
+    else process.env[k] = savedEnv[k];
+  }
 });
 
 describe("stripeWebhooks.processWebhookEvent", () => {
@@ -120,6 +178,7 @@ describe("stripeWebhooks.processWebhookEvent", () => {
       await ctx.db.insert("aiCredits", {
         clerkUserId: "user_pay_1",
         balance: 10,
+        purchasedBalance: 10,
         lastResetAt: Date.now(),
       });
     });
@@ -132,7 +191,8 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_pay_1",
     });
-    expect(credits?.balance).toBe(60);
+    expect(credits?.purchasedBalance).toBe(60);
+    expect(credits?.balance).toBe(10);
 
     const topupTransactions = await t.run(async ctx => {
       const rows = await ctx.db.query("creditTransactions").collect();
@@ -170,10 +230,10 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_pay_2",
     });
-    expect(credits?.balance).toBe(50);
+    expect(credits?.purchasedBalance).toBe(50);
   });
 
-  it("checkout.session.completed with mode 'subscription' routes to upsertSubscription AND grants 100 credits via grantInitialCredits (reset semantics, not addCredits/topup)", async () => {
+  it("checkout.session.completed with mode 'subscription' routes to upsertSubscription AND grants 500 credits via grantInitialCredits (reset semantics, not addCredits/topup)", async () => {
     const t = convexTest(schema, modules);
 
     await t.action(api.stripeWebhooks.processWebhookEvent, {
@@ -206,7 +266,7 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_sub_explicit",
     });
-    expect(credits?.balance).toBe(100);
+    expect(credits?.balance).toBe(500);
 
     const transactions = await t.run(async ctx =>
       ctx.db.query("creditTransactions").collect(),
@@ -236,7 +296,7 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     const creditsAfterFirst = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_sub_replay",
     });
-    expect(creditsAfterFirst?.balance).toBe(100);
+    expect(creditsAfterFirst?.balance).toBe(500);
 
     await t.action(api.stripeWebhooks.processWebhookEvent, {
       secret: TEST_SECRET,
@@ -246,7 +306,7 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     const creditsAfterSecond = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_sub_replay",
     });
-    expect(creditsAfterSecond?.balance).toBe(100);
+    expect(creditsAfterSecond?.balance).toBe(500);
 
     const subs = await t.run(async ctx =>
       ctx.db.query("subscriptions").collect(),
@@ -260,7 +320,7 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     expect(resetTransactions.length).toBe(1);
   });
 
-  it("D-01 re-subscription: a user with a leftover balance of 42 resets to exactly 100 (not additive 142) on a new subscription-mode checkout", async () => {
+  it("D-01 re-subscription: a user with a leftover balance of 42 resets to exactly 500 (not additive) on a new subscription-mode checkout", async () => {
     const t = convexTest(schema, modules);
     await t.run(async ctx => {
       await ctx.db.insert("aiCredits", {
@@ -283,7 +343,7 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_sub_resub",
     });
-    expect(credits?.balance).toBe(100);
+    expect(credits?.balance).toBe(500);
   });
 
   it("customer.subscription.updated patches the existing row's status and cancelAtPeriodEnd", async () => {
@@ -442,7 +502,7 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     },
   );
 
-  it("invoice.paid with billing_reason subscription_cycle resets aiCredits balance to 100", async () => {
+  it("invoice.paid with billing_reason subscription_cycle resets aiCredits balance to 500", async () => {
     const t = convexTest(schema, modules);
     await t.run(async ctx => {
       await ctx.db.insert("subscriptions", {
@@ -472,7 +532,7 @@ describe("stripeWebhooks.processWebhookEvent", () => {
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_20",
     });
-    expect(credits?.balance).toBe(100);
+    expect(credits?.balance).toBe(500);
   });
 
   it("invoice.paid with billing_reason other than subscription_cycle is a no-op (D-13-equivalent scope boundary)", async () => {
@@ -803,7 +863,7 @@ describe("top-up type regression", () => {
     });
     const rows = await t.run(ctx => ctx.db.query("aiCredits").take(5));
     expect(rows).toHaveLength(1);
-    expect(JSON.stringify(rows[0])).toContain("50");
+    expect(rows[0].purchasedBalance).toBe(50);
   });
 
   it("ai_credit_topup typed top-up credits 50", async () => {
@@ -817,6 +877,166 @@ describe("top-up type regression", () => {
     });
     const rows = await t.run(ctx => ctx.db.query("aiCredits").take(5));
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("credit packs (CRED-09, CRED-10)", () => {
+  beforeEach(() => {
+    process.env.INTERNAL_WEBHOOK_SECRET = TEST_SECRET;
+  });
+
+  const run = (t: ReturnType<typeof convexTest>, event: unknown) =>
+    t.action(api.stripeWebhooks.processWebhookEvent, {
+      secret: TEST_SECRET,
+      event,
+    });
+  const rowCounts = (t: ReturnType<typeof convexTest>) =>
+    t.run(async ctx => ({
+      credits: (await ctx.db.query("aiCredits").take(5)).length,
+      tx: (await ctx.db.query("creditTransactions").take(5)).length,
+    }));
+
+  it.each([
+    ["decouverte", 100],
+    ["boost", 300],
+    ["pro", 700],
+  ] as const)("pack %s credits %i to the purchased bucket", async (pack, n) => {
+    const t = convexTest(schema, modules);
+    await t.run(async ctx => {
+      await ctx.db.insert("aiCredits", {
+        clerkUserId: "user_p",
+        balance: 7,
+        purchasedBalance: 0,
+        lastResetAt: Date.now(),
+      });
+    });
+    const res = await run(
+      t,
+      seedPackCheckoutEvent("evt_" + pack, "user_p", pack, PACK_PRICES[pack]),
+    );
+    expect(res).toEqual({ credited: n });
+    const credits = await t.query(internal.aiCredits.getCredits, {
+      clerkUserId: "user_p",
+    });
+    expect(credits?.purchasedBalance).toBe(n);
+    expect(credits?.balance).toBe(7);
+    const tx = await t.run(ctx => ctx.db.query("creditTransactions").take(5));
+    expect(tx).toHaveLength(1);
+    expect(tx[0]).toMatchObject({
+      type: "topup",
+      packKey: pack,
+      purchasedDelta: n,
+    });
+  });
+
+  it("replaying the same event grants nothing extra", async () => {
+    const t = convexTest(schema, modules);
+    const event = seedPackCheckoutEvent(
+      "evt_rep",
+      "user_r",
+      "boost",
+      "price_boost",
+    );
+    await run(t, event);
+    const second = await run(t, event);
+    expect(second).toEqual({ alreadyProcessed: true });
+    const credits = await t.query(internal.aiCredits.getCredits, {
+      clerkUserId: "user_r",
+    });
+    expect(credits?.purchasedBalance).toBe(300);
+  });
+
+  describe("anomalies grant nothing", () => {
+    beforeEach(() => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("unknown price id", async () => {
+      const t = convexTest(schema, modules);
+      const res = await run(
+        t,
+        seedPackCheckoutEvent("e1", "u", "boost", "price_unknown"),
+      );
+      expect(res).toEqual({ anomaly: "unknown credit pack price" });
+      expect(await rowCounts(t)).toEqual({ credits: 0, tx: 0 });
+    });
+
+    it("env var unset names the env var in console.error", async () => {
+      delete process.env.STRIPE_PACK_BOOST_PRICE_ID;
+      const t = convexTest(schema, modules);
+      const res = await run(
+        t,
+        seedPackCheckoutEvent("e2", "u", "boost", "price_boost"),
+      );
+      expect(res).toEqual({ anomaly: "unknown credit pack price" });
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("STRIPE_PACK_BOOST_PRICE_ID"),
+      );
+      expect(await rowCounts(t)).toEqual({ credits: 0, tx: 0 });
+    });
+
+    it.each([
+      ["missing", { prices: undefined }],
+      ["empty", { prices: [] }],
+      [
+        "two items",
+        { prices: ["price_boost", "price_pro"], quantities: [1, 1] },
+      ],
+      ["quantity 2", { quantities: [2] }],
+      ["bad quantity type", { quantities: ["1"] }],
+    ] as const)("invalid line items: %s", async (_name, opts) => {
+      const t = convexTest(schema, modules);
+      const res = await run(
+        t,
+        seedPackCheckoutEvent("e3", "u", "boost", "price_boost", opts),
+      );
+      expect(res).toEqual({ anomaly: "invalid line items" });
+      expect(await rowCounts(t)).toEqual({ credits: 0, tx: 0 });
+    });
+
+    it("metadata.pack mismatch", async () => {
+      const t = convexTest(schema, modules);
+      const res = await run(
+        t,
+        seedPackCheckoutEvent("e4", "u", "pro", "price_boost"),
+      );
+      expect(res).toEqual({ anomaly: "credit pack metadata mismatch" });
+      expect(await rowCounts(t)).toEqual({ credits: 0, tx: 0 });
+    });
+
+    it("missing clerkUserId", async () => {
+      const t = convexTest(schema, modules);
+      const res = await run(
+        t,
+        seedPackCheckoutEvent("e5", undefined, "boost", "price_boost"),
+      );
+      expect(res).toEqual({ anomaly: "missing clerkUserId" });
+      expect(await rowCounts(t)).toEqual({ credits: 0, tx: 0 });
+    });
+
+    it("unknown type", async () => {
+      const t = convexTest(schema, modules);
+      const res = await run(
+        t,
+        seedPackCheckoutEvent("e6", "u", "boost", "price_boost", {
+          type: "something_else",
+        }),
+      );
+      expect(res).toEqual({ anomaly: "unknown checkout type" });
+      expect(await rowCounts(t)).toEqual({ credits: 0, tx: 0 });
+    });
+
+    it("legacy topup with a non-legacy price", async () => {
+      const t = convexTest(schema, modules);
+      const event = seedTopupCheckoutEvent("e7", "u", "pi_7");
+      event.data.object.lineItemPriceIds = ["price_other"];
+      const res = await run(t, event);
+      expect(res).toEqual({ anomaly: "unknown legacy topup price" });
+      expect(await rowCounts(t)).toEqual({ credits: 0, tx: 0 });
+    });
   });
 });
 
