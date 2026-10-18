@@ -202,8 +202,30 @@ Plans:
 4. Premium-tier user receives an auto-renewing ~500-credit monthly grant
 5. User can purchase one of three one-time credit packs via Stripe Checkout — Découverte (2€/100cr), Boost (5€/300cr), Pro (10€/700cr)
 6. Every credit deduction or purchase amount is resolved server-side from the action type or Stripe price ID — never trusted from client input
-   **Plans**: TBD
-   **UI hint**: yes
+   **Plans**: 8 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 16-01-PLAN.md — Shared pure credit catalog (costs, quotas, packs, UTC month math, price-ID map) + schema widening for two buckets
+- [ ] 16-02-PLAN.md — en/fr copy for costs, packs, quotas (30/500) + i18n key parity test
+
+**Wave 2**
+
+- [ ] 16-03-PLAN.md — aiCredits rework: action-keyed costs, two-bucket deduction, lazy Free UTC reset, refund-to-origin, Premium 500, purchased-bucket addCredits, new getMyCredits shape
+- [ ] 16-05-PLAN.md — Stripe pack price setup script (stripe:setup-packs) + createCreditPackCheckoutSession server action
+
+**Wave 3**
+
+- [ ] 16-04-PLAN.md — Webhook: route attaches line items; dispatcher resolves pack credits from price ID (replaces amount 50)
+- [ ] 16-06-PLAN.md — CreditPackPicker + Settings credits card + exhausted dialog for both tiers; remove legacy top-up action
+- [ ] 16-07-PLAN.md — Toolbar AI actions menu with cost chips, total balance, toasts
+
+**Wave 4**
+
+- [ ] 16-08-PLAN.md — Phase gate + human checkpoints (Stripe pack prices, Next/Convex env vars, end-to-end test-mode verification)
+      **UI hint**: yes
 
 ## Progress
 
