@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Stripe from "stripe";
 import {
   setupPremiumPrices,
+  setupCreditPackPrices,
   migrateProToPremium,
   archiveOldPriceIfUnused,
 } from "./stripeOps";
@@ -38,6 +39,7 @@ function makeFakeStripe() {
     },
     products: {
       update: vi.fn(),
+      create: vi.fn(),
     },
     subscriptions: {
       list: vi.fn(),
@@ -70,7 +72,7 @@ describe("setupPremiumPrices", () => {
     expect(fake.prices.retrieve).toHaveBeenCalledWith("price_old_pro");
     expect(fake.products.update).toHaveBeenCalledWith("prod_123", {
       name: "Premium",
-      description: "Premium subscription - 100 AI credits/month",
+      description: "Premium subscription - 500 AI credits/month",
     });
   });
 
@@ -90,7 +92,7 @@ describe("setupPremiumPrices", () => {
 
     expect(fake.products.update).toHaveBeenCalledWith("prod_expanded_456", {
       name: "Premium",
-      description: "Premium subscription - 100 AI credits/month",
+      description: "Premium subscription - 500 AI credits/month",
     });
     expect(result.productId).toBe("prod_expanded_456");
   });
@@ -467,5 +469,92 @@ describe("archiveOldPriceIfUnused", () => {
 
     expect(fake.subscriptions.list).not.toHaveBeenCalled();
     expect(fake.prices.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("setupCreditPackPrices", () => {
+  let fake: ReturnType<typeof makeFakeStripe>;
+
+  beforeEach(() => {
+    fake = makeFakeStripe();
+  });
+
+  it("creates a product and one-time price per pack when none exist", async () => {
+    fake.prices.list.mockImplementation(() => makePricesListResult([]));
+    let n = 0;
+    fake.products.create.mockImplementation(async () => ({
+      id: `prod_${++n}`,
+    }));
+    let m = 0;
+    fake.prices.create.mockImplementation(async () => ({ id: `price_${++m}` }));
+
+    const result = await setupCreditPackPrices(fake as unknown as Stripe);
+
+    expect(fake.products.create).toHaveBeenCalledTimes(3);
+    expect(fake.prices.create).toHaveBeenCalledTimes(3);
+    const amounts = fake.prices.create.mock.calls.map(c => c[0].unit_amount);
+    expect(amounts).toEqual([200, 500, 1000]);
+    for (const call of fake.prices.create.mock.calls) {
+      expect(call[0]).not.toHaveProperty("recurring");
+      expect(call[0].currency).toBe("eur");
+    }
+    expect(fake.prices.create.mock.calls[1][0].lookup_key).toBe(
+      "credit_pack_boost",
+    );
+    expect(fake.products.create.mock.calls[1][0]).toMatchObject({
+      metadata: { pack: "boost", credits: "300" },
+    });
+    expect(result.boost).toEqual({
+      productId: "prod_2",
+      priceId: "price_2",
+      created: true,
+    });
+  });
+
+  it("reuses an existing price with matching amount", async () => {
+    const amountFor: Record<string, number> = {
+      credit_pack_decouverte: 200,
+      credit_pack_boost: 500,
+      credit_pack_pro: 1000,
+    };
+    fake.prices.list.mockImplementation((p: { lookup_keys: string[] }) =>
+      makePricesListResult([
+        {
+          id: `price_${p.lookup_keys[0]}`,
+          product: "prod_x",
+          currency: "eur",
+          unit_amount: amountFor[p.lookup_keys[0]],
+        },
+      ]),
+    );
+
+    const result = await setupCreditPackPrices(fake as unknown as Stripe);
+
+    expect(fake.products.create).not.toHaveBeenCalled();
+    expect(fake.prices.create).not.toHaveBeenCalled();
+    expect(result.pro).toEqual({
+      productId: "prod_x",
+      priceId: "price_credit_pack_pro",
+      created: false,
+    });
+  });
+
+  it("rejects on amount mismatch without creating anything", async () => {
+    fake.prices.list.mockImplementation(() =>
+      makePricesListResult([
+        {
+          id: "price_bad",
+          product: "prod_x",
+          currency: "eur",
+          unit_amount: 999,
+        },
+      ]),
+    );
+
+    await expect(
+      setupCreditPackPrices(fake as unknown as Stripe),
+    ).rejects.toThrow(/decouverte.*price_bad.*999.*200/);
+    expect(fake.prices.create).not.toHaveBeenCalled();
+    expect(fake.products.create).not.toHaveBeenCalled();
   });
 });
