@@ -47,12 +47,15 @@ export const LEGACY_TOPUP_PRICE_ENV = "STRIPE_TOPUP_PRICE_ID";
 
 /** Cost of an action, or null for unknown keys (including prototype keys). */
 export function costForAction(key: string): number | null {
-  if (!Object.hasOwn(ACTION_COSTS, key)) return null;
+  if (!Object.prototype.hasOwnProperty.call(ACTION_COSTS, key)) return null;
   return ACTION_COSTS[key as ActionKey];
 }
 
 export function isPackKey(value: unknown): value is PackKey {
-  return typeof value === "string" && Object.hasOwn(PACKS, value);
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(PACKS, value)
+  );
 }
 
 export function packLookupKey(pack: PackKey): string {
