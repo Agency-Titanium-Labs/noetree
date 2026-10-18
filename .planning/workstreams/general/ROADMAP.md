@@ -224,7 +224,7 @@ Plans:
 
 **Wave 4**
 
-- [ ] 16-08-PLAN.md — Phase gate + human checkpoints (Stripe pack prices, Next/Convex env vars, end-to-end test-mode verification)
+- [x] 16-08-PLAN.md — Phase gate + human checkpoints (Stripe pack prices, Next/Convex env vars, end-to-end test-mode verification)
       **UI hint**: yes
 
 ## Progress
@@ -245,7 +245,7 @@ v1.2 phases execute in numeric order: 12 → 13 → 14 → 15 → 16 (13 and 15 
 | 13. Sharing — Links & Public Notes             | v1.2      | 7/7            | Complete | 2026-10-18 |
 | 14. Comments & Notifications                   | v1.2      | 8/8            | Complete | 2026-10-17 |
 | 15. Version History & Restoration              | v1.2      | 6/6            | Complete | 2026-10-17 |
-| 16. AI Credit System Revision                  | v1.2      | 7/8            | Complete | 2026-10-18 |
+| 16. AI Credit System Revision                  | v1.2      | 8/8            | Complete | 2026-10-18 |
 
 ---
 

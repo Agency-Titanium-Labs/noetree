@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: milestone_complete
-stopped_at: Milestone complete (Phase 16 was final phase)
-last_updated: 2026-10-18T20:37:02.526Z
+status: completed
+stopped_at: Phase 16 complete; v1.2 ready for milestone audit/complete
+last_updated: "2026-10-18T20:54:26.891Z"
 last_activity: 2026-10-18
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 35
-  completed_plans: 34
-  percent: 80
+  completed_plans: 35
+  percent: 100
 ---
 
 ## Current Position
@@ -103,9 +103,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 
 ## Session Continuity
 
-Last session: 2026-10-18T15:54:41.384Z
-Stopped at: Phase 16 planned (8 plans)
-Resume file: None
+Last session: 2026-10-18T20:54:26.876Z
+Stopped at: Phase 16 complete; v1.2 ready for milestone audit/complete
+Resume file:
 
 ## Operator Next Steps
 
