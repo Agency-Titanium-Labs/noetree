@@ -12,7 +12,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 **Goal :** Passer à un modèle freemium sans limite de notes, avec de nouvelles fonctionnalités sociales (partage, commentaires, historique) et un système de crédits IA revu.
 
-**Target features :**
+**Livré :**
 
 - Suppression du plafond de 20 notes gratuites (illimité pour tous les plans)
 - Renommage du plan Pro → Premium, repricing (9€/mois → 6,99€/mois ou 59€/an), migration des abonnés existants
@@ -20,6 +20,8 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 - Commentaires & notifications
 - Historique & restauration de versions (Free limité ~24h, Premium historique complet + restauration)
 - Système de crédits IA revu (coûts différenciés par action : 1 crédit basique, 3-5 crédits complexe/sémantique ; nouveaux quotas mensuels Free/Premium ; 3 packs d'achat à la carte)
+
+**Reste à faire au go-live :** migration live des abonnés Pro → Premium (scripts `stripe:migrate-premium`), redéploiement dev/staging/production + un achat de test par environnement, vérification du retour Clerk sur lien de partage en édition. Voir `.planning/workstreams/general/milestones/v1.2-MILESTONE-AUDIT.md`.
 
 **Explicitement hors scope de cette milestone :**
 
@@ -111,16 +113,16 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 ## Key Decisions
 
-| Decision                              | Rationale                                                   | Outcome                                                    |
-| ------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
-| Stripe comme provider                 | Maturité, webhooks robustes, support abonnements + one-time | ✓ Confirmé — Phase 2                                       |
-| UI custom (pas Stripe Portal)         | Meilleure cohérence UX dans l'app                           | ✓ Confirmé — Phase 6 (Settings page)                       |
-| Convex pour stocker statut abonnement | Temps réel, cohérent avec le reste du stack                 | ✓ Confirmé — Phase 2                                       |
-| Modèle hybride Free/Pro + crédits     | Monétisation flexible : récurrent + usage IA                | ✓ Confirmé — Phase 2 (reset), Phase 5 (déduction + top-up) |
-| Snapshot à l'achat (titre, prix, commission) sur la ligne `purchases` | L'historique ne dépend pas de l'annonce vivante (dépubliée/supprimée/renommée) | ✓ Confirmé — v1.1 Phase 11 |
-| Compteur `sellerEarnings` incrémenté une fois dans `markPaidFromCheckout` | Totaux vendeur O(1) et sûrs au rejeu du webhook ; backfill idempotent | ✓ Confirmé — v1.1 Phase 11 |
-| Garde `isSellerActive` interne appelée côté serveur (annonce + checkout) | Payout-readiness imposé même si le client est contourné | ✓ Confirmé — v1.1 Phases 7-9 |
-| Pas de remboursement (ventes finales) | Contenu numérique ; doublons de paiement journalisés seulement | ⚠️ Revisit — anomalies webhook à traiter manuellement |
+| Decision                                                                  | Rationale                                                                      | Outcome                                                    |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| Stripe comme provider                                                     | Maturité, webhooks robustes, support abonnements + one-time                    | ✓ Confirmé — Phase 2                                       |
+| UI custom (pas Stripe Portal)                                             | Meilleure cohérence UX dans l'app                                              | ✓ Confirmé — Phase 6 (Settings page)                       |
+| Convex pour stocker statut abonnement                                     | Temps réel, cohérent avec le reste du stack                                    | ✓ Confirmé — Phase 2                                       |
+| Modèle hybride Free/Pro + crédits                                         | Monétisation flexible : récurrent + usage IA                                   | ✓ Confirmé — Phase 2 (reset), Phase 5 (déduction + top-up) |
+| Snapshot à l'achat (titre, prix, commission) sur la ligne `purchases`     | L'historique ne dépend pas de l'annonce vivante (dépubliée/supprimée/renommée) | ✓ Confirmé — v1.1 Phase 11                                 |
+| Compteur `sellerEarnings` incrémenté une fois dans `markPaidFromCheckout` | Totaux vendeur O(1) et sûrs au rejeu du webhook ; backfill idempotent          | ✓ Confirmé — v1.1 Phase 11                                 |
+| Garde `isSellerActive` interne appelée côté serveur (annonce + checkout)  | Payout-readiness imposé même si le client est contourné                        | ✓ Confirmé — v1.1 Phases 7-9                               |
+| Pas de remboursement (ventes finales)                                     | Contenu numérique ; doublons de paiement journalisés seulement                 | ⚠️ Revisit — anomalies webhook à traiter manuellement      |
 
 ## Evolution
 
@@ -143,4 +145,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-10-17 — after v1.1 milestone (Marketplace de notes) shipped_
+_Last updated: 2026-10-19 — after v1.2 milestone (Pricing V2 & Fonctionnalités Sociales) shipped_

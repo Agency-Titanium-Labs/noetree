@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 16 complete; v1.2 ready for milestone audit/complete
-last_updated: "2026-10-18T20:54:26.891Z"
-last_activity: 2026-10-18
+last_updated: "2026-10-18T22:33:30.024Z"
+last_activity: 2026-10-18 — Milestone v1.2 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -16,12 +16,10 @@ progress:
 
 ## Current Position
 
-Phase: 16
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-10-18
-
-Progress: [██████████] 97%
+Phase: Milestone v1.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-18 — Milestone v1.2 completed and archived
 
 ## Project Reference
 
@@ -101,6 +99,16 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-12:
 | -------- | --------------- | ------------------------------------------------------------- |
 | uat_gap  | 03-HUMAN-UAT.md | resolved (0 pending scenarios; stale open-artifact scan flag) |
 
+Items acknowledged and deferred at v1.2 milestone close on 2026-10-19:
+
+| Category         | Item               | Status                                                           |
+| ---------------- | ------------------ | ---------------------------------------------------------------- |
+| uat_gap          | 12-HUMAN-UAT.md    | partial — live Stripe cutover deferred to go-live                |
+| uat_gap          | 15-UAT.md          | partial — history list lag after restore (known issue)           |
+| verification_gap | 12-VERIFICATION.md | human_needed                                                     |
+| verification_gap | 13-VERIFICATION.md | human_needed — signed-out edit-link sign-in round trip           |
+| verification_gap | 16-VERIFICATION.md | human_needed — dev verified; deploy + prod test purchase pending |
+
 ## Session Continuity
 
 Last session: 2026-10-18T20:54:26.876Z
@@ -109,5 +117,4 @@ Resume file:
 
 ## Operator Next Steps
 
-- Review and approve the v1.2 roadmap (.planning/ROADMAP.md)
-- Start phase planning with `/gsd:plan-phase 12`
+- Start the next milestone with /gsd-new-milestone
