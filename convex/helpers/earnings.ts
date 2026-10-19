@@ -10,6 +10,7 @@ export const EMPTY_EARNINGS = {
   grossCents: 0,
   commissionCents: 0,
   netCents: 0,
+  vatCents: 0,
 };
 
 export const EARNINGS_RECOMPUTE_MAX = 4000;
@@ -29,6 +30,7 @@ export async function addSaleToEarnings(
       grossCents: row.grossCents + p.priceCents,
       commissionCents: row.commissionCents + p.commissionCents,
       netCents: row.netCents + p.sellerNetCents,
+      vatCents: (row.vatCents ?? 0) + (p.vatCents ?? 0),
     });
   } else {
     await ctx.db.insert("sellerEarnings", {
@@ -37,6 +39,7 @@ export async function addSaleToEarnings(
       grossCents: p.priceCents,
       commissionCents: p.commissionCents,
       netCents: p.sellerNetCents,
+      vatCents: p.vatCents ?? 0,
     });
   }
 }
@@ -53,6 +56,7 @@ export async function recomputeEarningsForSeller(
   grossCents: number;
   commissionCents: number;
   netCents: number;
+  vatCents: number;
   truncated: boolean;
 }> {
   const rows = await ctx.db
@@ -68,6 +72,7 @@ export async function recomputeEarningsForSeller(
     grossCents: used.reduce((a, r) => a + r.priceCents, 0),
     commissionCents: used.reduce((a, r) => a + r.commissionCents, 0),
     netCents: used.reduce((a, r) => a + r.sellerNetCents, 0),
+    vatCents: used.reduce((a, r) => a + (r.vatCents ?? 0), 0),
   };
   if (truncated) {
     console.error(

@@ -24,6 +24,8 @@ export const listMySales = query({
         commissionRateBps: v.number(),
         commissionCents: v.number(),
         sellerNetCents: v.number(),
+        vatRateBps: v.number(),
+        vatCents: v.number(),
       }),
     ),
     isDone: v.boolean(),
@@ -62,6 +64,8 @@ export const listMySales = query({
         commissionRateBps: p.commissionRateBps,
         commissionCents: p.commissionCents,
         sellerNetCents: p.sellerNetCents,
+        vatRateBps: p.vatRateBps ?? 0,
+        vatCents: p.vatCents ?? 0,
       })),
     };
   },
@@ -72,6 +76,7 @@ const totalsValidator = v.object({
   grossCents: v.number(),
   commissionCents: v.number(),
   netCents: v.number(),
+  vatCents: v.number(),
 });
 
 /** D-12: all-time totals from the denormalized sellerEarnings counter. */
@@ -91,6 +96,7 @@ export const getMyTotals = query({
       grossCents: row.grossCents,
       commissionCents: row.commissionCents,
       netCents: row.netCents,
+      vatCents: row.vatCents ?? 0,
     };
   },
 });
@@ -102,6 +108,7 @@ export const recomputeSellerEarnings = internalMutation({
     grossCents: v.number(),
     commissionCents: v.number(),
     netCents: v.number(),
+    vatCents: v.number(),
     truncated: v.boolean(),
   }),
   handler: async (ctx, args) => recomputeEarningsForSeller(ctx, args.sellerId),
