@@ -16,6 +16,7 @@ import {
 import { tierFromClerkUserId, tierFromSubscription } from "./helpers/helper";
 import {
   MAX_INFLIGHT_RUNS,
+  REAP_RETRY_MS,
   RUN_TTL_MS,
   SWEEP_BATCH,
   canTransition,
@@ -276,7 +277,7 @@ type SettleResult = {
 };
 
 /** Compare-and-set close of a run. Idempotent: a settled run is a no-op. */
-async function settle(
+export async function settle(
   ctx: MutationCtx,
   runId: Id<"aiRuns">,
   outcome: RunOutcome,
@@ -361,7 +362,7 @@ export const settleInternal = internalMutation({
     settle(ctx, args.runId, args.outcome, args.usage),
 });
 
-async function expireOne(
+export async function expireOne(
   ctx: MutationCtx,
   runId: Id<"aiRuns">,
   now: number,
@@ -391,14 +392,34 @@ export const sweepStaleRuns = internalMutation({
       .withIndex("by_status_and_createdAt", q =>
         q.eq("status", "reserved").lt("createdAt", now - RUN_TTL_MS),
       )
+      // Skip runs the reaper recently failed on (poisoned), see below.
+      .filter(q =>
+        q.or(
+          q.eq(q.field("reapFailedAt"), undefined),
+          q.lt(q.field("reapFailedAt"), now - REAP_RETRY_MS),
+        ),
+      )
       .take(SWEEP_BATCH);
     let refunded = 0;
+    let failed = 0;
     for (const run of stale) {
-      const r = await expireOne(ctx, run._id, now);
-      if (r.changed) refunded += 1;
+      try {
+        // Each run is expired in its own sub-transaction: if it throws, only
+        // that run's writes roll back and the rest of the batch proceeds.
+        const r: SettleResult = await ctx.runMutation(
+          internal.aiRuns.expireRun,
+          { runId: run._id },
+        );
+        if (r.changed) refunded += 1;
+      } catch (err) {
+        failed += 1;
+        console.error(`sweepStaleRuns: expiring run ${run._id} failed`, err);
+        await ctx.db.patch(run._id, { reapFailedAt: now });
+      }
     }
-    // Bounded work per transaction: continue if the batch was full.
-    if (stale.length === SWEEP_BATCH) {
+    // Bounded work per transaction: continue if the batch was full and made
+    // progress (a batch of only poisoned runs must not reschedule forever).
+    if (stale.length === SWEEP_BATCH && failed < stale.length) {
       await ctx.scheduler.runAfter(0, internal.aiRuns.sweepStaleRuns, {});
     }
     return refunded;
