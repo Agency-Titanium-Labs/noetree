@@ -496,6 +496,7 @@
     "colListing": "Listing",
     "colGross": "Gross",
     "colVat": "VAT",
+    "vatNotRecorded": "No VAT recorded for this sale",
     "colCommission": "Commission",
     "colNet": "Net",
     "colPayout": "Payout",

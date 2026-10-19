@@ -58,7 +58,12 @@ export default function SalesSummary() {
     {
       key: "vat",
       label: t("totalVat"),
-      value: <PriceLabel cents={totals?.vatCents ?? 0} />,
+      // No VAT withheld yet (feature off or only legacy sales): "-", not 0.
+      value: totals?.vatCents ? (
+        <PriceLabel cents={totals.vatCents} />
+      ) : (
+        <span aria-label={t("vatNotRecorded")}>-</span>
+      ),
     },
     {
       key: "commission",

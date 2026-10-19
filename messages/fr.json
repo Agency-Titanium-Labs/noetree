@@ -496,6 +496,7 @@
     "colListing": "Annonce",
     "colGross": "Brut",
     "colVat": "TVA",
+    "vatNotRecorded": "Aucune TVA enregistrée pour cette vente",
     "colCommission": "Commission",
     "colNet": "Net",
     "colPayout": "Versement",
