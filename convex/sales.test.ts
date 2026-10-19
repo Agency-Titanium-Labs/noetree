@@ -254,7 +254,7 @@ describe("getMyTotals", () => {
       priceCents: number;
       commissionCents: number;
       sellerNetCents: number;
-      vatCents: number;
+      vatCents?: number;
     }> = [];
     let cursor: string | null = null;
     for (;;) {
@@ -275,7 +275,7 @@ describe("getMyTotals", () => {
       grossCents: rows.reduce((a, r) => a + r.priceCents, 0),
       commissionCents: rows.reduce((a, r) => a + r.commissionCents, 0),
       netCents: rows.reduce((a, r) => a + r.sellerNetCents, 0),
-      vatCents: rows.reduce((a, r) => a + r.vatCents, 0),
+      vatCents: rows.reduce((a, r) => a + (r.vatCents ?? 0), 0),
     });
   });
 
