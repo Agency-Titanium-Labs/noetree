@@ -81,20 +81,21 @@
 
 ## Traceability
 
-| Requirement       | Phase | Status  |
-| ----------------- | ----- | ------- |
-| AIF-01 … AIF-07   | TBD   | Pending |
-| CTX-01 … CTX-05   | TBD   | Pending |
-| CHAT-01 … CHAT-04 | TBD   | Pending |
-| TREE-01 … TREE-05 | TBD   | Pending |
-| AUTO-01 … AUTO-03 | TBD   | Pending |
-| LINK-01 … LINK-04 | TBD   | Pending |
-| VAT-01 … VAT-06   | TBD   | Pending |
+| Requirement       | Phase    | Status  |
+| ----------------- | -------- | ------- |
+| AIF-01 … AIF-07   | Phase 17 | Pending |
+| CTX-01 … CTX-05   | Phase 18 | Pending |
+| CHAT-01 … CHAT-04 | Phase 19 | Pending |
+| TREE-01 … TREE-05 | Phase 20 | Pending |
+| AUTO-01 … AUTO-03 | Phase 21 | Pending |
+| LINK-01 … LINK-04 | Phase 22 | Pending |
+| VAT-01 … VAT-06   | Phase 23 | Pending |
 
 **Coverage:**
 
 - v1.3 requirements: 34 total
-- Mapped to phases: 0 (roadmap pending)
+- Mapped to phases: 34 (7 + 5 + 4 + 5 + 3 + 4 + 6)
+- Unmapped: 0
 
 ---
 
