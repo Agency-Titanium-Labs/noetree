@@ -27,7 +27,10 @@ export default function SalesSummary() {
     convexQuery(api.sales.getMyTotals, isSignedIn ? {} : "skip"),
   );
   const { data: connect } = useQuery(
-    convexQuery(api.connectAccounts.getMyConnectStatus, isSignedIn ? {} : "skip"),
+    convexQuery(
+      api.connectAccounts.getMyConnectStatus,
+      isSignedIn ? {} : "skip",
+    ),
   );
 
   async function handleOpenDashboard() {
@@ -53,6 +56,11 @@ export default function SalesSummary() {
       value: <PriceLabel cents={totals?.grossCents ?? 0} />,
     },
     {
+      key: "vat",
+      label: t("totalVat"),
+      value: <PriceLabel cents={totals?.vatCents ?? 0} />,
+    },
+    {
       key: "commission",
       label: t("totalCommission"),
       value: <PriceLabel cents={totals?.commissionCents ?? 0} />,
@@ -75,7 +83,7 @@ export default function SalesSummary() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         {cards.map(c => (
           <Card key={c.key} className="gap-1 p-4">
             {showSkeleton ? (

@@ -21,6 +21,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import SellerPriceBreakdown from "@/components/SellerPriceBreakdown";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -189,6 +190,8 @@ export default function ListingFormDialog({
   const scope = watch("scope");
   const tags = watch("tags");
   const description = watch("description");
+  const priceInput = watch("price");
+  const previewPriceCents = parsePriceToCents(priceInput ?? "");
 
   const previewQuery = useQuery(
     convexQuery(
@@ -402,6 +405,12 @@ export default function ListingFormDialog({
                 />
               </div>
               {errors.price && <FieldError>{errors.price.message}</FieldError>}
+              {!errors.price &&
+                previewPriceCents !== null &&
+                previewPriceCents >= MIN_PRICE_CENTS &&
+                previewPriceCents <= MAX_PRICE_CENTS && (
+                  <SellerPriceBreakdown priceCents={previewPriceCents} />
+                )}
             </Field>
 
             <Field data-invalid={errors.scope ? "true" : undefined}>

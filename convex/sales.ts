@@ -8,6 +8,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getUser } from "./helpers/helper";
+import { parseVatRateBps } from "./helpers/commission";
 import { EMPTY_EARNINGS, recomputeEarningsForSeller } from "./helpers/earnings";
 
 const SALES_PAGE_MAX = 50;
@@ -69,6 +70,15 @@ export const listMySales = query({
       })),
     };
   },
+});
+
+/** Seller-side preview config: the VAT rate the next sale will snapshot. */
+export const getSplitConfig = query({
+  args: {},
+  returns: v.object({ vatRateBps: v.number() }),
+  handler: async () => ({
+    vatRateBps: parseVatRateBps(process.env.MARKETPLACE_VAT_RATE_BPS),
+  }),
 });
 
 const totalsValidator = v.object({

@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 
 const state: { totals: unknown; connect: unknown } = {
   totals: undefined,
@@ -19,7 +25,9 @@ vi.mock("@convex-dev/react-query", () => ({
 vi.mock("@/convex/_generated/api", () => ({
   api: {
     sales: { getMyTotals: "sales.getMyTotals" },
-    connectAccounts: { getMyConnectStatus: "connectAccounts.getMyConnectStatus" },
+    connectAccounts: {
+      getMyConnectStatus: "connectAccounts.getMyConnectStatus",
+    },
   },
 }));
 vi.mock("@clerk/nextjs", () => ({ useUser: () => ({ isSignedIn: true }) }));
@@ -73,9 +81,14 @@ describe("SalesSummary", () => {
   });
 
   it("renders formatted zeros for empty totals", () => {
-    state.totals = { saleCount: 0, grossCents: 0, commissionCents: 0, netCents: 0 };
+    state.totals = {
+      saleCount: 0,
+      grossCents: 0,
+      commissionCents: 0,
+      netCents: 0,
+    };
     render(<SalesSummary />);
-    expect(screen.getAllByText("€0.00")).toHaveLength(3);
+    expect(screen.getAllByText("€0.00")).toHaveLength(4);
     expect(screen.getByText("0")).toBeInTheDocument();
   });
 
@@ -83,7 +96,7 @@ describe("SalesSummary", () => {
     state.totals = undefined;
     const { container } = render(<SalesSummary />);
     expect(screen.queryByText("Total gross")).not.toBeInTheDocument();
-    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(4);
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(5);
   });
 
   it("shows dashboard button for an active account and calls the action", () => {
@@ -91,7 +104,9 @@ describe("SalesSummary", () => {
     createConnectLoginLink.mockResolvedValue(undefined);
     render(<SalesSummary />);
     expect(screen.getByText("Stripe account active")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open Stripe dashboard" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open Stripe dashboard" }),
+    );
     expect(createConnectLoginLink).toHaveBeenCalledTimes(1);
   });
 
@@ -110,12 +125,16 @@ describe("SalesSummary", () => {
     createConnectLoginLink.mockRejectedValue(new Error("boom"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     render(<SalesSummary />);
-    fireEvent.click(screen.getByRole("button", { name: "Open Stripe dashboard" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open Stripe dashboard" }),
+    );
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We could not open Stripe right now.",
     );
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Open Stripe dashboard" })).toBeEnabled(),
+      expect(
+        screen.getByRole("button", { name: "Open Stripe dashboard" }),
+      ).toBeEnabled(),
     );
   });
 

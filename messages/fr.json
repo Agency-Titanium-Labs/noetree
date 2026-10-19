@@ -476,6 +476,7 @@
   "Sales": {
     "title": "Ventes et revenus",
     "totalGross": "Total brut",
+    "totalVat": "Total TVA",
     "totalCommission": "Total commission",
     "totalEarned": "Total gagné",
     "saleCount": "Ventes",
@@ -487,6 +488,7 @@
     "colDate": "Date",
     "colListing": "Annonce",
     "colGross": "Brut",
+    "colVat": "TVA",
     "colCommission": "Commission",
     "colNet": "Net",
     "colPayout": "Versement",
@@ -497,6 +499,14 @@
     "emptyCta": "Publier une note",
     "loadMore": "Afficher plus",
     "loadError": "Impossible de charger vos ventes. Actualisez la page ; si le problème persiste, contactez le support."
+  },
+  "SellerBreakdown": {
+    "title": "Ce que vous recevez",
+    "gross": "Prix payé par l'acheteur",
+    "vat": "TVA ({rate})",
+    "commission": "Commission Noetree ({rate})",
+    "net": "Vous recevez",
+    "note": "La TVA est incluse dans le prix et retenue sur votre part. L'acheteur paie exactement le prix affiché."
   },
   "SharedNote": {
     "pageTitle": "Note partagée",
