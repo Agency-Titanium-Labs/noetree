@@ -19,7 +19,11 @@ import {
 import { v, ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import { getUser, tierFromClerkUserId } from "./helpers/helper";
-import { countSubtree, syncListingTags } from "./helpers/listings";
+import {
+  countSubtree,
+  LISTING_LIMITS,
+  syncListingTags,
+} from "./helpers/listings";
 import { computeSplit, parseVatRateBps } from "./helpers/commission";
 import { deliverPurchase } from "./helpers/delivery";
 import { addSaleToEarnings } from "./helpers/earnings";
@@ -143,6 +147,13 @@ export const preparePurchase = mutation({
           existing.commissionCents + (existing.vatCents ?? 0),
         destinationAccountId: existing.destinationAccountId,
       };
+    }
+
+    // IN-02: legacy listings priced below the floor get a specific code
+    // instead of the generic "unavailable" (also keeps net > 0 and the Stripe
+    // card minimum respected).
+    if (listing.priceCents < LISTING_LIMITS.PRICE_MIN_CENTS) {
+      throw new ConvexError("PURCHASE_PRICE_BELOW_MINIMUM");
     }
 
     const sellerTier = await sellerTierFor(ctx, listing.sellerClerkUserId);

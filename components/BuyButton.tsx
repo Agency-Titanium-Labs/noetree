@@ -44,7 +44,8 @@ export default function BuyButton({
         setHidden(true);
       } else if (
         code === "LISTING_SUBTREE_TOO_LARGE" ||
-        code === "LISTING_CONTAINS_FOREIGN_NOTES"
+        code === "LISTING_CONTAINS_FOREIGN_NOTES" ||
+        code === "PURCHASE_PRICE_BELOW_MINIMUM"
       ) {
         setAlertKind("listingChanged");
         setHidden(true);
