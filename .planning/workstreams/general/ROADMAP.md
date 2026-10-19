@@ -45,7 +45,7 @@ Full phase details archived: `.planning/workstreams/general/milestones/v1.2-ROAD
 
 ### 🚧 v1.3 IA et TVA marketplace (Phases 17-23) — IN PROGRESS
 
-- [ ] **Phase 17: AI Foundation** - Reserve/settle/refund metering, single tier source, rate limits and kill switch, cost catalog
+- [x] **Phase 17: AI Foundation** - Reserve/settle/refund metering, single tier source, rate limits and kill switch, cost catalog
 - [ ] **Phase 18: Context Assembly** - Budgeted, permission-aware, injection-safe note context for the LLM
 - [ ] **Phase 19: Streaming Chat (Free)** - Streaming AI chat in the editor with selectable context
 - [ ] **Phase 20: Premium Context and Tree Agent** - Personal AI context and AI-proposed node trees applied atomically with undo
