@@ -1,12 +1,25 @@
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalMutation,
+  QueryCtx,
+  MutationCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v, ConvexError } from "convex/values";
 import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
-import { unpublishListingForNote } from "./helpers/listings";
+import {
+  isNoteOrAncestorPurchased,
+  unpublishListingForNote,
+} from "./helpers/listings";
 import { deleteShareLinkForNote } from "./helpers/sharing";
 import { deleteCommentsForNote } from "./helpers/commentAccess";
 import { planCopy, writeCopy } from "./helpers/delivery";
-import { deleteVersionsForNote, writeNoteContent } from "./helpers/noteVersions";
+import {
+  deleteVersionsForNote,
+  writeNoteContent,
+} from "./helpers/noteVersions";
 import {
   getInheritedPermission,
   getUserPermission,
@@ -820,10 +833,16 @@ export const duplicateNote = mutation({
     if (!planned.ok) {
       throw new Error("Note not found");
     }
+    // D-06: a duplicate of purchased content stays purchased content. The
+    // source flag / purchaseId propagates inside writeCopy; an unflagged
+    // legacy note sitting under a purchased note is caught by the ancestor
+    // walk here.
+    const underPurchased = await isNoteOrAncestorPurchased(ctx, args.id);
     const newNoteId = await writeCopy(ctx, planned.plan, {
       owner: user._id,
       parentNote: sourceNote.parentNote,
       rootTitle: uniqueTitle,
+      purchased: underPurchased,
     });
 
     if (sourceNote.parentNote) {
@@ -1205,5 +1224,117 @@ export const updateShareRole = mutation({
 
     await ctx.db.patch(args.shareId, { role: args.role });
     return true;
+  },
+});
+
+/** Budget units per backfillPurchasedFlag call (writes and page reads). */
+const BACKFILL_WRITE_BUDGET = 200;
+/** Budget units charged per page read (keeps reads per call bounded). */
+const BACKFILL_READ_COST = 5;
+/** Copy roots read per page and children read per page. */
+const BACKFILL_ROOT_PAGE = 20;
+const BACKFILL_CHILD_PAGE = 50;
+
+type BackfillFrontier = { id: Id<"notes">; after: number | null };
+type BackfillResult = {
+  flagged: number;
+  done: boolean;
+  next: {
+    rootCursor: string | null;
+    rootsDone: boolean;
+    frontier: BackfillFrontier[];
+  };
+};
+
+/**
+ * One-off, idempotent, INTERNAL backfill for Phase 18 D-06. Flags every
+ * existing copy root (by_purchaseId index) and all of its descendants with
+ * isPurchasedContent, for data created before the flag existed. Bounded: each
+ * call spends at most BACKFILL_WRITE_BUDGET units (1 per write, 5 per read
+ * page) and, unless autoContinue is false, schedules itself with the returned
+ * state until done. Re-running is safe: already flagged notes are traversed
+ * but never rewritten.
+ *
+ * Convex allows ONE paginate() per function, so roots use it (at most once
+ * per call) and children use a _creationTime key cursor on by_parent.
+ *
+ * Run (against the deployment YOU choose): npx convex run notes:backfillPurchasedFlag
+ */
+export const backfillPurchasedFlag = internalMutation({
+  args: {
+    rootCursor: v.optional(v.union(v.string(), v.null())),
+    rootsDone: v.optional(v.boolean()),
+    frontier: v.optional(
+      v.array(
+        v.object({ id: v.id("notes"), after: v.union(v.number(), v.null()) }),
+      ),
+    ),
+    autoContinue: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<BackfillResult> => {
+    let rootCursor = args.rootCursor ?? null;
+    let rootsDone = args.rootsDone ?? false;
+    const frontier: BackfillFrontier[] = [...(args.frontier ?? [])];
+    let flagged = 0;
+    let budget = BACKFILL_WRITE_BUDGET;
+    let rootsFetched = false;
+
+    while (budget > 0) {
+      const top = frontier.pop();
+      if (!top) {
+        if (rootsDone || rootsFetched) break;
+        rootsFetched = true;
+        const page = await ctx.db
+          .query("notes")
+          .withIndex("by_purchaseId", q => q.gt("purchaseId", undefined))
+          .paginate({ numItems: BACKFILL_ROOT_PAGE, cursor: rootCursor });
+        budget -= BACKFILL_READ_COST;
+        for (const root of page.page) {
+          if (root.isPurchasedContent !== true) {
+            await ctx.db.patch("notes", root._id, { isPurchasedContent: true });
+            flagged++;
+            budget--;
+          }
+          frontier.push({ id: root._id, after: null });
+        }
+        rootCursor = page.continueCursor;
+        rootsDone = page.isDone;
+        continue;
+      }
+      const children = await ctx.db
+        .query("notes")
+        .withIndex("by_parent", q =>
+          top.after === null
+            ? q.eq("parentNote", top.id)
+            : q.eq("parentNote", top.id).gt("_creationTime", top.after),
+        )
+        .take(BACKFILL_CHILD_PAGE);
+      budget -= BACKFILL_READ_COST;
+      if (children.length === BACKFILL_CHILD_PAGE) {
+        frontier.push({
+          id: top.id,
+          after: children[children.length - 1]._creationTime,
+        });
+      }
+      for (const child of children) {
+        if (child.isPurchasedContent !== true) {
+          await ctx.db.patch("notes", child._id, { isPurchasedContent: true });
+          flagged++;
+          budget--;
+        }
+        frontier.push({ id: child._id, after: null });
+      }
+    }
+
+    const done = frontier.length === 0 && rootsDone;
+    const next = { rootCursor, rootsDone, frontier };
+    if (!done && args.autoContinue !== false) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notes.backfillPurchasedFlag,
+        next,
+      );
+    }
+    return { flagged, done, next };
   },
 });
