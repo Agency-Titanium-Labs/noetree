@@ -30,6 +30,7 @@ import type * as helpers_noteText from "../helpers/noteText.js";
 import type * as helpers_noteVersions from "../helpers/noteVersions.js";
 import type * as helpers_permissions from "../helpers/permissions.js";
 import type * as helpers_purchaseAccess from "../helpers/purchaseAccess.js";
+import type * as helpers_purchasedFlag from "../helpers/purchasedFlag.js";
 import type * as helpers_sharing from "../helpers/sharing.js";
 import type * as listings from "../listings.js";
 import type * as marketplace from "../marketplace.js";
@@ -73,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   "helpers/noteVersions": typeof helpers_noteVersions;
   "helpers/permissions": typeof helpers_permissions;
   "helpers/purchaseAccess": typeof helpers_purchaseAccess;
+  "helpers/purchasedFlag": typeof helpers_purchasedFlag;
   "helpers/sharing": typeof helpers_sharing;
   listings: typeof listings;
   marketplace: typeof marketplace;
