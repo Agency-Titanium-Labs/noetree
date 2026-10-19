@@ -528,7 +528,11 @@ describe("randomized interleavings keep the ledger consistent", () => {
         r =>
           r.type === "refund" && r.refundsTransactionId === run.transactionId,
       );
-      expect(refunds.length).toBe(run.status === "refunded" ? 1 : 0);
+      // A refunded run has one refund row, or none when nothing was restored
+      // (cross-month Free refund of a purely monthly debit, M5).
+      expect(refunds.length).toBe(run.refundTransactionId ? 1 : 0);
+      if (run.status !== "refunded")
+        expect(run.refundTransactionId).toBeUndefined();
     }
   });
 });

@@ -146,13 +146,17 @@ export async function applyDeduction(
   return { transactionId, fromMonthly, fromPurchased };
 }
 
-// Refund-to-origin (D-06): restores exactly what each bucket paid.
+// Refund-to-origin (D-06): restores exactly what each bucket paid. When
+// nothing is restored (both parts 0, e.g. a cross-month Free refund of a
+// purely monthly debit) no ledger row is written and null is returned: a
+// zero-amount "refund" row would be noise in the ledger.
 export async function refundDraw(
   ctx: MutationCtx,
   clerkUserId: string,
   draw: Draw,
   actionKey: string,
-) {
+): Promise<Id<"creditTransactions"> | null> {
+  if (draw.fromMonthly <= 0 && draw.fromPurchased <= 0) return null;
   const row = await ctx.db
     .query("aiCredits")
     .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))

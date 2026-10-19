@@ -13,7 +13,7 @@ import {
   monthStartUtc,
   tierForAction,
 } from "./helpers/creditCatalog";
-import { tierFromClerkUserId } from "./helpers/helper";
+import { tierFromClerkUserId, tierFromSubscription } from "./helpers/helper";
 import {
   MAX_INFLIGHT_RUNS,
   RUN_TTL_MS,
@@ -224,7 +224,7 @@ async function refundRunOnce(
   ctx: MutationCtx,
   run: Doc<"aiRuns">,
   now: number,
-): Promise<Id<"creditTransactions">> {
+): Promise<Id<"creditTransactions"> | null> {
   const already = await ctx.db
     .query("creditTransactions")
     .withIndex("by_refundsTransactionId", q =>
@@ -237,7 +237,13 @@ async function refundRunOnce(
     .query("aiCredits")
     .withIndex("by_clerkUserId", q => q.eq("clerkUserId", run.clerkUserId))
     .unique();
-  const tier = await tierFromClerkUserId(ctx, run.clerkUserId);
+  // .first(), not .unique(): a duplicate subscription row must never make the
+  // refund/expire path throw and strand a reservation.
+  const sub = await ctx.db
+    .query("subscriptions")
+    .withIndex("by_clerkUserId", q => q.eq("clerkUserId", run.clerkUserId))
+    .first();
+  const tier = tierFromSubscription(sub);
   // A monthly reset since the debit already replaced that bucket; restoring
   // would push it above its quota. Purchased credits never expire: always
   // restored.
@@ -260,7 +266,7 @@ async function refundRunOnce(
     },
     run.actionKey,
   );
-  await ctx.db.patch(refundId, { aiRunId: run._id });
+  if (refundId) await ctx.db.patch(refundId, { aiRunId: run._id });
   return refundId;
 }
 
@@ -276,6 +282,13 @@ async function settle(
   outcome: RunOutcome,
   usage?: { inputTokens?: number; outputTokens?: number },
 ): Promise<SettleResult> {
+  if (usage) {
+    for (const n of [usage.inputTokens, usage.outputTokens]) {
+      if (n !== undefined && (!Number.isInteger(n) || n < 0)) {
+        throw new ConvexError("INVALID_USAGE");
+      }
+    }
+  }
   const run = await ctx.db.get(runId);
   if (!run) throw new ConvexError("RUN_NOT_FOUND");
 
@@ -291,7 +304,7 @@ async function settle(
       status: "refunded",
       settledAt: now,
       outcome,
-      refundTransactionId,
+      ...(refundTransactionId ? { refundTransactionId } : {}),
       ...(usage ? { usage } : {}),
     });
   } else {

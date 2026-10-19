@@ -729,3 +729,85 @@ describe("end to end with the fake LLM provider", () => {
     expect(await balances(t)).toMatchObject({ monthly: 7 });
   });
 });
+
+describe("settle hardening", () => {
+  it("rejects a bad secret with a generic message that does not name the env var", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    const { runId } = await begin(t, "r1");
+    let msg = "";
+    try {
+      await t.mutation(api.aiRuns.settleRun, {
+        secret: "wrong",
+        runId,
+        outcome: "failed",
+      });
+    } catch (err) {
+      msg = errorCode(err);
+    }
+    expect(msg).toBe("Unauthorized");
+    expect(msg).not.toMatch(/INTERNAL_WEBHOOK_SECRET/);
+  });
+
+  it.each([
+    ["NaN", Number.NaN],
+    ["negative", -1],
+    ["fractional", 1.5],
+    ["Infinity", Number.POSITIVE_INFINITY],
+  ])(
+    "rejects %s token usage and leaves the run untouched (L4)",
+    async (_n, bad) => {
+      const t = convexTest(schema, modules);
+      await seedCredits(t, { monthly: 10 });
+      const { runId } = await begin(t, "r1");
+      for (const usage of [{ inputTokens: bad }, { outputTokens: bad }]) {
+        expect(
+          await rejects(
+            t.mutation(api.aiRuns.settleRun, {
+              secret: TEST_SECRET,
+              runId,
+              outcome: "completed",
+              usage,
+            }),
+          ),
+        ).toBe("INVALID_USAGE");
+      }
+      expect((await runs(t))[0].status).toBe("reserved");
+    },
+  );
+
+  it("stores valid integer usage", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    const { runId } = await begin(t, "r1");
+    await t.mutation(api.aiRuns.settleRun, {
+      secret: TEST_SECRET,
+      runId,
+      outcome: "completed",
+      usage: { inputTokens: 12, outputTokens: 0 },
+    });
+    expect((await runs(t))[0].usage).toEqual({
+      inputTokens: 12,
+      outputTokens: 0,
+    });
+  });
+
+  it("writes no refund row when nothing is restored (M5)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 5, 30, 23, 59));
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 30 });
+    const { runId } = await begin(t, "r1", "semantic"); // all from monthly
+    vi.setSystemTime(Date.UTC(2026, 6, 1, 0, 6)); // next UTC month
+    expect(await settle(t, runId, "expired")).toEqual({
+      status: "refunded",
+      changed: true,
+    });
+    const ledgerRows = await ledger(t);
+    expect(ledgerRows.filter(r => r.type === "refund")).toHaveLength(0);
+    const [run] = await runs(t);
+    expect(run.status).toBe("refunded");
+    expect(run.refundTransactionId).toBeUndefined();
+    expect(await balances(t)).toMatchObject({ monthly: 27, purchased: 0 });
+  });
+});
