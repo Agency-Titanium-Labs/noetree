@@ -483,6 +483,7 @@
   "Sales": {
     "title": "Sales and earnings",
     "totalGross": "Total gross",
+    "totalVat": "Total VAT",
     "totalCommission": "Total commission",
     "totalEarned": "Total earned",
     "saleCount": "Sales",
@@ -494,6 +495,7 @@
     "colDate": "Date",
     "colListing": "Listing",
     "colGross": "Gross",
+    "colVat": "VAT",
     "colCommission": "Commission",
     "colNet": "Net",
     "colPayout": "Payout",
@@ -504,6 +506,14 @@
     "emptyCta": "List a note",
     "loadMore": "Load more",
     "loadError": "We could not load your sales. Refresh the page; if it keeps happening, contact support."
+  },
+  "SellerBreakdown": {
+    "title": "What you receive",
+    "gross": "Price paid by the buyer",
+    "vat": "VAT ({rate})",
+    "commission": "Noetree commission ({rate})",
+    "net": "You receive",
+    "note": "VAT is included in the price and withheld from your share. The buyer pays exactly the displayed price."
   },
   "SharedNote": {
     "pageTitle": "Shared note",

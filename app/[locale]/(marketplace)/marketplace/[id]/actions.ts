@@ -33,6 +33,7 @@ type Snapshot = {
   priceCents: number;
   currency: string;
   commissionCents: number;
+  applicationFeeCents: number;
   destinationAccountId: string;
   listingId: string;
 };
@@ -67,7 +68,7 @@ async function createDestinationSession(
         },
       ],
       payment_intent_data: {
-        application_fee_amount: snapshot.commissionCents,
+        application_fee_amount: snapshot.applicationFeeCents,
         transfer_data: { destination: snapshot.destinationAccountId },
         metadata,
       },

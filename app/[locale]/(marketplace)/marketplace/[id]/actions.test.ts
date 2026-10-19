@@ -55,6 +55,7 @@ function snap(over: Record<string, unknown> = {}) {
     priceCents: 1500,
     currency: "eur",
     commissionCents: 225,
+    applicationFeeCents: 480,
     destinationAccountId: "acct_seller",
     listingId: LISTING,
     ...over,
@@ -156,7 +157,7 @@ describe("createMarketplaceCheckout", () => {
         },
       ],
       payment_intent_data: {
-        application_fee_amount: 225,
+        application_fee_amount: 480,
         transfer_data: { destination: "acct_seller" },
         metadata: { type: "marketplace_purchase", purchaseId: "purchase1" },
       },

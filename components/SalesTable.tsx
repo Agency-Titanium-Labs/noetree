@@ -30,6 +30,8 @@ export type SaleRow = {
   commissionRateBps: number;
   commissionCents: number;
   sellerNetCents: number;
+  vatRateBps?: number;
+  vatCents?: number;
 };
 
 type Status = "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted";
@@ -112,6 +114,9 @@ export function SalesTableView({
                 {t("colGross")}
               </TableHead>
               <TableHead scope="col" className="text-right">
+                {t("colVat")}
+              </TableHead>
+              <TableHead scope="col" className="text-right">
                 {t("colCommission")}
               </TableHead>
               <TableHead scope="col" className="text-right">
@@ -127,6 +132,9 @@ export function SalesTableView({
                 <TableCell>{r.title}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   <PriceLabel cents={r.priceCents} />
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  <PriceLabel cents={r.vatCents ?? 0} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   <PriceLabel cents={r.commissionCents} />{" "}
@@ -158,6 +166,10 @@ export function SalesTableView({
                 <dt className="text-muted-foreground">{t("colGross")}</dt>
                 <dd className="text-right tabular-nums">
                   <PriceLabel cents={r.priceCents} />
+                </dd>
+                <dt className="text-muted-foreground">{t("colVat")}</dt>
+                <dd className="text-right tabular-nums">
+                  <PriceLabel cents={r.vatCents ?? 0} />
                 </dd>
                 <dt className="text-muted-foreground">{t("colCommission")}</dt>
                 <dd className="text-right tabular-nums">

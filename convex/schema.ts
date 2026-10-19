@@ -377,6 +377,10 @@ export default defineSchema({
     commissionRateBps: v.number(),
     commissionCents: v.number(),
     sellerNetCents: v.number(),
+    // Phase 23: VAT absorbed by the seller. Optional so v1.1/v1.2 rows stay
+    // valid; undefined reads as 0 (no backfill of history).
+    vatRateBps: v.optional(v.number()),
+    vatCents: v.optional(v.number()),
     scope: v.union(v.literal("note"), v.literal("subtree")),
     accessMode: v.union(v.literal("copy"), v.literal("readonly")),
     noteCount: v.number(),
@@ -425,5 +429,7 @@ export default defineSchema({
     grossCents: v.number(),
     commissionCents: v.number(),
     netCents: v.number(),
+    // Phase 23: undefined reads as 0.
+    vatCents: v.optional(v.number()),
   }).index("by_sellerId", ["sellerId"]),
 });

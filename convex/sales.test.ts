@@ -89,6 +89,8 @@ describe("listMySales (HIST-02)", () => {
         "priceCents",
         "sellerNetCents",
         "title",
+        "vatCents",
+        "vatRateBps",
       ].sort(),
     );
   });
@@ -179,8 +181,30 @@ describe("getMyTotals", () => {
     ).toEqual({
       saleCount: 1,
       grossCents: 1000,
-      commissionCents: 200,
-      netCents: 800,
+      commissionCents: 166,
+      netCents: 668,
+      vatCents: 166,
+    });
+  });
+
+  test("legacy rows without VAT fields read as 0, no backfill", async () => {
+    const s = await setupTotals();
+    const id = await sellPaid(s);
+    await s.t.run(async ctx => {
+      await ctx.db.patch("purchases", id, {
+        vatRateBps: undefined,
+        vatCents: undefined,
+      });
+      const e = (await ctx.db.query("sellerEarnings").take(1))[0];
+      await ctx.db.patch("sellerEarnings", e._id, { vatCents: undefined });
+    });
+    const seller = asUser(s.t, "seller");
+    const res = await seller.query(api.sales.listMySales, {
+      paginationOpts: { numItems: 5, cursor: null },
+    });
+    expect(res.page[0]).toMatchObject({ vatCents: 0, vatRateBps: 0 });
+    expect(await seller.query(api.sales.getMyTotals, {})).toMatchObject({
+      vatCents: 0,
     });
   });
 
@@ -195,6 +219,7 @@ describe("getMyTotals", () => {
       priceCents: number;
       commissionCents: number;
       sellerNetCents: number;
+      vatCents: number;
     }> = [];
     let cursor: string | null = null;
     for (;;) {
@@ -215,6 +240,7 @@ describe("getMyTotals", () => {
       grossCents: rows.reduce((a, r) => a + r.priceCents, 0),
       commissionCents: rows.reduce((a, r) => a + r.commissionCents, 0),
       netCents: rows.reduce((a, r) => a + r.sellerNetCents, 0),
+      vatCents: rows.reduce((a, r) => a + r.vatCents, 0),
     });
   });
 
@@ -225,6 +251,7 @@ describe("getMyTotals", () => {
       grossCents: 0,
       commissionCents: 0,
       netCents: 0,
+      vatCents: 0,
     };
     expect(
       await asUser(s.t, "seller").query(api.sales.getMyTotals, {}),
@@ -265,8 +292,9 @@ describe("backfillEarnings", () => {
     expect(a).toEqual({
       saleCount: 2,
       grossCents: 2000,
-      commissionCents: 400,
-      netCents: 1600,
+      commissionCents: 332,
+      netCents: 1336,
+      vatCents: 332,
     });
     expect(b.saleCount).toBe(1);
     await run(s);
