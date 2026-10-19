@@ -17,11 +17,11 @@
 
 ### Contexte (CTX)
 
-- [ ] **CTX-01**: L'IA peut recevoir la note courante, ses parents et ses enfants dans une limite de taille fixe.
-- [ ] **CTX-02**: Une action dont le contexte dépasse la limite est refusée sans débit.
-- [ ] **CTX-03**: Le contenu des notes est traité comme des données non fiables par l'IA.
-- [ ] **CTX-04**: Les notes que l'utilisateur ne peut pas lire n'entrent jamais dans le contexte.
-- [ ] **CTX-05**: Les notes achetées sur la marketplace sont exclues du contexte IA.
+- [x] **CTX-01**: L'IA peut recevoir la note courante, ses parents et ses enfants dans une limite de taille fixe.
+- [x] **CTX-02**: Une action dont le contexte dépasse la limite est refusée sans débit.
+- [x] **CTX-03**: Le contenu des notes est traité comme des données non fiables par l'IA.
+- [x] **CTX-04**: Les notes que l'utilisateur ne peut pas lire n'entrent jamais dans le contexte.
+- [x] **CTX-05**: Les notes achetées sur la marketplace sont exclues du contexte IA.
 
 ### Chat gratuit (CHAT)
 
@@ -81,15 +81,15 @@
 
 ## Traceability
 
-| Requirement       | Phase    | Status  |
-| ----------------- | -------- | ------- |
+| Requirement       | Phase    | Status   |
+| ----------------- | -------- | -------- |
 | AIF-01 … AIF-07   | Phase 17 | Complete |
-| CTX-01 … CTX-05   | Phase 18 | Pending |
-| CHAT-01 … CHAT-04 | Phase 19 | Pending |
-| TREE-01 … TREE-05 | Phase 20 | Pending |
-| AUTO-01 … AUTO-03 | Phase 21 | Pending |
-| LINK-01 … LINK-04 | Phase 22 | Pending |
-| VAT-01 … VAT-06   | Phase 23 | Pending |
+| CTX-01 … CTX-05   | Phase 18 | Complete |
+| CHAT-01 … CHAT-04 | Phase 19 | Pending  |
+| TREE-01 … TREE-05 | Phase 20 | Pending  |
+| AUTO-01 … AUTO-03 | Phase 21 | Pending  |
+| LINK-01 … LINK-04 | Phase 22 | Pending  |
+| VAT-01 … VAT-06   | Phase 23 | Pending  |
 
 **Coverage:**
 
