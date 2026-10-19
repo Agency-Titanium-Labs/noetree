@@ -1,12 +1,12 @@
 import {
   internalQuery,
   internalMutation,
-  mutation,
   query,
   MutationCtx,
   QueryCtx,
 } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { tierFromSubscription } from "./helpers/helper";
 import { v, ConvexError } from "convex/values";
 import {
   costForAction,
@@ -25,16 +25,22 @@ async function getSubscriptionRow(ctx: DbCtx, clerkUserId: string) {
     .unique();
 }
 
-// Premium credits are Stripe-driven (D-08): users with an "active" or
-// "past_due" subscription are never lazily reset. past_due is kept out of the
-// lazy path so a payment hiccup does not wipe Premium credits (RESEARCH A4).
-// No row / canceled / unpaid / incomplete* fall back to the Free lazy path.
-async function isLazyResetEligible(
+// Premium credits are Stripe-driven (D-08): only users the single tier rule
+// (helpers/helper.ts tierFromSubscription) calls "premium" are never lazily
+// reset. AIF-05/W1: past_due is Free for the gate, the commission AND here,
+// so a user can no longer be Free for access yet Premium for credits. A
+// past_due user keeps the balance until the next month start (no clamp, so
+// out-of-order Stripe events never wipe credits), then follows the Free reset.
+async function lazyResetPolicy(
   ctx: DbCtx,
   clerkUserId: string,
-): Promise<boolean> {
+): Promise<{ eligible: boolean; clampLapsed: boolean }> {
   const sub = await getSubscriptionRow(ctx, clerkUserId);
-  return !(sub?.status === "active" || sub?.status === "past_due");
+  return {
+    eligible: tierFromSubscription(sub) === "free",
+    // W3: a canceled Premium keeps no spendable Premium credit.
+    clampLapsed: sub?.status === "canceled",
+  };
 }
 
 // Loads the aiCredits row, applying the Free lazy monthly reset (D-07) when
@@ -49,11 +55,12 @@ async function loadEffectiveRow(
     .query("aiCredits")
     .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))
     .unique();
-  const eligible = await isLazyResetEligible(ctx, clerkUserId);
+  const { eligible, clampLapsed } = await lazyResetPolicy(ctx, clerkUserId);
   const { needsReset } = effectiveMonthly(
     eligible,
     row ? { balance: row.balance, lastResetAt: row.lastResetAt } : null,
     now,
+    clampLapsed,
   );
   if (!needsReset) return row;
 
@@ -156,7 +163,7 @@ export async function refundDraw(
       purchasedBalance: (row.purchasedBalance ?? 0) + draw.fromPurchased,
     });
   }
-  await ctx.db.insert("creditTransactions", {
+  return await ctx.db.insert("creditTransactions", {
     clerkUserId,
     type: "refund",
     amount: draw.fromMonthly + draw.fromPurchased,
@@ -192,39 +199,6 @@ export const deductCredit = internalMutation({
   },
 });
 
-// Security: clerkUserId is derived exclusively from the caller's
-// authenticated Convex identity (never a client-supplied argument). The cost
-// is resolved server-side from the catalog; the client sends only an
-// actionKey (CRED-10). actionKey is v.string() (not a literal union) so
-// unknown keys raise ConvexError UNKNOWN_ACTION, not a validator error (D-04).
-export const runAiAction = mutation({
-  args: { actionKey: v.string() },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("UNAUTHENTICATED");
-    const clerkUserId = identity.subject;
-
-    const cost = costForAction(args.actionKey);
-    if (cost === null) throw new ConvexError("UNKNOWN_ACTION");
-
-    // Deduct + placeholder action + refund all share this single mutation
-    // transaction (never split across mutation calls).
-    const draw = await applyDeduction(ctx, clerkUserId, cost, args.actionKey);
-
-    // Placeholder action (D-06): no real LLM call this phase, always
-    // succeeds. The refund branch is implemented but unreachable while
-    // actionSucceeded is hardcoded true; it exists so a future real action
-    // can flip this without restructuring the transaction.
-    const actionSucceeded = true as boolean;
-
-    if (!actionSucceeded) {
-      await refundDraw(ctx, clerkUserId, draw, args.actionKey);
-    }
-
-    return { success: actionSucceeded, cost };
-  },
-});
-
 // Identity-derived (03-REVIEW.md CR-01). Date.now() in a query is fixed per
 // execution; the virtual reset self-corrects on the next mutation.
 export const getMyCredits = query({
@@ -239,17 +213,15 @@ export const getMyCredits = query({
       .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
       .unique();
     const subscription = await getSubscriptionRow(ctx, identity.subject);
-    const eligible = !(
-      subscription?.status === "active" || subscription?.status === "past_due"
-    );
+    const tier = tierFromSubscription(subscription);
+    const eligible = tier === "free";
     const { monthly } = effectiveMonthly(
       eligible,
       row ? { balance: row.balance, lastResetAt: row.lastResetAt } : null,
       now,
+      subscription?.status === "canceled",
     );
     const purchased = row?.purchasedBalance ?? 0;
-    const tier: "free" | "premium" =
-      subscription?.status === "active" ? "premium" : "free";
     // subscriptions.currentPeriodEnd is in SECONDS; nextResetAt is ms.
     const nextResetAt = eligible
       ? nextMonthStartUtc(now)

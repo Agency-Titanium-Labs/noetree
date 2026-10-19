@@ -7,13 +7,13 @@
 
 ### Fondation IA (AIF)
 
-- [ ] **AIF-01**: Chaque action IA payante réserve ses crédits avant l'appel au LLM, une seule fois même si la requête est rejouée.
-- [ ] **AIF-02**: Si l'appel LLM échoue ou est abandonné avant le premier jeton, les crédits sont remboursés une seule fois à leur origine.
-- [ ] **AIF-03**: Une réservation restée bloquée est remboursée automatiquement par une tâche planifiée.
-- [ ] **AIF-04**: Un utilisateur Free qui lance une action Premium reçoit `PREMIUM_REQUIRED` sans aucun débit, et voit une invitation à passer Premium.
-- [ ] **AIF-05**: Le palier d'un utilisateur (`past_due`, Premium résilié) est calculé au même endroit pour l'accès, les crédits et la commission.
-- [ ] **AIF-06**: Chaque appel IA est limité en débit par utilisateur, et un interrupteur permet de couper l'IA sans redéploiement.
-- [ ] **AIF-07**: Le coût en crédits de chaque action est affiché avant son lancement (catalogue partagé UI/serveur).
+- [x] **AIF-01**: Chaque action IA payante réserve ses crédits avant l'appel au LLM, une seule fois même si la requête est rejouée.
+- [x] **AIF-02**: Si l'appel LLM échoue ou est abandonné avant le premier jeton, les crédits sont remboursés une seule fois à leur origine.
+- [x] **AIF-03**: Une réservation restée bloquée est remboursée automatiquement par une tâche planifiée.
+- [x] **AIF-04**: Un utilisateur Free qui lance une action Premium reçoit `PREMIUM_REQUIRED` sans aucun débit, et voit une invitation à passer Premium.
+- [x] **AIF-05**: Le palier d'un utilisateur (`past_due`, Premium résilié) est calculé au même endroit pour l'accès, les crédits et la commission.
+- [x] **AIF-06**: Chaque appel IA est limité en débit par utilisateur, et un interrupteur permet de couper l'IA sans redéploiement.
+- [x] **AIF-07**: Le coût en crédits de chaque action est affiché avant son lancement (catalogue partagé UI/serveur).
 
 ### Contexte (CTX)
 
@@ -83,7 +83,7 @@
 
 | Requirement       | Phase    | Status  |
 | ----------------- | -------- | ------- |
-| AIF-01 … AIF-07   | Phase 17 | Pending |
+| AIF-01 … AIF-07   | Phase 17 | Complete |
 | CTX-01 … CTX-05   | Phase 18 | Pending |
 | CHAT-01 … CHAT-04 | Phase 19 | Pending |
 | TREE-01 … TREE-05 | Phase 20 | Pending |

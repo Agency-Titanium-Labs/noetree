@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Coins, Link2, Loader2, Sparkles } from "lucide-react";
+import { Brain, Coins, Crown, Link2, Loader2, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -12,7 +12,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import {
-  ACTION_COSTS,
+  ACTIONS,
   ACTION_KEYS,
   type ActionKey,
 } from "@/convex/helpers/creditCatalog";
@@ -28,18 +28,25 @@ interface AiActionsMenuProps {
   balance: number | undefined;
   pending: boolean;
   onSelect: (actionKey: ActionKey) => void;
+  /** Server-derived tier; undefined while loading (no lock shown). */
+  tier?: "free" | "premium";
+  /** Operator kill switch; false disables every action (AIF-06). */
+  aiEnabled?: boolean;
 }
 
 /**
- * Display-only: costs come from the catalog for visibility (CRED-06). The
- * callback receives only the action key; the server resolves cost and
- * enforces balance (D-04, CRED-10). Insufficient items are visually flagged
- * but remain selectable so the server decides (D-10).
+ * Display-only: cost and tier come from the shared catalog so the user sees
+ * the price before launching (CRED-06, AIF-07). The callback receives only the
+ * action key; the server resolves cost, tier and balance (D-04, CRED-10).
+ * Insufficient and Premium-locked items stay selectable: the parent opens the
+ * upsell for locked ones, and the server remains authoritative (AIF-04).
  */
 export default function AiActionsMenu({
   balance,
   pending,
   onSelect,
+  tier,
+  aiEnabled = true,
 }: AiActionsMenuProps) {
   const t = useTranslations("AiCredits");
   const tEditor = useTranslations("Editor");
@@ -55,6 +62,7 @@ export default function AiActionsMenu({
               variant="ghost"
               className="h-8 w-8"
               aria-label={t("menuAria")}
+              disabled={!aiEnabled}
             >
               {pending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -65,12 +73,13 @@ export default function AiActionsMenu({
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          {tEditor("tooltips.aiAction")}
+          {aiEnabled ? tEditor("tooltips.aiAction") : t("unavailableTooltip")}
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="start">
         {ACTION_KEYS.map(key => {
-          const cost = ACTION_COSTS[key];
+          const cost = ACTIONS[key].cost;
+          const locked = ACTIONS[key].tier === "premium" && tier === "free";
           const Icon = ICONS[key];
           const insufficient = balance !== undefined && balance < cost;
           const flagged = insufficient || pending;
@@ -88,9 +97,19 @@ export default function AiActionsMenu({
             >
               <Icon className="h-4 w-4" />
               <span className="text-sm">{t(`actions.${key}`)}</span>
+              {locked ? (
+                <Badge
+                  variant="outline"
+                  className="ml-auto text-xs font-semibold gap-1"
+                  aria-label={t("premiumBadgeAria")}
+                >
+                  <Crown className="h-3 w-3" />
+                  {t("premiumBadge")}
+                </Badge>
+              ) : null}
               <Badge
                 variant="secondary"
-                className="ml-auto text-xs font-semibold gap-1"
+                className={`${locked ? "" : "ml-auto "}text-xs font-semibold gap-1`}
                 aria-label={t("costAria", { count: cost })}
               >
                 <Coins className="h-3 w-3" />

@@ -9,8 +9,25 @@
  * It holds only public prices/costs and env var NAMES, never secrets.
  */
 
-export const ACTION_COSTS = { basic: 1, semantic: 3, linking: 5 } as const;
-export type ActionKey = keyof typeof ACTION_COSTS;
+export type ActionTier = "free" | "premium";
+
+/**
+ * One row per paid AI action: its credit cost and the minimum tier allowed to
+ * launch it (AIF-04). The server gate (aiRuns.beginRun) and the UI both read
+ * this table, so the cost shown before launch is the cost charged (AIF-07).
+ */
+export const ACTIONS = {
+  basic: { cost: 1, tier: "free" },
+  semantic: { cost: 3, tier: "free" },
+  linking: { cost: 5, tier: "premium" },
+} as const satisfies Record<string, { cost: number; tier: ActionTier }>;
+export type ActionKey = keyof typeof ACTIONS;
+
+export const ACTION_COSTS = {
+  basic: ACTIONS.basic.cost,
+  semantic: ACTIONS.semantic.cost,
+  linking: ACTIONS.linking.cost,
+} as const;
 /** Ascending cost; UI menu order. */
 export const ACTION_KEYS: readonly ActionKey[] = [
   "basic",
@@ -49,6 +66,12 @@ export const LEGACY_TOPUP_PRICE_ENV = "STRIPE_TOPUP_PRICE_ID";
 export function costForAction(key: string): number | null {
   if (!Object.prototype.hasOwnProperty.call(ACTION_COSTS, key)) return null;
   return ACTION_COSTS[key as ActionKey];
+}
+
+/** Minimum tier of an action, or null for unknown keys. */
+export function tierForAction(key: string): ActionTier | null {
+  if (!Object.prototype.hasOwnProperty.call(ACTIONS, key)) return null;
+  return ACTIONS[key as ActionKey].tier;
 }
 
 export function isPackKey(value: unknown): value is PackKey {
@@ -96,16 +119,25 @@ export function packForPriceId(
  * Single pure rule for the Free lazy monthly reset, shared by the mutation
  * path and the read-only query path. Non-cumulative: a reset replaces the
  * monthly bucket with the quota.
+ *
+ * `clampLapsed` (W3): the owner's Premium subscription is canceled. Any
+ * monthly balance above the Free quota is Premium credit that is no longer
+ * paid for, so it is clamped to the quota instead of being spendable until
+ * the next month start.
  */
 export function effectiveMonthly(
   lazyResetEligible: boolean,
   row: { balance: number; lastResetAt: number } | null,
   now: number,
+  clampLapsed = false,
 ): { monthly: number; needsReset: boolean } {
   if (!lazyResetEligible) {
     return { monthly: row ? row.balance : 0, needsReset: false };
   }
   if (row === null || row.lastResetAt < monthStartUtc(now)) {
+    return { monthly: FREE_MONTHLY_QUOTA, needsReset: true };
+  }
+  if (clampLapsed && row.balance > FREE_MONTHLY_QUOTA) {
     return { monthly: FREE_MONTHLY_QUOTA, needsReset: true };
   }
   return { monthly: row.balance, needsReset: false };

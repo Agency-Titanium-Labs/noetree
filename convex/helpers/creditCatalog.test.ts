@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
+  ACTIONS,
   ACTION_KEYS,
+  tierForAction,
   FREE_MONTHLY_QUOTA,
   PACKS,
   PACK_KEYS,
@@ -132,5 +134,48 @@ describe("effectiveMonthly", () => {
       monthly: 0,
       needsReset: false,
     });
+  });
+});
+
+describe("tierForAction (AIF-04)", () => {
+  test("basic and semantic are free, linking is premium", () => {
+    expect(tierForAction("basic")).toBe("free");
+    expect(tierForAction("semantic")).toBe("free");
+    expect(tierForAction("linking")).toBe("premium");
+  });
+
+  test("unknown and prototype keys return null", () => {
+    for (const k of ["toString", "__proto__", "constructor", "", "nope"]) {
+      expect(tierForAction(k)).toBeNull();
+    }
+  });
+
+  test("costs derive from the same ACTIONS table", () => {
+    for (const key of ACTION_KEYS) {
+      expect(costForAction(key)).toBe(ACTIONS[key].cost);
+    }
+  });
+});
+
+describe("effectiveMonthly clampLapsed (W3)", () => {
+  const now = Date.UTC(2026, 5, 15);
+  const same = Date.UTC(2026, 5, 2);
+
+  test("clamps a lapsed Premium bucket to the Free quota", () => {
+    expect(
+      effectiveMonthly(true, { balance: 400, lastResetAt: same }, now, true),
+    ).toEqual({ monthly: FREE_MONTHLY_QUOTA, needsReset: true });
+  });
+
+  test("does not touch a balance already at or below the quota", () => {
+    expect(
+      effectiveMonthly(true, { balance: 12, lastResetAt: same }, now, true),
+    ).toEqual({ monthly: 12, needsReset: false });
+  });
+
+  test("no clamp without the flag", () => {
+    expect(
+      effectiveMonthly(true, { balance: 400, lastResetAt: same }, now),
+    ).toEqual({ monthly: 400, needsReset: false });
   });
 });
