@@ -204,8 +204,9 @@ describe("beginRun with note context (CTX-01..CTX-05)", () => {
     const other = await seedUser(t, { key: "user_other" });
     await seedCredits(t, { monthly: 10 });
     const { rootId } = await seedTree(t, other, { content: doc("x") });
+    // A missing users row is an identity problem, not a missing note.
     expect(await rejects(beginWithNote(t, "ctx-nouser-1", rootId))).toBe(
-      "NOTE_NOT_FOUND",
+      "UNAUTHENTICATED",
     );
     await untouched(t, 10);
   });
@@ -304,11 +305,12 @@ describe("beginRun with note context (CTX-01..CTX-05)", () => {
     const res = await beginWithNote(t, "ctx-mix-1", parent);
     const titles = res.context!.included.map(i => i.title);
     expect(titles).toEqual(["Parent", "Mine listed"]);
+    // The id of a note the user does not own is never exposed.
     expect(res.context!.dropped).toContainEqual({
-      noteId: foreign,
       role: "child",
       reason: "not_owned",
     });
+    expect(JSON.stringify(res.context!.dropped)).not.toContain(foreign);
     expect(res.context!.serialized).not.toContain("foreign body");
   });
 

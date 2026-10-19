@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import {
   ANCESTOR_EXTRACT_MAX,
   CHILD_EXTRACT_MAX,
@@ -8,6 +8,7 @@ import {
   CONTEXT_MAX_ANCESTOR_HOPS,
   CONTEXT_MAX_CHILDREN,
   CONTEXT_STATEMENT,
+  MIN_EXTRACT_CHARS,
   assembleContext,
   escapeContextText,
   type AssembledContext,
@@ -176,7 +177,24 @@ describe("CTX-01: structure, order and budget", () => {
     expect(r.dropped.filter(d => d.reason === "missing")).toHaveLength(
       CONTEXT_CHILD_SCAN_MAX,
     );
-    expect(r.dropped.filter(d => d.reason === "child_cap")).toHaveLength(10);
+    // The unread rest is ONE aggregate entry, not one entry per id.
+    expect(r.dropped.filter(d => d.reason === "child_cap")).toEqual([
+      { role: "child", reason: "child_cap", count: 10 },
+    ]);
+  });
+
+  it("a parent holding thousands of child ids keeps `dropped` bounded", () => {
+    const many = Array.from({ length: 5_000 }, (_, i) => `k${i}`);
+    const cur = note("cur", { childNotes: many });
+    const r = build("cur", [cur]);
+    expect(r.dropped).toHaveLength(CONTEXT_CHILD_SCAN_MAX + 1);
+    expect(r.dropped.filter(d => d.reason === "child_cap")).toEqual([
+      {
+        role: "child",
+        reason: "child_cap",
+        count: 5_000 - CONTEXT_CHILD_SCAN_MAX,
+      },
+    ]);
   });
 
   it("does not include grandchildren", () => {
@@ -322,13 +340,13 @@ describe("CTX-02: oversized current note", () => {
     expect(refusal(() => tryBody(room + 1))).toBe("CONTEXT_TOO_LARGE");
   });
 
-  it("refuses an ancestor chain deeper than it can verify (fail closed)", () => {
+  it("refuses an ancestor chain deeper than it can verify with its own code (fail closed)", () => {
     const chain: ContextNote[] = [];
     const depth = CONTEXT_MAX_ANCESTOR_HOPS + 5;
     for (let i = 0; i <= depth; i++) {
       chain.push(note(`n${i}`, i < depth ? { parentNote: `n${i + 1}` } : {}));
     }
-    expect(refusal(() => build("n0", chain))).toBe("CONTEXT_TOO_LARGE");
+    expect(refusal(() => build("n0", chain))).toBe("CONTEXT_TOO_DEEP");
   });
 
   it("accepts a chain of exactly the maximum depth", () => {
@@ -362,11 +380,9 @@ describe("CTX-04: ownership on every note", () => {
     const cur = note("cur", { parentNote: "theirs" });
     const r = build("cur", [top, theirs, cur]);
     expect(ids(r)).toEqual(["cur", "top"]);
-    expect(r.dropped).toContainEqual({
-      noteId: "theirs",
-      role: "ancestor",
-      reason: "not_owned",
-    });
+    // Foreign ids are never exposed: no noteId on a not_owned entry.
+    expect(r.dropped).toContainEqual({ role: "ancestor", reason: "not_owned" });
+    expect(JSON.stringify(r.dropped)).not.toContain("theirs");
     expect(r.serialized).not.toContain("Body of theirs");
   });
 
@@ -376,12 +392,16 @@ describe("CTX-04: ownership on every note", () => {
     const theirs = note("theirs", { owner: OTHER, parentNote: "cur" });
     const r = build("cur", [cur, mine, theirs]);
     expect(ids(r)).toEqual(["cur", "mine"]);
-    expect(r.dropped).toContainEqual({
-      noteId: "theirs",
-      role: "child",
-      reason: "not_owned",
-    });
+    expect(r.dropped).toContainEqual({ role: "child", reason: "not_owned" });
+    expect(JSON.stringify(r.dropped)).not.toContain("theirs");
     expect(r.serialized).not.toContain("Body of theirs");
+  });
+
+  it("a foreign child that points elsewhere is still reported without its id", () => {
+    const cur = note("cur", { childNotes: ["liar"] });
+    const liar = note("liar", { owner: OTHER, parentNote: "elsewhere" });
+    const r = build("cur", [cur, liar]);
+    expect(r.dropped).toEqual([{ role: "child", reason: "not_owned" }]);
   });
 
   it("includes own notes that are listed for sale (no purchaseId)", () => {
@@ -425,6 +445,44 @@ describe("CTX-05: purchased content", () => {
     expect(refusal(() => build("cur", [copy, cur]))).toBe(
       "PURCHASED_CONTENT_EXCLUDED",
     );
+  });
+
+  it("refuses a request on a flagged note (isPurchasedContent) with no purchaseId", () => {
+    const moved = note("moved", { isPurchasedContent: true });
+    expect(refusal(() => build("moved", [moved]))).toBe(
+      "PURCHASED_CONTENT_EXCLUDED",
+    );
+  });
+
+  it("refuses a note whose ancestor is flagged (flag, not purchaseId)", () => {
+    const flagged = note("flagged", { isPurchasedContent: true });
+    const cur = note("cur", { parentNote: "flagged" });
+    expect(refusal(() => build("cur", [flagged, cur]))).toBe(
+      "PURCHASED_CONTENT_EXCLUDED",
+    );
+  });
+
+  it("excludes a flagged child (moved purchased sub-note) from its parent's context", () => {
+    const cur = note("cur", { childNotes: ["moved", "mine"] });
+    const moved = note("moved", {
+      parentNote: "cur",
+      isPurchasedContent: true,
+      content: doc("seller secret"),
+    });
+    const mine = note("mine", { parentNote: "cur" });
+    const r = build("cur", [cur, moved, mine]);
+    expect(ids(r)).toEqual(["cur", "mine"]);
+    expect(r.dropped).toContainEqual({
+      noteId: "moved",
+      role: "child",
+      reason: "purchased",
+    });
+    expect(r.serialized).not.toContain("seller secret");
+  });
+
+  it("isPurchasedContent: false is not purchased", () => {
+    const cur = note("cur", { isPurchasedContent: false });
+    expect(ids(build("cur", [cur]))).toEqual(["cur"]);
   });
 
   it("excludes a purchased child root from the context of its parent", () => {
@@ -591,8 +649,9 @@ describe("CTX-03: untrusted data framing and adversarial fixtures", () => {
     expect(body.match(/<\/noetree-context>/g)).toHaveLength(1);
     // Hidden characters never survive raw.
     expect(hiddenCodePoints(body)).toEqual([]);
-    // No active image/markup payloads.
+    // No active image/link/markup payloads.
     expect(body).not.toContain("![");
+    expect(body).not.toContain("](");
     expect(body).not.toMatch(/<img|<script|<system/i);
   }
 
@@ -662,14 +721,26 @@ describe("CTX-03: untrusted data framing and adversarial fixtures", () => {
     expect(r.serialized).toContain(CONTEXT_STATEMENT);
   });
 
-  it("defangs markdown images and HTML in titles too", () => {
+  it("defangs markdown images, links and HTML in titles too", () => {
     const cur = note("cur", {
-      title: "![t](https://evil.example/?q=1) <img src=x>",
+      title:
+        "![t](https://evil.example/?q=1) [l](https://evil.example) <img src=x>",
     });
     const r = build("cur", [cur]);
     assertSafe(r);
-    expect(r.included[0].title).not.toContain("![");
-    expect(r.included[0].title).not.toContain("<");
+    const m = r.serialized.match(/<title>([\s\S]*?)<\/title>/);
+    expect(m![1]).not.toContain("![");
+    expect(m![1]).not.toContain("](");
+    expect(m![1]).not.toContain("<");
+  });
+
+  it("keeps the RAW title in included[] for display; the text carries the escaped one", () => {
+    const cur = note("cur", { title: "A <b> & ![x](y)" });
+    const r = build("cur", [cur]);
+    expect(r.included[0].title).toBe("A <b> & ![x](y)");
+    expect(r.serialized).toContain(
+      "<title>A &lt;b&gt; &amp; !&#91;x]&#40;y)</title>",
+    );
   });
 
   it("flattens newlines in titles so a title can not open a new line of data", () => {
@@ -707,6 +778,35 @@ describe("escapeContextText", () => {
   it("is injective on entity-looking input", () => {
     expect(escapeContextText("&lt;")).toBe("&amp;lt;");
     expect(escapeContextText("&#x200B;")).toBe("&amp;#x200B;");
+    // Our own defang entities can not be forged by a literal in the note.
+    expect(escapeContextText("&#91;")).toBe("&amp;#91;");
+    expect(escapeContextText("&#40;")).toBe("&amp;#40;");
+    expect(escapeContextText("![")).not.toBe(escapeContextText("!&#91;"));
+    expect(escapeContextText("](")).not.toBe(escapeContextText("]&#40;"));
+  });
+
+  it("defangs markdown link openers and image openers, and is reversible", () => {
+    const text =
+      "see [docs](https://evil.example/?q=SECRET) and ![i](http://e/p.png)";
+    const out = escapeContextText(text);
+    expect(out).not.toContain("](");
+    expect(out).not.toContain("![");
+    expect(out).toBe(
+      "see [docs]&#40;https://evil.example/?q=SECRET) and !&#91;i]&#40;http://e/p.png)",
+    );
+    // Reversible: undo the entity families.
+    const back = out
+      .replace(/!&#91;/g, "![")
+      .replace(/\]&#40;/g, "](")
+      .replace(/&gt;/g, ">")
+      .replace(/&lt;/g, "<")
+      .replace(/&amp;/g, "&");
+    expect(back).toBe(text);
+  });
+
+  it("handles adjacent and repeated openers", () => {
+    expect(escapeContextText("![](x)")).toBe("!&#91;]&#40;x)");
+    expect(escapeContextText("]((")).toBe("]&#40;(");
   });
 
   it("never emits angle brackets", () => {
@@ -722,5 +822,41 @@ describe("escapeContextText", () => {
 
   it("keeps ordinary text, newlines and accents", () => {
     expect(escapeContextText("Café\nnoël\tok")).toBe("Café\nnoël\tok");
+  });
+});
+
+describe("fitEscaped boundary (M-2)", () => {
+  // "![" costs 2 raw units but 6 escaped once BOTH characters are in the cut,
+  // so measuring one character at a time undercounts and overflows the block.
+  it("keeps an extract whose cut crosses the '![' defang boundary", () => {
+    const bang = "![".repeat(400);
+    const root = note("root", { content: doc(bang) });
+    const cur = note("cur", { parentNote: "root", content: doc("c") });
+    const full = build("cur", [root, cur]);
+    const rootFull = full.included.find(i => i.noteId === "root")!;
+    const bare = full.totalChars - rootFull.chars;
+
+    for (const room of [
+      262, 263, 264, 265, 266, 267, 268, 269, 300, 301, 302,
+    ]) {
+      const budget = bare + room;
+      const r = build("cur", [root, cur], { budget });
+      expect(r.serialized.length).toBeLessThanOrEqual(budget);
+      const inc = r.included.find(i => i.noteId === "root");
+      expect(inc, `room ${room}`).toBeDefined();
+      expect(inc!.truncated).toBe(true);
+      expect(inc!.chars).toBeGreaterThanOrEqual(MIN_EXTRACT_CHARS);
+      expect(r.dropped.filter(d => d.noteId === "root")).toEqual([]);
+    }
+  });
+
+  it("uses the room: the slack is below one escaped pair", () => {
+    const root = note("root", { content: doc("a![".repeat(300)) });
+    const cur = note("cur", { parentNote: "root", content: doc("c") });
+    const budget = 1_200;
+    const r = build("cur", [root, cur], { budget });
+    expect(r.included.some(i => i.noteId === "root")).toBe(true);
+    expect(r.serialized.length).toBeLessThanOrEqual(budget);
+    expect(budget - r.serialized.length).toBeLessThan(7);
   });
 });
