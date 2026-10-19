@@ -667,7 +667,7 @@ describe("end to end with the fake LLM provider", () => {
     expect(first.claimed).toBe(true);
     let calls = 0;
     const counting = {
-      stream: (..._a: unknown[]) => {
+      stream: () => {
         calls += 1;
         return createFakeProvider({ mode: "ok" }).stream(
           { prompt: "hi" },
