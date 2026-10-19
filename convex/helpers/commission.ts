@@ -21,18 +21,32 @@ export function computeCommission(
 }
 
 /**
- * Phase 23 (VAT absorbed). DRAFT defaults, pending accountant confirmation
- * (see .planning/workstreams/general/phases/23-marketplace-vat/23-VAT-DECISION.md).
+ * Phase 23 (VAT absorbed). The VAT carve-out is OFF unless explicitly enabled:
+ * while the VAT-01 decision is unsigned (see
+ * .planning/workstreams/general/phases/23-marketplace-vat/23-VAT-DECISION.md),
+ * an unset MARKETPLACE_VAT_RATE_BPS means rate 0 and fee = commission only
+ * (identical to v1.1). Setting the env var is the explicit opt-in.
  */
-export const DEFAULT_VAT_RATE_BPS = 2000;
+export const DEFAULT_VAT_RATE_BPS = 0;
+export const MAX_VAT_RATE_BPS = 5000;
 
-/** Parses a configured VAT rate (bps). Invalid or missing values fall back to the default. */
+/**
+ * Parses a configured VAT rate (bps). Unset or empty means 0 (disabled, no
+ * log). Anything that is not a plain decimal integer in 0..5000 falls back to
+ * 0 and logs one console.error; it never throws (checkout must not break).
+ */
 export function parseVatRateBps(raw: string | undefined | null): number {
   if (raw === undefined || raw === null || raw.trim() === "") {
     return DEFAULT_VAT_RATE_BPS;
   }
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < 0 || n > 5000) return DEFAULT_VAT_RATE_BPS;
+  const trimmed = raw.trim();
+  const n = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN;
+  if (!Number.isSafeInteger(n) || n > MAX_VAT_RATE_BPS) {
+    console.error(
+      `MARKETPLACE_VAT_RATE_BPS invalid (${JSON.stringify(raw)}): expected an integer in basis points between 0 and ${MAX_VAT_RATE_BPS}; VAT carve-out disabled (rate 0)`,
+    );
+    return DEFAULT_VAT_RATE_BPS;
+  }
   return n;
 }
 

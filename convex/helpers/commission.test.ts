@@ -1,7 +1,8 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   COMMISSION_BPS,
   computeCommission,
+  DEFAULT_VAT_RATE_BPS,
   computeSplit,
   parseVatRateBps,
 } from "./commission";
@@ -96,12 +97,48 @@ describe("computeSplit (VAT absorbed)", () => {
     expect(() => computeSplit(100, "free", -5)).toThrow();
   });
 
-  test("parseVatRateBps falls back to default on bad config", () => {
-    expect(parseVatRateBps(undefined)).toBe(2000);
-    expect(parseVatRateBps("")).toBe(2000);
-    expect(parseVatRateBps("abc")).toBe(2000);
-    expect(parseVatRateBps("-1")).toBe(2000);
-    expect(parseVatRateBps("999999")).toBe(2000);
-    expect(parseVatRateBps("550")).toBe(550);
+  test("default rate is 0 (VAT disabled until opted in)", () => {
+    expect(DEFAULT_VAT_RATE_BPS).toBe(0);
+    for (const tier of ["free", "premium"] as const) {
+      const s = computeSplit(1000, tier);
+      expect(s.vatCents).toBe(0);
+      expect(s.applicationFeeCents).toBe(s.commissionCents);
+    }
   });
+});
+
+describe("parseVatRateBps", () => {
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => errSpy.mockRestore());
+
+  test("unset or empty is 0 and silent", () => {
+    expect(parseVatRateBps(undefined)).toBe(0);
+    expect(parseVatRateBps(null)).toBe(0);
+    expect(parseVatRateBps("")).toBe(0);
+    expect(parseVatRateBps("   ")).toBe(0);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  test("accepts plain integers in 0..5000", () => {
+    expect(parseVatRateBps("0")).toBe(0);
+    expect(parseVatRateBps("550")).toBe(550);
+    expect(parseVatRateBps("2000")).toBe(2000);
+    expect(parseVatRateBps(" 2000 ")).toBe(2000);
+    expect(parseVatRateBps("5000")).toBe(5000);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  test.each(["20%", "0x10", "1e3", "20000", "5001", "-1", "1.5", "abc", "0b1"])(
+    "rejects %s: falls back to 0 and logs once",
+    raw => {
+      expect(parseVatRateBps(raw)).toBe(0);
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(String(errSpy.mock.calls[0][0])).toContain(
+        "MARKETPLACE_VAT_RATE_BPS",
+      );
+    },
+  );
 });
