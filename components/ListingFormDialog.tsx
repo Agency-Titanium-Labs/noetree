@@ -12,6 +12,7 @@ import { AlertCircle, Loader2, X } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { LISTING_LIMITS } from "@/convex/helpers/listings";
 import { Link } from "@/i18n/routing";
 import {
   centsToPriceInput,
@@ -45,10 +46,10 @@ interface ListingFormDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const MIN_PRICE_CENTS = 100;
-const MAX_PRICE_CENTS = 50000;
-const MAX_TAGS = 5;
-const MAX_TAG_LENGTH = 24;
+const MIN_PRICE_CENTS = LISTING_LIMITS.PRICE_MIN_CENTS;
+const MAX_PRICE_CENTS = LISTING_LIMITS.PRICE_MAX_CENTS;
+const MAX_TAGS = LISTING_LIMITS.TAGS_MAX;
+const MAX_TAG_LENGTH = LISTING_LIMITS.TAG_MAX_LENGTH;
 
 type FormValues = {
   title: string;
