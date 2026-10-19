@@ -6,7 +6,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
-import { v, ConvexError } from "convex/values";
+import { v, ConvexError, type Infer } from "convex/values";
 import { applyDeduction, refundDraw } from "./aiCredits";
 import {
   costForAction,
@@ -27,6 +27,7 @@ import {
 } from "./helpers/aiRunState";
 import { RATE_LIMIT_CAPACITY, consumeToken } from "./helpers/aiRateLimit";
 import { isValidInternalSecret } from "./helpers/internalSecret";
+import { assembleContextForUser } from "./helpers/aiContextLoad";
 
 /**
  * AI metering state machine (AIF-01..AIF-06). Reserve, run, settle:
@@ -59,6 +60,42 @@ const outcomeValidator = v.union(
 
 const GLOBAL_KEY = "global";
 
+// What beginRun hands back when the caller asked for note context (CTX-01).
+// ids are strings so the shape matches the pure builder output exactly.
+const contextValidator = v.object({
+  budget: v.number(),
+  totalChars: v.number(),
+  serialized: v.string(),
+  included: v.array(
+    v.object({
+      noteId: v.string(),
+      role: v.union(
+        v.literal("current"),
+        v.literal("ancestor"),
+        v.literal("child"),
+      ),
+      seq: v.number(),
+      title: v.string(),
+      chars: v.number(),
+      truncated: v.boolean(),
+    }),
+  ),
+  truncated: v.array(v.string()),
+  dropped: v.array(
+    v.object({
+      noteId: v.string(),
+      role: v.union(v.literal("ancestor"), v.literal("child")),
+      reason: v.union(
+        v.literal("budget"),
+        v.literal("not_owned"),
+        v.literal("purchased"),
+        v.literal("missing"),
+        v.literal("child_cap"),
+      ),
+    }),
+  ),
+});
+
 async function isAiEnabled(ctx: Pick<MutationCtx, "db">): Promise<boolean> {
   const cfg = await ctx.db
     .query("aiConfig")
@@ -67,18 +104,28 @@ async function isAiEnabled(ctx: Pick<MutationCtx, "db">): Promise<boolean> {
   return cfg === null || cfg.enabled;
 }
 
+const beginResultValidator = v.object({
+  runId: v.id("aiRuns"),
+  cost: v.number(),
+  status: runStatusValidator,
+  replayed: v.boolean(),
+  // Single-owner streaming (H1): true only for the call that created the
+  // run. A replay never owns the stream and must not call the provider.
+  claimed: v.boolean(),
+  // Present only on the claiming call when noteId was given.
+  context: v.optional(contextValidator),
+});
+
 export const beginRun = mutation({
-  args: { requestId: v.string(), actionKey: v.string() },
-  returns: v.object({
-    runId: v.id("aiRuns"),
-    cost: v.number(),
-    status: runStatusValidator,
-    replayed: v.boolean(),
-    // Single-owner streaming (H1): true only for the call that created the
-    // run. A replay never owns the stream and must not call the provider.
-    claimed: v.boolean(),
-  }),
-  handler: async (ctx, args) => {
+  args: {
+    requestId: v.string(),
+    actionKey: v.string(),
+    // Note whose context the action needs (CTX-01). Optional: actions that
+    // send no note text omit it.
+    noteId: v.optional(v.id("notes")),
+  },
+  returns: beginResultValidator,
+  handler: async (ctx, args): Promise<Infer<typeof beginResultValidator>> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("UNAUTHENTICATED");
     // Derived from the identity only, never from an argument.
@@ -136,6 +183,22 @@ export const beginRun = mutation({
     if (requiredTier === "premium") {
       const tier = await tierFromClerkUserId(ctx, clerkUserId);
       if (tier !== "premium") throw new ConvexError("PREMIUM_REQUIRED");
+    }
+
+    // 3b. Context (CTX-01..CTX-05). Built and validated BEFORE the rate
+    //     limit and the debit: CONTEXT_TOO_LARGE, NOTE_NOT_OWNED,
+    //     PURCHASED_CONTENT_EXCLUDED and NOTE_NOT_FOUND throw here, so no
+    //     token is consumed, no credit debited and no aiRuns row written.
+    let context: Awaited<ReturnType<typeof assembleContextForUser>> | undefined;
+    if (args.noteId !== undefined) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token", q =>
+          q.eq("tokenIdentifier", identity.tokenIdentifier),
+        )
+        .unique();
+      if (!user) throw new ConvexError("NOTE_NOT_FOUND");
+      context = await assembleContextForUser(ctx, user._id, args.noteId);
     }
 
     // 4. In-flight cap: bounded read, at most MAX_INFLIGHT_RUNS reserved.
@@ -210,6 +273,7 @@ export const beginRun = mutation({
       status: "reserved" as const,
       replayed: false,
       claimed: true,
+      ...(context ? { context } : {}),
     };
   },
 });
