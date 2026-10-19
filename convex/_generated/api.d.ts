@@ -9,14 +9,19 @@
  */
 
 import type * as aiCredits from "../aiCredits.js";
+import type * as aiRuns from "../aiRuns.js";
 import type * as comments from "../comments.js";
 import type * as connectAccounts from "../connectAccounts.js";
+import type * as crons from "../crons.js";
+import type * as helpers_aiRateLimit from "../helpers/aiRateLimit.js";
+import type * as helpers_aiRunState from "../helpers/aiRunState.js";
 import type * as helpers_commentAccess from "../helpers/commentAccess.js";
 import type * as helpers_commission from "../helpers/commission.js";
 import type * as helpers_creditCatalog from "../helpers/creditCatalog.js";
 import type * as helpers_delivery from "../helpers/delivery.js";
 import type * as helpers_earnings from "../helpers/earnings.js";
 import type * as helpers_helper from "../helpers/helper.js";
+import type * as helpers_internalSecret from "../helpers/internalSecret.js";
 import type * as helpers_listings from "../helpers/listings.js";
 import type * as helpers_noteVersions from "../helpers/noteVersions.js";
 import type * as helpers_permissions from "../helpers/permissions.js";
@@ -43,14 +48,19 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   aiCredits: typeof aiCredits;
+  aiRuns: typeof aiRuns;
   comments: typeof comments;
   connectAccounts: typeof connectAccounts;
+  crons: typeof crons;
+  "helpers/aiRateLimit": typeof helpers_aiRateLimit;
+  "helpers/aiRunState": typeof helpers_aiRunState;
   "helpers/commentAccess": typeof helpers_commentAccess;
   "helpers/commission": typeof helpers_commission;
   "helpers/creditCatalog": typeof helpers_creditCatalog;
   "helpers/delivery": typeof helpers_delivery;
   "helpers/earnings": typeof helpers_earnings;
   "helpers/helper": typeof helpers_helper;
+  "helpers/internalSecret": typeof helpers_internalSecret;
   "helpers/listings": typeof helpers_listings;
   "helpers/noteVersions": typeof helpers_noteVersions;
   "helpers/permissions": typeof helpers_permissions;

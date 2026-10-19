@@ -164,7 +164,7 @@ export async function refundDraw(
       purchasedBalance: (row.purchasedBalance ?? 0) + draw.fromPurchased,
     });
   }
-  await ctx.db.insert("creditTransactions", {
+  return await ctx.db.insert("creditTransactions", {
     clerkUserId,
     type: "refund",
     amount: draw.fromMonthly + draw.fromPurchased,
