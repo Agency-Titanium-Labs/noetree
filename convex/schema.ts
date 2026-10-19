@@ -114,9 +114,65 @@ export default defineSchema({
     actionKey: v.optional(v.string()),
     packKey: v.optional(v.string()),
     refundsTransactionId: v.optional(v.id("creditTransactions")),
+    // Phase 17: the AI run this deduction/refund belongs to (audit only).
+    aiRunId: v.optional(v.id("aiRuns")),
   })
     .index("by_clerkUserId", ["clerkUserId"])
-    .index("by_clerkUserId_and_type", ["clerkUserId", "type"]),
+    .index("by_clerkUserId_and_type", ["clerkUserId", "type"])
+    // Phase 17: second line of defence, a deduction can be refunded once.
+    .index("by_refundsTransactionId", ["refundsTransactionId"]),
+
+  // AI run metering (Phase 17). Invariants:
+  // - One row per (clerkUserId, requestId): a replay never debits twice.
+  // - Inserted only by aiRuns.beginRun, in the same transaction as the debit.
+  // - status leaves "reserved" exactly once (compare-and-set in settle/expire).
+  // - fromMonthly/fromPurchased/transactionId are the original Draw so a
+  //   refund restores exactly what each bucket paid.
+  // - Never exposes prompts or completions: only ids, costs and token usage.
+  aiRuns: defineTable({
+    clerkUserId: v.string(),
+    requestId: v.string(),
+    actionKey: v.string(),
+    cost: v.number(),
+    status: v.union(
+      v.literal("reserved"),
+      v.literal("completed"),
+      v.literal("refunded"),
+    ),
+    transactionId: v.id("creditTransactions"),
+    fromMonthly: v.number(),
+    fromPurchased: v.number(),
+    createdAt: v.number(),
+    settledAt: v.optional(v.number()),
+    outcome: v.optional(v.string()),
+    refundTransactionId: v.optional(v.id("creditTransactions")),
+    usage: v.optional(
+      v.object({
+        inputTokens: v.optional(v.number()),
+        outputTokens: v.optional(v.number()),
+      }),
+    ),
+  })
+    .index("by_clerkUserId_and_requestId", ["clerkUserId", "requestId"])
+    .index("by_clerkUserId_and_status", ["clerkUserId", "status"])
+    .index("by_status_and_createdAt", ["status", "createdAt"]),
+
+  // Operator kill switch (Phase 17). Singleton row keyed "global"; absent
+  // means AI is enabled. Flipped from the Convex dashboard through the
+  // internal mutation aiRuns.setAiEnabled, no redeploy needed.
+  aiConfig: defineTable({
+    key: v.string(),
+    enabled: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
+  // Per-user token bucket + operator block (Phase 17).
+  aiRateLimits: defineTable({
+    clerkUserId: v.string(),
+    tokens: v.number(),
+    updatedAt: v.number(),
+    blockedUntil: v.optional(v.number()),
+  }).index("by_clerkUserId", ["clerkUserId"]),
 
   processedStripeEvents: defineTable({
     stripeEventId: v.string(),
