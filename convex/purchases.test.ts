@@ -188,12 +188,59 @@ describe("snapshot", () => {
       status: "pending",
       sellerTier: "free",
       commissionRateBps: 2000,
-      commissionCents: 200,
-      sellerNetCents: 800,
+      vatRateBps: 2000,
+      vatCents: 166,
+      commissionCents: 166,
+      sellerNetCents: 668,
       priceCents: 1000,
       destinationAccountId: "acct_seller",
       snapshotVersion: 1,
     });
+  });
+
+  test("returns explicit applicationFeeCents = commission + VAT; buyer price unchanged", async () => {
+    const { t, listingId } = await setup({ price: 1000 });
+    const buyer = asUser(t, "buyer");
+    const res = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    expect(res.priceCents).toBe(1000);
+    expect(res.vatCents).toBe(166);
+    expect(res.commissionCents).toBe(166);
+    expect(res.applicationFeeCents).toBe(332);
+    await buyer.mutation(api.purchases.attachCheckoutSession, {
+      purchaseId: res.purchaseId,
+      stripeCheckoutSessionId: "cs_1",
+      snapshotVersion: res.snapshotVersion,
+    });
+    const again = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    expect(again.applicationFeeCents).toBe(332);
+  });
+
+  test("reuse of a legacy pending row without VAT fields reads VAT as 0", async () => {
+    const { t, listingId } = await setup({ price: 1000 });
+    const buyer = asUser(t, "buyer");
+    const res = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    await buyer.mutation(api.purchases.attachCheckoutSession, {
+      purchaseId: res.purchaseId,
+      stripeCheckoutSessionId: "cs_1",
+      snapshotVersion: res.snapshotVersion,
+    });
+    await t.run(ctx =>
+      ctx.db.patch("purchases", res.purchaseId, {
+        vatRateBps: undefined,
+        vatCents: undefined,
+      }),
+    );
+    const again = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    expect(again.vatCents).toBe(0);
+    expect(again.applicationFeeCents).toBe(again.commissionCents);
   });
 
   test("active subscription means premium 10%", async () => {
@@ -206,7 +253,7 @@ describe("snapshot", () => {
     expect(row).toMatchObject({
       sellerTier: "premium",
       commissionRateBps: 1000,
-      commissionCents: 100,
+      commissionCents: 83,
     });
   });
 
@@ -1242,8 +1289,9 @@ describe("earnings counter (HIST-02)", () => {
     expect(rows[0]).toMatchObject({
       saleCount: 1,
       grossCents: 1000,
-      commissionCents: 200,
-      netCents: 800,
+      commissionCents: 166,
+      netCents: 668,
+      vatCents: 166,
     });
   });
 
