@@ -39,6 +39,18 @@ describe("listing helpers — pure", () => {
     );
   });
 
+  test("extractExcerpt turns a hardBreak into a space (locks the behavior)", () => {
+    const content = doc({
+      type: "paragraph",
+      content: [
+        { type: "text", text: "line1" },
+        { type: "hardBreak" },
+        { type: "text", text: "line2" },
+      ],
+    });
+    expect(extractExcerpt(content)).toBe("line1 line2");
+  });
+
   test("extractExcerpt returns empty string for empty or malformed content", () => {
     expect(extractExcerpt("{}")).toBe("");
     expect(extractExcerpt("not json")).toBe("");

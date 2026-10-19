@@ -1,5 +1,6 @@
 import { ConvexError } from "convex/values";
 import { cutAtWord, extractNoteText } from "./noteText";
+import { isPurchasedNote } from "./purchasedFlag";
 
 /**
  * Pure, budgeted, permission-aware, injection-safe context assembly for the
@@ -9,23 +10,30 @@ import { cutAtWord, extractNoteText } from "./noteText";
  * parse the string.
  *
  * Rules (18-CONTEXT.md D-01..D-08):
- *  - 24 000 characters for the WHOLE serialized text, framing included.
+ *  - 24 000 UTF-16 code units (JS string length) for the WHOLE serialized
+ *    text, framing included. That is about 6 000 tokens for Latin text only;
+ *    CJK, emoji and heavily escaped text can approach 1 token per unit.
  *  - The current note is sent whole or the request is refused with
  *    CONTEXT_TOO_LARGE (before any credit reservation, see beginRun).
  *  - Remaining budget goes to ancestors (nearest first) then direct children
  *    (tree order, cap 20) as extracts. Cut text is marked, dropped notes are
  *    reported.
  *  - Only notes OWNED by the requester are ever included (every note, not
- *    only the requested one). A purchased copy root (purchaseId) anywhere in
- *    the ancestor chain of the requested note refuses the request; a purchased
- *    child is excluded.
+ *    only the requested one). Purchased content (isPurchasedNote: purchaseId
+ *    OR the sticky isPurchasedContent flag) on the requested note or anywhere
+ *    in its ancestor chain refuses the request; a purchased child is excluded.
+ *    The flag survives edits, moves and duplication (D-06).
  *  - Note text is data. It is escaped so that it can not contain the
  *    structural characters of the framing, and every block carries explicit
  *    lengths. A fixed statement before and after says block contents are not
  *    instructions.
  */
 
-/** Total budget in characters (about 6 000 tokens) for the serialized text. */
+/**
+ * Total budget for the serialized text, in UTF-16 code units (JS
+ * `string.length`), NOT tokens: about 6 000 tokens for Latin text, but CJK,
+ * emoji and escaped text can cost about 1 token per unit. Tunable constant.
+ */
 export const CONTEXT_BUDGET_CHARS = 24_000;
 /** Direct children included, in tree order. */
 export const CONTEXT_MAX_CHILDREN = 20;
@@ -42,6 +50,7 @@ export const CONTEXT_TITLE_MAX = 200;
 
 export type ContextErrorCode =
   | "CONTEXT_TOO_LARGE"
+  | "CONTEXT_TOO_DEEP"
   | "NOTE_NOT_FOUND"
   | "NOTE_NOT_OWNED"
   | "PURCHASED_CONTENT_EXCLUDED";
@@ -57,6 +66,8 @@ export type ContextNote = {
   childNotes?: readonly string[];
   /** Set on a marketplace purchase copy root. */
   purchaseId?: string;
+  /** Sticky marker on every note holding purchased content (D-06). */
+  isPurchasedContent?: boolean;
 };
 
 export type ContextRole = "current" | "ancestor" | "child";
@@ -73,6 +84,10 @@ export type ContextIncluded = {
   role: ContextRole;
   /** 1-based position in the serialized text. */
   seq: number;
+  /**
+   * RAW title (single line, bounded, NOT escaped) for the Phase 19 "what will
+   * be sent" display. The serialized text carries the escaped form.
+   */
   title: string;
   /** Escaped body length as serialized. */
   chars: number;
@@ -81,9 +96,15 @@ export type ContextIncluded = {
 };
 
 export type ContextDropped = {
-  noteId: string;
+  /**
+   * Absent for "not_owned" (ids of notes the user does not own are never
+   * exposed) and for the aggregate child-scan entry.
+   */
+  noteId?: string;
   role: "ancestor" | "child";
   reason: DropReason;
+  /** Aggregate entries only: how many children were skipped unread. */
+  count?: number;
 };
 
 export type AssembledContext = {
@@ -168,8 +189,9 @@ function entity(cp: number): string {
  * Makes untrusted text safe to embed between our tags. Injective (a literal
  * "&lt;" in a note becomes "&amp;lt;"), so nothing is ambiguous, and the
  * output can never contain "<" or ">", hence never a tag of ours. Hidden and
- * look-alike characters become visible entities. Markdown image syntax is
- * defanged so an echoed payload does not render an exfiltration request.
+ * look-alike characters become visible entities. Markdown image syntax
+ * ("![") and link openers ("](") are defanged so an echoed payload does not
+ * render an exfiltration request.
  */
 export function escapeContextText(text: string): string {
   let out = "";
@@ -189,13 +211,17 @@ export function escapeContextText(text: string): string {
       out += ch;
     }
   }
-  return out.replace(/!\[/g, "!&#91;");
+  // Markdown exfiltration channels: "![" (image) and "](" (link target).
+  // Both rewrites emit entities of the same family as the escapes above; a
+  // literal "&#91;" / "&#40;" in a note is escaped to "&amp;#91;" first, so
+  // the output stays injective and reversible.
+  return out.replace(/!\[/g, "!&#91;").replace(/\]\(/g, "]&#40;");
 }
 
-/** Single-line, bounded, escaped title. */
+/** Single-line, bounded, RAW title (display). Serialization escapes it. */
 function cleanTitle(title: string): string {
   const oneLine = title.replace(/\s+/g, " ").trim();
-  return escapeContextText(cutAtWord(oneLine, CONTEXT_TITLE_MAX));
+  return cutAtWord(oneLine, CONTEXT_TITLE_MAX);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,17 +250,25 @@ function renderHeader(budget: number): string {
 
 const FOOTER = `</noetree-context>\n${CONTEXT_FOOTER}`;
 
-/** Longest prefix of `text` whose ESCAPED length is <= room. */
+/**
+ * Longest prefix of `text` whose ESCAPED length is <= room. The escape is not
+ * a per-character map ("![" and "](" are rewritten across character
+ * boundaries), so the candidate cut itself is re-measured. Escaped length
+ * never decreases when the prefix grows, hence a binary search is exact.
+ */
 function fitEscaped(text: string, room: number): string {
-  let out = "";
-  let used = 0;
-  for (const ch of text) {
-    const len = escapeContextText(ch).length;
-    if (used + len > room) break;
-    used += len;
-    out += ch;
+  const chars = Array.from(text);
+  let lo = 0;
+  let hi = chars.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (escapeContextText(chars.slice(0, mid).join("")).length <= room) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
   }
-  return out;
+  return chars.slice(0, lo).join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -251,13 +285,15 @@ export function assembleContext(input: ContextInput): AssembledContext {
   const current = notes.get(input.currentId);
   if (!current) refuse("NOTE_NOT_FOUND");
   if (current.owner !== requesterId) refuse("NOTE_NOT_OWNED");
-  if (current.purchaseId !== undefined) refuse("PURCHASED_CONTENT_EXCLUDED");
+  if (isPurchasedNote(current)) refuse("PURCHASED_CONTENT_EXCLUDED");
 
   const dropped: ContextDropped[] = [];
 
   // 2. Ancestor walk, cycle-safe and bounded. Every ancestor is checked for
-  // a purchase flag whether or not it is owned: a branch under a purchased
-  // copy root is never sent, even when the buyer owns the sub-note.
+  // purchased content (purchaseId or isPurchasedContent) whether or not it is
+  // owned: a branch under a purchased note is never sent, even when the buyer
+  // owns the sub-note. (A purchased sub-note moved elsewhere is itself
+  // flagged, so it is refused above or excluded below.)
   const ancestors: ContextNote[] = [];
   const visited = new Set<string>([current.id]);
   let cursor = current.parentNote;
@@ -266,7 +302,7 @@ export function assembleContext(input: ContextInput): AssembledContext {
     if (visited.has(cursor)) break; // cycle: every node on it was visited
     if (hops >= CONTEXT_MAX_ANCESTOR_HOPS) {
       // Chain longer than we can verify: fail closed.
-      refuse("CONTEXT_TOO_LARGE");
+      refuse("CONTEXT_TOO_DEEP");
     }
     const node = notes.get(cursor);
     if (!node) {
@@ -275,33 +311,40 @@ export function assembleContext(input: ContextInput): AssembledContext {
     }
     visited.add(cursor);
     hops += 1;
-    if (node.purchaseId !== undefined) refuse("PURCHASED_CONTENT_EXCLUDED");
+    if (isPurchasedNote(node)) refuse("PURCHASED_CONTENT_EXCLUDED");
     if (node.owner !== requesterId) {
-      dropped.push({ noteId: node.id, role: "ancestor", reason: "not_owned" });
+      // No id: the user must not learn ids of notes they do not own.
+      dropped.push({ role: "ancestor", reason: "not_owned" });
     } else {
       ancestors.push(node);
     }
     cursor = node.parentNote;
   }
 
-  // 3. Direct children in tree order, deduplicated, scan-bounded.
+  // 3. Direct children in tree order, deduplicated, scan-bounded. Ids past
+  // the scan limit are not read and not listed one by one: a parent holding
+  // thousands of ids yields ONE aggregate entry.
   const children: ContextNote[] = [];
   const seenChildren = new Set<string>();
   const childIds = current.childNotes ?? [];
-  for (let i = 0; i < childIds.length; i++) {
-    const id = childIds[i];
+  const scanned = childIds.slice(0, CONTEXT_CHILD_SCAN_MAX);
+  if (childIds.length > scanned.length) {
+    dropped.push({
+      role: "child",
+      reason: "child_cap",
+      count: childIds.length - scanned.length,
+    });
+  }
+  for (const id of scanned) {
     if (seenChildren.has(id) || id === current.id) continue;
     seenChildren.add(id);
-    if (i >= CONTEXT_CHILD_SCAN_MAX) {
-      dropped.push({ noteId: id, role: "child", reason: "child_cap" });
-      continue;
-    }
     const child = notes.get(id);
-    if (!child || child.parentNote !== current.id) {
+    if (child && child.owner !== requesterId) {
+      // Checked before anything else and reported without the id.
+      dropped.push({ role: "child", reason: "not_owned" });
+    } else if (!child || child.parentNote !== current.id) {
       dropped.push({ noteId: id, role: "child", reason: "missing" });
-    } else if (child.owner !== requesterId) {
-      dropped.push({ noteId: id, role: "child", reason: "not_owned" });
-    } else if (child.purchaseId !== undefined) {
+    } else if (isPurchasedNote(child)) {
       dropped.push({ noteId: id, role: "child", reason: "purchased" });
     } else if (children.length >= CONTEXT_MAX_CHILDREN) {
       dropped.push({ noteId: id, role: "child", reason: "child_cap" });
@@ -319,7 +362,7 @@ export function assembleContext(input: ContextInput): AssembledContext {
   const currentBlock = renderBlock(
     1,
     "current",
-    currentTitle,
+    escapeContextText(currentTitle),
     currentBody,
     false,
   );
@@ -348,28 +391,38 @@ export function assembleContext(input: ContextInput): AssembledContext {
       role === "ancestor" ? ANCESTOR_EXTRACT_MAX : CHILD_EXTRACT_MAX;
     const seq = included.length + 1;
     const title = cleanTitle(note.title);
+    const escapedTitle = escapeContextText(title);
     const full = extractNoteText(note.content, extractMax + 200);
     let cut = full.length > extractMax;
     let text = cut ? cutAtWord(full, extractMax) : full;
     let body = escapeContextText(text);
-    let block = renderBlock(seq, role, title, body, cut);
+    let block = renderBlock(seq, role, escapedTitle, body, cut);
 
     if (block.length > remaining) {
-      const bare = renderBlock(seq, role, title, "", true).length;
-      const room = remaining - bare - 1; // 1 for the ellipsis
-      const fitted = room > 0 ? fitEscaped(text, room) : "";
-      if (fitted.length < Math.min(MIN_EXTRACT_CHARS, text.length)) {
+      const bare = renderBlock(seq, role, escapedTitle, "", true).length;
+      const source = text;
+      let room = remaining - bare - 1; // 1 for the ellipsis
+      let fits = false;
+      // The digits of body-len grow with the body, so the real block can be a
+      // few units longer than `bare` predicted: shrink by the measured
+      // overflow and refit (converges in a round or two).
+      for (let round = 0; round < 4 && room > 0; round++) {
+        const fitted = fitEscaped(source, room);
+        if (fitted.length < Math.min(MIN_EXTRACT_CHARS, source.length)) break;
+        text = fitted.trimEnd() + "…";
+        body = escapeContextText(text);
+        block = renderBlock(seq, role, escapedTitle, body, true);
+        if (block.length <= remaining) {
+          fits = true;
+          break;
+        }
+        room -= block.length - remaining;
+      }
+      if (!fits) {
         dropped.push({ noteId: note.id, role, reason: "budget" });
         continue;
       }
-      text = fitted.trimEnd() + "…";
       cut = true;
-      body = escapeContextText(text);
-      block = renderBlock(seq, role, title, body, true);
-      if (block.length > remaining) {
-        dropped.push({ noteId: note.id, role, reason: "budget" });
-        continue;
-      }
     }
 
     blocks.push(block);

@@ -17,6 +17,7 @@ function toContextNote(note: Doc<"notes">): ContextNote {
     parentNote: note.parentNote,
     childNotes: note.childNotes,
     purchaseId: note.purchaseId,
+    isPurchasedContent: note.isPurchasedContent,
   };
 }
 

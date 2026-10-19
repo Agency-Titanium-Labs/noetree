@@ -7,7 +7,9 @@
  * - D-06/D-07/D-20: copy root lands at the buyer's root level with the original
  *   title; only title, content and sibling index are copied (the root's index
  *   is left unset); copies are private and unpinned, with fresh timestamps.
- * - D-08: only the copy root carries purchaseId.
+ * - D-08: only the copy root carries purchaseId. Every delivered note also
+ *   carries isPurchasedContent (Phase 18 D-06) so moved-out sub-notes stay
+ *   excluded from AI context and resale.
  * - D-10: content is read live from the seller's notes at delivery time.
  * - D-15: at most purchase.noteCount notes are copied. "The first noteCount
  *   notes" means strict pre-order: parent before its children, siblings in
@@ -21,6 +23,7 @@
  */
 import { Doc, Id } from "../_generated/dataModel";
 import { MutationCtx, QueryCtx } from "../_generated/server";
+import { isPurchasedNote } from "./purchasedFlag";
 
 export const MAX_COPY_BYTES = 8 * 1024 * 1024;
 
@@ -117,15 +120,29 @@ export async function writeCopy(
     parentNote?: Id<"notes">;
     rootTitle?: string;
     purchaseId?: Id<"purchases">;
+    /**
+     * Mark every written note as purchased content (isPurchasedContent).
+     * Purchase delivery sets it. Independently of this option, a note is
+     * flagged when its source is purchased (purchaseId or flag) or when its
+     * parent in the plan is flagged, so duplicates of purchased content stay
+     * excluded from AI context and from resale (18-CONTEXT D-06).
+     */
+    purchased?: boolean;
   },
 ): Promise<Id<"notes">> {
   const now = new Date().toISOString();
   const newIds: Id<"notes">[] = [];
+  const flagged: boolean[] = [];
   const childrenOf = new Map<number, Id<"notes">[]>();
 
   for (let i = 0; i < plan.length; i++) {
     const { src, parentIdx } = plan[i];
     const isRoot = i === 0;
+    const isPurchased =
+      opts.purchased === true ||
+      isPurchasedNote(src) ||
+      (parentIdx !== null && flagged[parentIdx] === true);
+    flagged.push(isPurchased);
     const id = await ctx.db.insert("notes", {
       owner: opts.owner,
       title: isRoot ? (opts.rootTitle ?? src.title) : src.title,
@@ -140,6 +157,7 @@ export async function writeCopy(
       updated_at: now,
       ...(!isRoot && src.index !== undefined ? { index: src.index } : {}),
       ...(isRoot && opts.purchaseId ? { purchaseId: opts.purchaseId } : {}),
+      ...(isPurchased ? { isPurchasedContent: true } : {}),
     });
     newIds.push(id);
     if (!isRoot && parentIdx !== null) {
@@ -220,6 +238,7 @@ export async function deliverPurchase(
     const rootId = await writeCopy(ctx, planned.plan, {
       owner: p.buyerId,
       purchaseId: p._id,
+      purchased: true,
     });
     return await markDelivered(ctx, p._id, rootId);
   }

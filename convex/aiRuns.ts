@@ -83,7 +83,10 @@ const contextValidator = v.object({
   truncated: v.array(v.string()),
   dropped: v.array(
     v.object({
-      noteId: v.string(),
+      // Absent for not_owned (foreign ids are never exposed) and for the
+      // aggregate child-scan entry.
+      noteId: v.optional(v.string()),
+      count: v.optional(v.number()),
       role: v.union(v.literal("ancestor"), v.literal("child")),
       reason: v.union(
         v.literal("budget"),
@@ -112,7 +115,11 @@ const beginResultValidator = v.object({
   // Single-owner streaming (H1): true only for the call that created the
   // run. A replay never owns the stream and must not call the provider.
   claimed: v.boolean(),
-  // Present only on the claiming call when noteId was given.
+  // Present only on the claiming call when noteId was given. Only that
+  // claiming caller receives the context and MUST keep it (hand it to the
+  // provider call): a replay (same requestId) returns none and never rebuilds
+  // it, so a caller that loses the response can not recover it (18-CONTEXT
+  // D-09).
   context: v.optional(contextValidator),
 });
 
@@ -197,7 +204,8 @@ export const beginRun = mutation({
           q.eq("tokenIdentifier", identity.tokenIdentifier),
         )
         .unique();
-      if (!user) throw new ConvexError("NOTE_NOT_FOUND");
+      // A missing users row is an identity problem, not a missing note.
+      if (!user) throw new ConvexError("UNAUTHENTICATED");
       context = await assembleContextForUser(ctx, user._id, args.noteId);
     }
 

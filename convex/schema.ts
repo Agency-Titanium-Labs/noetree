@@ -37,6 +37,11 @@ export default defineSchema({
     isPublic: v.optional(v.boolean()),
     // D-08: set on a purchase copy root so it can be found by its purchase.
     purchaseId: v.optional(v.id("purchases")),
+    // Phase 18 (D-06): sticky marker on EVERY note that holds purchased
+    // marketplace content (all notes written by purchase delivery, and their
+    // duplicates). Never cleared by edits or moves. Optional: older rows are
+    // flagged by notes.backfillPurchasedFlag.
+    isPurchasedContent: v.optional(v.boolean()),
     // Phase 15: user who last saved the current content (author of the next
     // snapshot of this content). Optional so no migration is needed.
     lastEditedBy: v.optional(v.id("users")),

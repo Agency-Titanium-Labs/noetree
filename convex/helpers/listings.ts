@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import { Doc, Id } from "../_generated/dataModel";
 import { QueryCtx, MutationCtx } from "../_generated/server";
 import { flattenTipTap } from "./noteText";
+import { isPurchasedNote } from "./purchasedFlag";
 
 export const LISTING_LIMITS = {
   TITLE_MAX: 100,
@@ -151,6 +152,10 @@ export async function countSubtree(
         if (child.owner !== sellerId) {
           throw new ConvexError("LISTING_CONTAINS_FOREIGN_NOTES");
         }
+        // A flagged purchased note moved under the listed subtree.
+        if (isPurchasedNote(child)) {
+          throw new ConvexError("LISTING_PURCHASED_CONTENT");
+        }
         count++;
         if (count > cap) {
           throw new ConvexError("LISTING_SUBTREE_TOO_LARGE");
@@ -278,6 +283,24 @@ export async function unpublishListingForNote(
 const MAX_ANCESTOR_HOPS = 64;
 
 /**
+ * True when the note or any ancestor (bounded to 64 hops) is purchased content
+ * per the shared predicate (purchaseId OR isPurchasedContent).
+ */
+export async function isNoteOrAncestorPurchased(
+  ctx: QueryCtx | MutationCtx,
+  noteId: Id<"notes">,
+): Promise<boolean> {
+  let currentId: Id<"notes"> | undefined = noteId;
+  for (let hops = 0; currentId && hops < MAX_ANCESTOR_HOPS; hops++) {
+    const current: Doc<"notes"> | null = await ctx.db.get("notes", currentId);
+    if (!current) break;
+    if (isPurchasedNote(current)) return true;
+    currentId = current.parentNote;
+  }
+  return false;
+}
+
+/**
  * D-09 / D-21: purchased content cannot be re-listed.
  *  (a) the note or any ancestor (bounded to 64 hops) carries purchaseId, or
  *  (b) the note's subtree contains one of the caller's delivered copy roots
@@ -290,15 +313,11 @@ export async function assertNotPurchasedContent(
   noteId: Id<"notes">,
   userId: Id<"users">,
 ): Promise<void> {
-  // (a) ancestor walk, inclusive of noteId.
-  let currentId: Id<"notes"> | undefined = noteId;
-  for (let hops = 0; currentId && hops < MAX_ANCESTOR_HOPS; hops++) {
-    const current: Doc<"notes"> | null = await ctx.db.get("notes", currentId);
-    if (!current) break;
-    if (current.purchaseId !== undefined) {
-      throw new ConvexError("LISTING_PURCHASED_CONTENT");
-    }
-    currentId = current.parentNote;
+  // (a) ancestor walk, inclusive of noteId. "Purchased" is the shared
+  // predicate (purchaseId OR isPurchasedContent), so a purchased sub-note
+  // moved out of its copy stays unsellable (18-CONTEXT D-06).
+  if (await isNoteOrAncestorPurchased(ctx, noteId)) {
+    throw new ConvexError("LISTING_PURCHASED_CONTENT");
   }
 
   // (b) delivered copy roots of this buyer. The cap of 500 purchases per buyer
