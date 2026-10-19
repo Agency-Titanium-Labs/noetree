@@ -205,14 +205,49 @@ describe("kill switch, rate limit, caps (AIF-06)", () => {
     await expect(begin(t, "r1")).resolves.toMatchObject({ replayed: false });
   });
 
-  it("a replay of an already reserved run still answers while AI is disabled (no new debit)", async () => {
+  it("a replay of a reserved run is rejected while AI is disabled (kill switch cannot be bypassed)", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    await begin(t, "r1");
+    await t.mutation(internal.aiRuns.setAiEnabled, { enabled: false });
+    expect(await rejects(begin(t, "r1"))).toBe("AI_DISABLED");
+    expect(await balances(t)).toMatchObject({ monthly: 9 });
+  });
+
+  it("a replay of a reserved run is rejected for a blocked user", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    await begin(t, "r1");
+    await t.mutation(internal.aiRuns.setUserAiBlock, {
+      clerkUserId: USER,
+      blockedUntil: Date.now() + 60_000,
+    });
+    expect(await rejects(begin(t, "r1"))).toBe("RATE_LIMITED");
+  });
+
+  it("a replay of a settled run still answers while AI is disabled (read-only, no work)", async () => {
     const t = convexTest(schema, modules);
     await seedCredits(t, { monthly: 10 });
     const a = await begin(t, "r1");
+    await settle(t, a.runId, "completed");
     await t.mutation(internal.aiRuns.setAiEnabled, { enabled: false });
     const b = await begin(t, "r1");
-    expect(b.runId).toBe(a.runId);
-    expect(await balances(t)).toMatchObject({ monthly: 9 });
+    expect(b).toMatchObject({
+      runId: a.runId,
+      status: "completed",
+      replayed: true,
+      claimed: false,
+    });
+  });
+
+  it("only the creating call holds the stream claim (H1)", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    const a = await begin(t, "r1");
+    const b = await begin(t, "r1");
+    const c = await begin(t, "r1");
+    expect([a.claimed, b.claimed, c.claimed]).toEqual([true, false, false]);
+    expect((await runs(t))[0].streamClaimedAt).toBeTypeOf("number");
   });
 
   it("rate limits a user after the burst capacity, without debiting the rejected call", async () => {
@@ -476,7 +511,12 @@ describe("end to end with the fake LLM provider", () => {
     return {
       begin: async () => {
         const r = await begin(t, requestId, "semantic");
-        return { runId: r.runId, replayed: r.replayed, status: r.status };
+        return {
+          runId: r.runId,
+          replayed: r.replayed,
+          status: r.status,
+          claimed: r.claimed,
+        };
       },
       settle: (runId, outcome) => settle(t, runId as never, outcome),
     };
@@ -599,7 +639,12 @@ describe("end to end with the fake LLM provider", () => {
     const host: RunHost = {
       begin: async () => {
         const r = await begin(t, "r1", "linking");
-        return { runId: r.runId, replayed: r.replayed, status: r.status };
+        return {
+          runId: r.runId,
+          replayed: r.replayed,
+          status: r.status,
+          claimed: r.claimed,
+        };
       },
       settle: async () => undefined,
     };
@@ -612,6 +657,48 @@ describe("end to end with the fake LLM provider", () => {
       }),
     ).rejects.toThrow();
     expect(await tableCounts(t)).toEqual({ runs: 0, tx: 0, limits: 0 });
+  });
+
+  it("replaying a still-reserved run never starts a second stream (H1)", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    // The first call owns the stream and is still in flight.
+    const first = await begin(t, "r1", "semantic");
+    expect(first.claimed).toBe(true);
+    let calls = 0;
+    const counting = {
+      stream: () => {
+        calls += 1;
+        return createFakeProvider({ mode: "ok" }).stream(
+          { prompt: "hi" },
+          new AbortController().signal,
+        );
+      },
+    };
+    const replay = await executeRun({
+      host: hostFor(t, "r1"),
+      provider: counting,
+      input: { prompt: "hi" },
+      signal: new AbortController().signal,
+    });
+    expect(replay.outcome).toBe("replay_skipped");
+    expect(calls).toBe(0);
+    expect((await runs(t))[0].status).toBe("reserved");
+    expect(await balances(t)).toMatchObject({ monthly: 7 });
+  });
+
+  it("a stream that ends with zero tokens and no abort is failed and refunded (L2)", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    const res = await executeRun({
+      host: hostFor(t, "r1"),
+      provider: createFakeProvider({ mode: "ok", chunks: [] }),
+      input: { prompt: "hi" },
+      signal: new AbortController().signal,
+    });
+    expect(res.outcome).toBe("failed");
+    expect((await runs(t))[0].status).toBe("refunded");
+    expect(await balances(t)).toMatchObject({ monthly: 10 });
   });
 
   it("replaying a closed run does not call the provider again", async () => {
@@ -640,5 +727,87 @@ describe("end to end with the fake LLM provider", () => {
     expect(again.outcome).toBe("replay_skipped");
     expect(calls).toBe(0);
     expect(await balances(t)).toMatchObject({ monthly: 7 });
+  });
+});
+
+describe("settle hardening", () => {
+  it("rejects a bad secret with a generic message that does not name the env var", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    const { runId } = await begin(t, "r1");
+    let msg = "";
+    try {
+      await t.mutation(api.aiRuns.settleRun, {
+        secret: "wrong",
+        runId,
+        outcome: "failed",
+      });
+    } catch (err) {
+      msg = errorCode(err);
+    }
+    expect(msg).toBe("Unauthorized");
+    expect(msg).not.toMatch(/INTERNAL_WEBHOOK_SECRET/);
+  });
+
+  it.each([
+    ["NaN", Number.NaN],
+    ["negative", -1],
+    ["fractional", 1.5],
+    ["Infinity", Number.POSITIVE_INFINITY],
+  ])(
+    "rejects %s token usage and leaves the run untouched (L4)",
+    async (_n, bad) => {
+      const t = convexTest(schema, modules);
+      await seedCredits(t, { monthly: 10 });
+      const { runId } = await begin(t, "r1");
+      for (const usage of [{ inputTokens: bad }, { outputTokens: bad }]) {
+        expect(
+          await rejects(
+            t.mutation(api.aiRuns.settleRun, {
+              secret: TEST_SECRET,
+              runId,
+              outcome: "completed",
+              usage,
+            }),
+          ),
+        ).toBe("INVALID_USAGE");
+      }
+      expect((await runs(t))[0].status).toBe("reserved");
+    },
+  );
+
+  it("stores valid integer usage", async () => {
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    const { runId } = await begin(t, "r1");
+    await t.mutation(api.aiRuns.settleRun, {
+      secret: TEST_SECRET,
+      runId,
+      outcome: "completed",
+      usage: { inputTokens: 12, outputTokens: 0 },
+    });
+    expect((await runs(t))[0].usage).toEqual({
+      inputTokens: 12,
+      outputTokens: 0,
+    });
+  });
+
+  it("writes no refund row when nothing is restored (M5)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 5, 30, 23, 59));
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 30 });
+    const { runId } = await begin(t, "r1", "semantic"); // all from monthly
+    vi.setSystemTime(Date.UTC(2026, 6, 1, 0, 6)); // next UTC month
+    expect(await settle(t, runId, "expired")).toEqual({
+      status: "refunded",
+      changed: true,
+    });
+    const ledgerRows = await ledger(t);
+    expect(ledgerRows.filter(r => r.type === "refund")).toHaveLength(0);
+    const [run] = await runs(t);
+    expect(run.status).toBe("refunded");
+    expect(run.refundTransactionId).toBeUndefined();
+    expect(await balances(t)).toMatchObject({ monthly: 27, purchased: 0 });
   });
 });

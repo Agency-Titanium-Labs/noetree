@@ -51,8 +51,18 @@ export function canTransition(from: RunStatus, to: RunStatus): boolean {
   return from === "reserved" && (to === "completed" || to === "refunded");
 }
 
-/** A reservation older than this is considered stuck (> route maxDuration). */
+/**
+ * Hard ceiling for one run's wall-clock time. The future chat route's
+ * `maxDuration` MUST be <= this value, and RUN_TTL_MS must stay strictly above
+ * it with a safety margin: the reaper refunds anything still reserved after
+ * RUN_TTL_MS, so a stream that outlives it could be refunded while it is still
+ * producing output (free compute for the user).
+ */
+export const MAX_RUN_DURATION_MS = 2 * 60 * 1000;
+/** A reservation older than this is considered stuck (> MAX_RUN_DURATION_MS). */
 export const RUN_TTL_MS = 5 * 60 * 1000;
+/** A run the reaper failed on is retried no sooner than this. */
+export const REAP_RETRY_MS = 60 * 60 * 1000;
 /** Max concurrently reserved runs per user. */
 export const MAX_INFLIGHT_RUNS = 3;
 /** Bounded batch for the reaper sweep. */

@@ -13,9 +13,10 @@ import {
   monthStartUtc,
   tierForAction,
 } from "./helpers/creditCatalog";
-import { tierFromClerkUserId } from "./helpers/helper";
+import { tierFromClerkUserId, tierFromSubscription } from "./helpers/helper";
 import {
   MAX_INFLIGHT_RUNS,
+  REAP_RETRY_MS,
   RUN_TTL_MS,
   SWEEP_BATCH,
   canTransition,
@@ -73,6 +74,9 @@ export const beginRun = mutation({
     cost: v.number(),
     status: runStatusValidator,
     replayed: v.boolean(),
+    // Single-owner streaming (H1): true only for the call that created the
+    // run. A replay never owns the stream and must not call the provider.
+    claimed: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -95,11 +99,28 @@ export const beginRun = mutation({
       if (existing.actionKey !== args.actionKey) {
         throw new ConvexError("REQUEST_ID_REUSED");
       }
+      // A replay of a still-reserved run is a reconnect: it does no work
+      // (claimed: false) but must not bypass the operator controls, so the
+      // kill switch and the per-user block are re-checked first.
+      if (existing.status === "reserved") {
+        if (!(await isAiEnabled(ctx))) throw new ConvexError("AI_DISABLED");
+        const bucket = await ctx.db
+          .query("aiRateLimits")
+          .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))
+          .unique();
+        if (
+          bucket?.blockedUntil !== undefined &&
+          bucket.blockedUntil > Date.now()
+        ) {
+          throw new ConvexError("RATE_LIMITED");
+        }
+      }
       return {
         runId: existing._id,
         cost: existing.cost,
         status: existing.status,
         replayed: true,
+        claimed: false,
       };
     }
 
@@ -171,6 +192,10 @@ export const beginRun = mutation({
       fromMonthly: draw.fromMonthly,
       fromPurchased: draw.fromPurchased,
       createdAt: now,
+      // The creator owns the stream; set in the same insert so no other call
+      // can ever observe the run unclaimed (compare-and-set by construction:
+      // the unique (user, requestId) lookup above is in this transaction).
+      streamClaimedAt: now,
     });
     await ctx.db.patch(draw.transactionId, { aiRunId: runId });
 
@@ -179,7 +204,13 @@ export const beginRun = mutation({
       runId,
     });
 
-    return { runId, cost, status: "reserved" as const, replayed: false };
+    return {
+      runId,
+      cost,
+      status: "reserved" as const,
+      replayed: false,
+      claimed: true,
+    };
   },
 });
 
@@ -194,7 +225,7 @@ async function refundRunOnce(
   ctx: MutationCtx,
   run: Doc<"aiRuns">,
   now: number,
-): Promise<Id<"creditTransactions">> {
+): Promise<Id<"creditTransactions"> | null> {
   const already = await ctx.db
     .query("creditTransactions")
     .withIndex("by_refundsTransactionId", q =>
@@ -207,7 +238,13 @@ async function refundRunOnce(
     .query("aiCredits")
     .withIndex("by_clerkUserId", q => q.eq("clerkUserId", run.clerkUserId))
     .unique();
-  const tier = await tierFromClerkUserId(ctx, run.clerkUserId);
+  // .first(), not .unique(): a duplicate subscription row must never make the
+  // refund/expire path throw and strand a reservation.
+  const sub = await ctx.db
+    .query("subscriptions")
+    .withIndex("by_clerkUserId", q => q.eq("clerkUserId", run.clerkUserId))
+    .first();
+  const tier = tierFromSubscription(sub);
   // A monthly reset since the debit already replaced that bucket; restoring
   // would push it above its quota. Purchased credits never expire: always
   // restored.
@@ -230,7 +267,7 @@ async function refundRunOnce(
     },
     run.actionKey,
   );
-  await ctx.db.patch(refundId, { aiRunId: run._id });
+  if (refundId) await ctx.db.patch(refundId, { aiRunId: run._id });
   return refundId;
 }
 
@@ -240,12 +277,19 @@ type SettleResult = {
 };
 
 /** Compare-and-set close of a run. Idempotent: a settled run is a no-op. */
-async function settle(
+export async function settle(
   ctx: MutationCtx,
   runId: Id<"aiRuns">,
   outcome: RunOutcome,
   usage?: { inputTokens?: number; outputTokens?: number },
 ): Promise<SettleResult> {
+  if (usage) {
+    for (const n of [usage.inputTokens, usage.outputTokens]) {
+      if (n !== undefined && (!Number.isInteger(n) || n < 0)) {
+        throw new ConvexError("INVALID_USAGE");
+      }
+    }
+  }
   const run = await ctx.db.get(runId);
   if (!run) throw new ConvexError("RUN_NOT_FOUND");
 
@@ -261,7 +305,7 @@ async function settle(
       status: "refunded",
       settledAt: now,
       outcome,
-      refundTransactionId,
+      ...(refundTransactionId ? { refundTransactionId } : {}),
       ...(usage ? { usage } : {}),
     });
   } else {
@@ -300,7 +344,7 @@ export const settleRun = mutation({
   returns: settleResultValidator,
   handler: async (ctx, args) => {
     if (!isValidInternalSecret(args.secret)) {
-      throw new ConvexError("Unauthorized: invalid INTERNAL_WEBHOOK_SECRET");
+      throw new ConvexError("Unauthorized");
     }
     return await settle(ctx, args.runId, args.outcome, args.usage);
   },
@@ -318,7 +362,7 @@ export const settleInternal = internalMutation({
     settle(ctx, args.runId, args.outcome, args.usage),
 });
 
-async function expireOne(
+export async function expireOne(
   ctx: MutationCtx,
   runId: Id<"aiRuns">,
   now: number,
@@ -348,14 +392,34 @@ export const sweepStaleRuns = internalMutation({
       .withIndex("by_status_and_createdAt", q =>
         q.eq("status", "reserved").lt("createdAt", now - RUN_TTL_MS),
       )
+      // Skip runs the reaper recently failed on (poisoned), see below.
+      .filter(q =>
+        q.or(
+          q.eq(q.field("reapFailedAt"), undefined),
+          q.lt(q.field("reapFailedAt"), now - REAP_RETRY_MS),
+        ),
+      )
       .take(SWEEP_BATCH);
     let refunded = 0;
+    let failed = 0;
     for (const run of stale) {
-      const r = await expireOne(ctx, run._id, now);
-      if (r.changed) refunded += 1;
+      try {
+        // Each run is expired in its own sub-transaction: if it throws, only
+        // that run's writes roll back and the rest of the batch proceeds.
+        const r: SettleResult = await ctx.runMutation(
+          internal.aiRuns.expireRun,
+          { runId: run._id },
+        );
+        if (r.changed) refunded += 1;
+      } catch (err) {
+        failed += 1;
+        console.error(`sweepStaleRuns: expiring run ${run._id} failed`, err);
+        await ctx.db.patch(run._id, { reapFailedAt: now });
+      }
     }
-    // Bounded work per transaction: continue if the batch was full.
-    if (stale.length === SWEEP_BATCH) {
+    // Bounded work per transaction: continue if the batch was full and made
+    // progress (a batch of only poisoned runs must not reschedule forever).
+    if (stale.length === SWEEP_BATCH && failed < stale.length) {
       await ctx.scheduler.runAfter(0, internal.aiRuns.sweepStaleRuns, {});
     }
     return refunded;

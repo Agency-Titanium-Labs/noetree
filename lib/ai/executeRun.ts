@@ -16,7 +16,13 @@ export type SettleOutcome =
 
 export type RunHost = {
   /** Calls aiRuns.beginRun. Rejects (no run, no debit) on gate failures. */
-  begin(): Promise<{ runId: string; replayed: boolean; status: string }>;
+  begin(): Promise<{
+    runId: string;
+    replayed: boolean;
+    status: string;
+    /** True only for the call that created the run (single stream owner). */
+    claimed: boolean;
+  }>;
   /** Calls aiRuns.settleRun. May reject; the reaper is the backstop. */
   settle(runId: string, outcome: SettleOutcome): Promise<unknown>;
 };
@@ -45,8 +51,10 @@ export async function executeRun(args: {
   // run exists, nothing to settle, nothing was debited.
   const run = await host.begin();
 
-  // A replayed request whose run is already closed must not call the LLM again.
-  if (run.replayed && run.status !== "reserved") {
+  // Single owner: only the call that holds the claim may call the provider.
+  // A replay (closed OR still reserved) returns without any work, so a
+  // retried requestId can never start a second stream.
+  if (!run.claimed) {
     return { runId: run.runId, outcome: "replay_skipped", text: "" };
   }
 
@@ -60,6 +68,9 @@ export async function executeRun(args: {
     }
     if (signal.aborted) {
       outcome = gotToken ? "aborted_after_output" : "aborted_before_output";
+    } else if (!gotToken) {
+      // A stream that ends cleanly with zero tokens delivered nothing: refund.
+      outcome = "failed";
     }
   } catch (err) {
     if (isAbort(err, signal)) {

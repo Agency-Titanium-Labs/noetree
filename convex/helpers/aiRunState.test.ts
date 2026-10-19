@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
+  MAX_RUN_DURATION_MS,
+  RUN_TTL_MS,
   RUN_OUTCOMES,
   canTransition,
   isValidRequestId,
@@ -92,5 +94,12 @@ describe("shouldRestoreMonthly", () => {
         monthStartNow,
       }),
     ).toBe(true);
+  });
+});
+
+describe("run time budget (M1)", () => {
+  test("RUN_TTL_MS leaves a safety margin above MAX_RUN_DURATION_MS", () => {
+    const margin = 60_000;
+    expect(RUN_TTL_MS).toBeGreaterThan(MAX_RUN_DURATION_MS + margin);
   });
 });

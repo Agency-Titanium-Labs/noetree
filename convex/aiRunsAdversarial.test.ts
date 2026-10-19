@@ -4,6 +4,9 @@ import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import * as aiCreditsModule from "./aiCredits";
 import * as aiRunsModule from "./aiRuns";
+import { expireOne, settle as settleHelper } from "./aiRuns";
+import type { MutationCtx } from "./_generated/server";
+import { errorCode } from "../test-utils/aiHarness";
 import {
   MAX_INFLIGHT_RUNS,
   RUN_TTL_MS,
@@ -38,36 +41,57 @@ afterEach(() => {
 const refundRows = async (t: ReturnType<typeof convexTest>) =>
   (await ledger(t)).filter(r => r.type === "refund");
 
-describe("concurrent beginRun", () => {
-  it("the same requestId fired 8 times at once debits exactly once", async () => {
+// HONESTY NOTE: convex-test executes mutations serially, so Promise.all over
+// mutations below tests IDEMPOTENCY (repeated / reordered calls converge on one
+// state), not true parallelism. The real race guarantee comes from Convex
+// itself: every mutation is one serializable transaction with optimistic
+// concurrency, so two mutations touching the same aiRuns / aiCredits documents
+// cannot both commit a stale read. The deterministic interleaving tests further
+// down call the internal helpers inside a single t.run to pin specific orders.
+describe("idempotency of repeated beginRun (sequential, not parallel)", () => {
+  it("the same requestId sent 8 times debits exactly once and only one call is claimed", async () => {
     const t = convexTest(schema, modules);
     await seedCredits(t, { monthly: 30 });
     const results = await Promise.allSettled(
       Array.from({ length: 8 }, () => begin(t, "dup", "semantic")),
     );
-    const ok = results.filter(r => r.status === "fulfilled");
-    expect(ok.length).toBe(8);
-    const ids = new Set(
-      ok.map(r => (r as PromiseFulfilledResult<{ runId: string }>).value.runId),
+    expect(results.every(r => r.status === "fulfilled")).toBe(true);
+    const values = results.map(
+      r =>
+        (
+          r as PromiseFulfilledResult<{
+            runId: string;
+            claimed: boolean;
+            replayed: boolean;
+          }>
+        ).value,
     );
-    expect(ids.size).toBe(1);
+    expect(new Set(values.map(v => v.runId)).size).toBe(1);
+    expect(values.filter(v => v.claimed)).toHaveLength(1);
+    expect(values.filter(v => v.replayed)).toHaveLength(7);
     expect(await runs(t)).toHaveLength(1);
-    expect(await balances(t)).toMatchObject({ monthly: 27 });
+    expect(await balances(t)).toEqual({ monthly: 27, purchased: 0, total: 27 });
     expect((await ledger(t)).filter(r => r.type === "deduction")).toHaveLength(
       1,
     );
     await assertLedgerInvariant(t, 30);
   });
 
-  it("distinct requests cannot overdraw: balance 2, three concurrent debits of 1", async () => {
+  it("distinct requests cannot overdraw: balance 2, three debits of 1 give exactly 2 ok and 1 INSUFFICIENT_CREDITS", async () => {
     const t = convexTest(schema, modules);
     await seedCredits(t, { monthly: 2 });
     const results = await Promise.allSettled(
       ["a", "b", "c"].map(id => begin(t, id)),
     );
-    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(2);
-    expect(results.filter(r => r.status === "rejected")).toHaveLength(1);
-    expect(await balances(t)).toMatchObject({ monthly: 0, purchased: 0 });
+    expect(results.map(r => r.status)).toEqual([
+      "fulfilled",
+      "fulfilled",
+      "rejected",
+    ]);
+    expect(errorCode((results[2] as PromiseRejectedResult).reason)).toBe(
+      "INSUFFICIENT_CREDITS",
+    );
+    expect(await balances(t)).toEqual({ monthly: 0, purchased: 0, total: 0 });
     await assertLedgerInvariant(t, 2);
   });
 
@@ -78,24 +102,164 @@ describe("concurrent beginRun", () => {
       begin(t, "x", "semantic"),
       begin(t, "y", "semantic"),
     ]);
-    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.map(r => r.status)).toEqual(["fulfilled", "rejected"]);
     expect((await balances(t)).total).toBe(0);
     await assertLedgerInvariant(t, 3);
   });
 
-  it("the in-flight cap holds under concurrency", async () => {
+  it("the in-flight cap lets exactly MAX_INFLIGHT_RUNS through out of 8", async () => {
     const t = convexTest(schema, modules);
     await seedCredits(t, { monthly: 100 });
     const results = await Promise.allSettled(
       Array.from({ length: 8 }, (_, i) => begin(t, `c-${i}`)),
     );
-    const ok = results.filter(r => r.status === "fulfilled").length;
-    expect(ok).toBeLessThanOrEqual(MAX_INFLIGHT_RUNS);
-    expect((await runs(t)).filter(r => r.status === "reserved").length).toBe(
-      ok,
+    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(
+      MAX_INFLIGHT_RUNS,
     );
-    expect(await balances(t)).toMatchObject({ monthly: 100 - ok });
+    const rejected = results.filter(
+      r => r.status === "rejected",
+    ) as PromiseRejectedResult[];
+    expect(rejected).toHaveLength(8 - MAX_INFLIGHT_RUNS);
+    for (const r of rejected) expect(errorCode(r.reason)).toBe("TOO_MANY_RUNS");
+    expect((await runs(t)).filter(r => r.status === "reserved")).toHaveLength(
+      MAX_INFLIGHT_RUNS,
+    );
+    expect(await balances(t)).toMatchObject({
+      monthly: 100 - MAX_INFLIGHT_RUNS,
+    });
     await assertLedgerInvariant(t, 100);
+  });
+});
+
+describe("deterministic interleavings of the settle/expire helpers (one transaction)", () => {
+  const T0 = Date.UTC(2026, 5, 15, 12, 0);
+  const asCtx = (ctx: unknown) => ctx as MutationCtx;
+
+  async function start(requestId = "r1") {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 10 });
+    const { runId } = await begin(t, requestId, "semantic");
+    vi.setSystemTime(T0 + RUN_TTL_MS + 1_000);
+    return { t, runId };
+  }
+
+  it("settle(completed) -> settle(failed) -> expire: first writer wins, charge stands, no refund", async () => {
+    const { t, runId } = await start();
+    const out = await t.run(async ctx => {
+      const c = asCtx(ctx);
+      return [
+        await settleHelper(c, runId, "completed"),
+        await settleHelper(c, runId, "failed"),
+        await expireOne(c, runId, Date.now()),
+      ];
+    });
+    expect(out).toEqual([
+      { status: "completed", changed: true },
+      { status: "completed", changed: false },
+      { status: "completed", changed: false },
+    ]);
+    expect(await refundRows(t)).toHaveLength(0);
+    expect(await balances(t)).toMatchObject({ monthly: 7 });
+    expect((await runs(t))[0].outcome).toBe("completed");
+  });
+
+  it("expire -> settle(completed) -> settle(failed): reaper wins, one refund, no re-charge", async () => {
+    const { t, runId } = await start();
+    const out = await t.run(async ctx => {
+      const c = asCtx(ctx);
+      return [
+        await expireOne(c, runId, Date.now()),
+        await settleHelper(c, runId, "completed"),
+        await settleHelper(c, runId, "failed"),
+      ];
+    });
+    expect(out).toEqual([
+      { status: "refunded", changed: true },
+      { status: "refunded", changed: false },
+      { status: "refunded", changed: false },
+    ]);
+    expect(await refundRows(t)).toHaveLength(1);
+    expect(await balances(t)).toMatchObject({ monthly: 10 });
+    expect((await runs(t))[0].outcome).toBe("expired");
+    await assertLedgerInvariant(t, 10);
+  });
+
+  it("settle(failed) x5 interleaved with expire x5: exactly one refund", async () => {
+    const { t, runId } = await start();
+    const changed = await t.run(async ctx => {
+      const c = asCtx(ctx);
+      const flags: boolean[] = [];
+      for (let i = 0; i < 5; i++) {
+        flags.push((await settleHelper(c, runId, "failed")).changed);
+        flags.push((await expireOne(c, runId, Date.now())).changed);
+      }
+      return flags;
+    });
+    expect(changed.filter(Boolean)).toHaveLength(1);
+    expect(changed[0]).toBe(true);
+    expect(await refundRows(t)).toHaveLength(1);
+    expect(await balances(t)).toMatchObject({ monthly: 10 });
+  });
+
+  it("two runs of one user settled in opposite orders restore exact balances", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { monthly: 5 });
+    const a = await begin(t, "a", "semantic"); // 3
+    const b = await begin(t, "b", "basic"); // 1
+    await t.run(async ctx => {
+      const c = asCtx(ctx);
+      await settleHelper(c, b.runId, "failed");
+      await settleHelper(c, a.runId, "completed");
+      await settleHelper(c, b.runId, "failed");
+    });
+    expect(await balances(t)).toEqual({ monthly: 2, purchased: 0, total: 2 });
+    const byId = Object.fromEntries(
+      (await runs(t)).map(r => [r.requestId, r.status]),
+    );
+    expect(byId).toEqual({ a: "completed", b: "refunded" });
+    await assertLedgerInvariant(t, 5);
+  });
+});
+
+describe("reaper isolation (M2)", () => {
+  it("one poisoned run does not block the others and is flagged, not retried immediately", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 5, 15, 12, 0));
+    const t = convexTest(schema, modules);
+    await seedCredits(t, { clerkUserId: "good", monthly: 10 });
+    await seedCredits(t, { clerkUserId: "bad", monthly: 10 });
+    await begin(t, "g1", "semantic", "good");
+    await begin(t, "b1", "semantic", "bad");
+    // Poison: a duplicate aiCredits row makes the refund's .unique() throw.
+    await t.run(async ctx => {
+      await ctx.db.insert("aiCredits", {
+        clerkUserId: "bad",
+        balance: 1,
+        purchasedBalance: 0,
+        lastResetAt: Date.now(),
+      });
+    });
+    vi.setSystemTime(Date.UTC(2026, 5, 15, 12, 0) + RUN_TTL_MS + 1_000);
+
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await t.mutation(internal.aiRuns.sweepStaleRuns, {})).toBe(1);
+    errSpy.mockRestore();
+
+    const byReq = Object.fromEntries(
+      (await runs(t)).map(r => [r.requestId, r]),
+    );
+    expect(byReq.g1.status).toBe("refunded");
+    expect(byReq.b1.status).toBe("reserved");
+    expect(byReq.b1.reapFailedAt).toBeTypeOf("number");
+    expect(await balances(t, "good")).toMatchObject({ monthly: 10 });
+    await assertLedgerInvariant(t, 10, "good");
+
+    // The flagged run is skipped by the next sweep (no hot loop).
+    expect(await t.mutation(internal.aiRuns.sweepStaleRuns, {})).toBe(0);
   });
 });
 
@@ -117,7 +281,7 @@ describe("double settle", () => {
     await assertLedgerInvariant(t, 10);
   });
 
-  it("10 concurrent failed-settles refund exactly once", async () => {
+  it("10 repeated failed-settles refund exactly once (sequential idempotency)", async () => {
     const t = convexTest(schema, modules);
     await seedCredits(t, { monthly: 10 });
     const { runId } = await begin(t, "r1", "semantic");
@@ -157,7 +321,7 @@ describe("double settle", () => {
     expect(await balances(t)).toMatchObject({ monthly: 10 });
   });
 
-  it("conflicting concurrent reports (completed vs failed) end in exactly one consistent state", async () => {
+  it("conflicting reports (completed vs failed) in sequence end in exactly one consistent state", async () => {
     const t = convexTest(schema, modules);
     await seedCredits(t, { monthly: 10 });
     const { runId } = await begin(t, "r1");
@@ -255,7 +419,7 @@ describe("reaper vs settle", () => {
     await assertLedgerInvariant(t, 10);
   });
 
-  it("settle, expireRun and sweep racing together refund exactly once", async () => {
+  it("settle, expireRun and sweep issued together refund exactly once (sequential idempotency)", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.UTC(2026, 5, 15, 12, 0));
     const t = convexTest(schema, modules);
@@ -528,7 +692,11 @@ describe("randomized interleavings keep the ledger consistent", () => {
         r =>
           r.type === "refund" && r.refundsTransactionId === run.transactionId,
       );
-      expect(refunds.length).toBe(run.status === "refunded" ? 1 : 0);
+      // A refunded run has one refund row, or none when nothing was restored
+      // (cross-month Free refund of a purely monthly debit, M5).
+      expect(refunds.length).toBe(run.refundTransactionId ? 1 : 0);
+      if (run.status !== "refunded")
+        expect(run.refundTransactionId).toBeUndefined();
     }
   });
 });

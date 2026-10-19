@@ -13,7 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Link } from "@/i18n/routing";
-import type { ActionKey } from "@/convex/helpers/creditCatalog";
+import {
+  PREMIUM_MONTHLY_QUOTA,
+  type ActionKey,
+} from "@/convex/helpers/creditCatalog";
 
 interface AiUpsellDialogProps {
   open: boolean;
@@ -41,7 +44,10 @@ export default function AiUpsellDialog({
           <DialogTitle>{t("upsellTitle")}</DialogTitle>
           <DialogDescription>
             {actionKey
-              ? t("upsellBody", { action: t(`actions.${actionKey}`) })
+              ? t("upsellBody", {
+                  action: t(`actions.${actionKey}`),
+                  quota: PREMIUM_MONTHLY_QUOTA,
+                })
               : t("upsellBodyGeneric")}
           </DialogDescription>
         </DialogHeader>
