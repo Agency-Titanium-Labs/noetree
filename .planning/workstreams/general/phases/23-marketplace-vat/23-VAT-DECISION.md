@@ -1,5 +1,7 @@
 # VAT-01 Decision Record (DRAFT)
 
+**Decision 2026-10-19 (product owner): keep VAT DISABLED.** No accountant sign-off yet. The code stays ready with a configurable rate, `MARKETPLACE_VAT_RATE_BPS` stays unset (rate 0) in every environment, and checkout behaves exactly like v1.1 (fee = commission only). The VAT carve-out is enabled only after a written accountant confirmation recorded below.
+
 **Status: DRAFT, PENDING ACCOUNTANT CONFIRMATION.** Human gate (VAT-01). Nothing here is legal or tax advice.
 Implementation is configurable so the accountant's answer changes a value, not the design.
 
