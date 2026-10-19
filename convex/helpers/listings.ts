@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import { Doc, Id } from "../_generated/dataModel";
 import { QueryCtx, MutationCtx } from "../_generated/server";
+import { flattenTipTap } from "./noteText";
 
 export const LISTING_LIMITS = {
   TITLE_MAX: 100,
@@ -19,12 +20,6 @@ export type ListingStatus = "published" | "unpublished";
 export type ListingScope = "note" | "subtree";
 export type ListingAccessMode = "copy" | "readonly";
 
-type TipTapNode = {
-  type?: unknown;
-  text?: unknown;
-  content?: unknown;
-};
-
 /**
  * Derives a plain-text excerpt from TipTap JSON. Only `text` of text nodes is
  * read - attrs (image src, link href) and marks are never touched (T-08-01).
@@ -34,39 +29,9 @@ export function extractExcerpt(
   content: string,
   max: number = LISTING_LIMITS.EXCERPT_MAX,
 ): string {
-  let doc: unknown;
-  try {
-    doc = JSON.parse(content);
-  } catch {
-    return "";
-  }
-
-  const parts: string[] = [];
-  let length = 0;
-  const limit = max + 50;
-
-  const walk = (node: unknown): void => {
-    if (length > limit || node === null || typeof node !== "object") return;
-    const n = node as TipTapNode;
-    if (n.type === "text") {
-      if (typeof n.text === "string") {
-        parts.push(n.text);
-        length += n.text.length;
-      }
-      return;
-    }
-    if (Array.isArray(n.content)) {
-      for (const child of n.content) {
-        walk(child);
-        if (length > limit) return;
-      }
-      parts.push(" ");
-      length += 1;
-    }
-  };
-  walk(doc);
-
-  const text = parts.join("").replace(/\s+/g, " ").trim();
+  const text = flattenTipTap(content, " ", max + 50)
+    .replace(/\s+/g, " ")
+    .trim();
   if (text.length <= max) return text;
 
   const slice = text.slice(0, max);
