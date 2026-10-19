@@ -25,8 +25,9 @@ export const listMySales = query({
         commissionRateBps: v.number(),
         commissionCents: v.number(),
         sellerNetCents: v.number(),
-        vatRateBps: v.number(),
-        vatCents: v.number(),
+        // Absent on legacy (pre-VAT) rows: the UI renders "-", not "0".
+        vatRateBps: v.optional(v.number()),
+        vatCents: v.optional(v.number()),
       }),
     ),
     isDone: v.boolean(),
@@ -65,8 +66,8 @@ export const listMySales = query({
         commissionRateBps: p.commissionRateBps,
         commissionCents: p.commissionCents,
         sellerNetCents: p.sellerNetCents,
-        vatRateBps: p.vatRateBps ?? 0,
-        vatCents: p.vatCents ?? 0,
+        ...(p.vatRateBps !== undefined ? { vatRateBps: p.vatRateBps } : {}),
+        ...(p.vatCents !== undefined ? { vatCents: p.vatCents } : {}),
       })),
     };
   },

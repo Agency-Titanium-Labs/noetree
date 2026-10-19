@@ -34,6 +34,8 @@ vi.mock("@clerk/nextjs", () => ({ useUser: () => ({ isSignedIn: true }) }));
 
 const messages: Record<string, string> = {
   totalGross: "Total gross",
+  totalVat: "Total VAT",
+  vatNotRecorded: "No VAT recorded",
   totalCommission: "Total commission",
   totalEarned: "Total earned",
   saleCount: "Sales",
@@ -67,6 +69,27 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+describe("SalesSummary VAT card (WR-05)", () => {
+  it("shows a dash when no VAT has been withheld (feature off or legacy sales)", () => {
+    render(<SalesSummary />);
+    expect(screen.getByText("Total VAT")).toBeInTheDocument();
+    expect(screen.getByLabelText("No VAT recorded")).toHaveTextContent("-");
+  });
+
+  it("shows the VAT total when present", () => {
+    state.totals = {
+      saleCount: 3,
+      grossCents: 3000,
+      commissionCents: 500,
+      netCents: 2500,
+      vatCents: 417,
+    };
+    render(<SalesSummary />);
+    expect(screen.getByText("€4.17")).toBeInTheDocument();
+    expect(screen.queryByLabelText("No VAT recorded")).not.toBeInTheDocument();
+  });
+});
+
 describe("SalesSummary", () => {
   it("renders the four totals", () => {
     render(<SalesSummary />);
@@ -88,7 +111,8 @@ describe("SalesSummary", () => {
       netCents: 0,
     };
     render(<SalesSummary />);
-    expect(screen.getAllByText("€0.00")).toHaveLength(4);
+    expect(screen.getAllByText("€0.00")).toHaveLength(3);
+    expect(screen.getByLabelText("No VAT recorded")).toHaveTextContent("-");
     expect(screen.getByText("0")).toBeInTheDocument();
   });
 

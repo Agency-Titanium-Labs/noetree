@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { ConvexError } from "convex/values";
+import { computeSplit } from "../../../../../convex/helpers/commission";
 
 const mockSessionsCreate = vi.fn();
 const mockSessionsRetrieve = vi.fn();
@@ -45,6 +46,10 @@ let createMarketplaceCheckout: (
 
 const LISTING = "listing123";
 
+// Coherent split derived from the real computeSplit (1500 cents, free seller,
+// 20% VAT: vat 250 + commission 250 = fee 500, net 1000).
+const SPLIT = computeSplit(1500, "free", 2000);
+
 function snap(over: Record<string, unknown> = {}) {
   return {
     purchaseId: "purchase1",
@@ -54,8 +59,9 @@ function snap(over: Record<string, unknown> = {}) {
     title: "My Notes",
     priceCents: 1500,
     currency: "eur",
-    commissionCents: 225,
-    applicationFeeCents: 480,
+    commissionCents: SPLIT.commissionCents,
+    vatCents: SPLIT.vatCents,
+    applicationFeeCents: SPLIT.applicationFeeCents,
     destinationAccountId: "acct_seller",
     listingId: LISTING,
     ...over,
@@ -157,7 +163,7 @@ describe("createMarketplaceCheckout", () => {
         },
       ],
       payment_intent_data: {
-        application_fee_amount: 480,
+        application_fee_amount: SPLIT.applicationFeeCents,
         transfer_data: { destination: "acct_seller" },
         metadata: { type: "marketplace_purchase", purchaseId: "purchase1" },
       },
@@ -167,6 +173,15 @@ describe("createMarketplaceCheckout", () => {
       cancel_url: `https://localhost:3000/en/marketplace/${LISTING}`,
       expires_at: 1_700_000_000 + 3600,
     });
+    // Fee = commission + VAT (coherent split); the buyer is charged the full
+    // displayed price and the seller transfer is what remains.
+    expect(SPLIT.applicationFeeCents).toBe(
+      SPLIT.commissionCents + SPLIT.vatCents,
+    );
+    expect(
+      params.line_items[0].price_data.unit_amount -
+        params.payment_intent_data.application_fee_amount,
+    ).toBe(SPLIT.sellerNetCents);
     expect(opts).toEqual({
       idempotencyKey: "marketplace-checkout-purchase1-v1",
     });
@@ -195,6 +210,7 @@ describe("createMarketplaceCheckout", () => {
     "PURCHASE_OWN_LISTING",
     "PURCHASE_ALREADY_OWNED",
     "CONNECT_ONBOARDING_REQUIRED",
+    "PURCHASE_PRICE_BELOW_MINIMUM",
   ])("maps ConvexError %s to a result code", async code => {
     signedIn();
     prepareQueue.push(new ConvexError(code));

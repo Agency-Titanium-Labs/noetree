@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import {
@@ -16,6 +16,14 @@ const modules = (
     glob: (pattern: string) => Record<string, () => Promise<unknown>>;
   }
 ).glob("./**/*.*s");
+
+// VAT carve-out is opt-in (default 0); these suites exercise the enabled path.
+beforeEach(() => {
+  vi.stubEnv("MARKETPLACE_VAT_RATE_BPS", "2000");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("listMySales (HIST-02)", () => {
   const first = { numItems: 10, cursor: null };
@@ -187,7 +195,7 @@ describe("getMyTotals", () => {
     });
   });
 
-  test("legacy rows without VAT fields read as 0, no backfill", async () => {
+  test("legacy rows without VAT fields: VAT absent in the row, totals read 0 (WR-05)", async () => {
     const s = await setupTotals();
     const id = await sellPaid(s);
     await s.t.run(async ctx => {
@@ -202,9 +210,36 @@ describe("getMyTotals", () => {
     const res = await seller.query(api.sales.listMySales, {
       paginationOpts: { numItems: 5, cursor: null },
     });
-    expect(res.page[0]).toMatchObject({ vatCents: 0, vatRateBps: 0 });
+    expect(res.page[0]).not.toHaveProperty("vatRateBps");
+    expect(res.page[0]).not.toHaveProperty("vatCents");
     expect(await seller.query(api.sales.getMyTotals, {})).toMatchObject({
       vatCents: 0,
+    });
+  });
+
+  test("rate 0 sale stores explicit 0 VAT (distinct from legacy rows)", async () => {
+    vi.stubEnv("MARKETPLACE_VAT_RATE_BPS", "");
+    const s = await setupTotals();
+    await sellPaid(s);
+    const res = await asUser(s.t, "seller").query(api.sales.listMySales, {
+      paginationOpts: { numItems: 5, cursor: null },
+    });
+    expect(res.page[0]).toMatchObject({
+      vatRateBps: 0,
+      vatCents: 0,
+      commissionCents: 200,
+      sellerNetCents: 800,
+    });
+  });
+
+  test("getSplitConfig reflects env: unset is 0, set is exposed", async () => {
+    const s = await setupTotals();
+    expect(await s.t.query(api.sales.getSplitConfig, {})).toEqual({
+      vatRateBps: 2000,
+    });
+    vi.stubEnv("MARKETPLACE_VAT_RATE_BPS", "");
+    expect(await s.t.query(api.sales.getSplitConfig, {})).toEqual({
+      vatRateBps: 0,
     });
   });
 

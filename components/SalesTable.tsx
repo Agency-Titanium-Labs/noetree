@@ -95,6 +95,20 @@ export function SalesTableView({
   const formatDate = (ts?: number) => (ts ? dateFmt.format(ts) : "");
   const formatRate = (bps: number) => rateFmt.format(bps / 10000);
 
+  // Legacy (pre-VAT) rows carry no VAT data: show "-", never a fake 0.
+  const vatCell = (r: SaleRow) =>
+    r.vatCents === undefined ? (
+      <span
+        className="text-muted-foreground"
+        aria-label={t("vatNotRecorded")}
+        title={t("vatNotRecorded")}
+      >
+        -
+      </span>
+    ) : (
+      <PriceLabel cents={r.vatCents} />
+    );
+
   const payoutLabel = (
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <Check className="size-3" />
@@ -134,7 +148,7 @@ export function SalesTableView({
                   <PriceLabel cents={r.priceCents} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  <PriceLabel cents={r.vatCents ?? 0} />
+                  {vatCell(r)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   <PriceLabel cents={r.commissionCents} />{" "}
@@ -168,9 +182,7 @@ export function SalesTableView({
                   <PriceLabel cents={r.priceCents} />
                 </dd>
                 <dt className="text-muted-foreground">{t("colVat")}</dt>
-                <dd className="text-right tabular-nums">
-                  <PriceLabel cents={r.vatCents ?? 0} />
-                </dd>
+                <dd className="text-right tabular-nums">{vatCell(r)}</dd>
                 <dt className="text-muted-foreground">{t("colCommission")}</dt>
                 <dd className="text-right tabular-nums">
                   <PriceLabel cents={r.commissionCents} />{" "}
