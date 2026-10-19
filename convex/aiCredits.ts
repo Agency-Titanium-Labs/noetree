@@ -7,6 +7,7 @@ import {
   QueryCtx,
 } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { tierFromSubscription } from "./helpers/helper";
 import { v, ConvexError } from "convex/values";
 import {
   costForAction,
@@ -25,16 +26,22 @@ async function getSubscriptionRow(ctx: DbCtx, clerkUserId: string) {
     .unique();
 }
 
-// Premium credits are Stripe-driven (D-08): users with an "active" or
-// "past_due" subscription are never lazily reset. past_due is kept out of the
-// lazy path so a payment hiccup does not wipe Premium credits (RESEARCH A4).
-// No row / canceled / unpaid / incomplete* fall back to the Free lazy path.
-async function isLazyResetEligible(
+// Premium credits are Stripe-driven (D-08): only users the single tier rule
+// (helpers/helper.ts tierFromSubscription) calls "premium" are never lazily
+// reset. AIF-05/W1: past_due is Free for the gate, the commission AND here,
+// so a user can no longer be Free for access yet Premium for credits. A
+// past_due user keeps the balance until the next month start (no clamp, so
+// out-of-order Stripe events never wipe credits), then follows the Free reset.
+async function lazyResetPolicy(
   ctx: DbCtx,
   clerkUserId: string,
-): Promise<boolean> {
+): Promise<{ eligible: boolean; clampLapsed: boolean }> {
   const sub = await getSubscriptionRow(ctx, clerkUserId);
-  return !(sub?.status === "active" || sub?.status === "past_due");
+  return {
+    eligible: tierFromSubscription(sub) === "free",
+    // W3: a canceled Premium keeps no spendable Premium credit.
+    clampLapsed: sub?.status === "canceled",
+  };
 }
 
 // Loads the aiCredits row, applying the Free lazy monthly reset (D-07) when
@@ -49,11 +56,12 @@ async function loadEffectiveRow(
     .query("aiCredits")
     .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))
     .unique();
-  const eligible = await isLazyResetEligible(ctx, clerkUserId);
+  const { eligible, clampLapsed } = await lazyResetPolicy(ctx, clerkUserId);
   const { needsReset } = effectiveMonthly(
     eligible,
     row ? { balance: row.balance, lastResetAt: row.lastResetAt } : null,
     now,
+    clampLapsed,
   );
   if (!needsReset) return row;
 
@@ -239,17 +247,15 @@ export const getMyCredits = query({
       .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
       .unique();
     const subscription = await getSubscriptionRow(ctx, identity.subject);
-    const eligible = !(
-      subscription?.status === "active" || subscription?.status === "past_due"
-    );
+    const tier = tierFromSubscription(subscription);
+    const eligible = tier === "free";
     const { monthly } = effectiveMonthly(
       eligible,
       row ? { balance: row.balance, lastResetAt: row.lastResetAt } : null,
       now,
+      subscription?.status === "canceled",
     );
     const purchased = row?.purchasedBalance ?? 0;
-    const tier: "free" | "premium" =
-      subscription?.status === "active" ? "premium" : "free";
     // subscriptions.currentPeriodEnd is in SECONDS; nextResetAt is ms.
     const nextResetAt = eligible
       ? nextMonthStartUtc(now)

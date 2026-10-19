@@ -1039,9 +1039,15 @@ describe("aiCredits lazy Free reset", () => {
     }
   });
 
-  it.each(["active", "past_due"] as const)(
-    "%s subscription with stale lastResetAt is not lazily reset",
-    async status => {
+  // AIF-05 / W1: only "active" is Premium. past_due is Free everywhere, so it
+  // follows the Free lazy reset at month rollover (no longer Premium for
+  // credits only).
+  it.each([
+    ["active", 3],
+    ["past_due", 29],
+  ] as const)(
+    "%s subscription with stale lastResetAt ends at balance %i",
+    async (status, expected) => {
       const t = convexTest(schema, modules);
       await t.run(async ctx => {
         await ctx.db.insert("subscriptions", {
@@ -1061,7 +1067,7 @@ describe("aiCredits lazy Free reset", () => {
       const credits = await t.query(internal.aiCredits.getCredits, {
         clerkUserId: "user_x",
       });
-      expect(credits?.balance).toBe(3);
+      expect(credits?.balance).toBe(expected);
     },
   );
 

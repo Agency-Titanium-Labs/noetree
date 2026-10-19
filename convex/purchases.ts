@@ -18,7 +18,7 @@ import {
 } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
-import { getUser } from "./helpers/helper";
+import { getUser, tierFromClerkUserId } from "./helpers/helper";
 import { countSubtree, syncListingTags } from "./helpers/listings";
 import { computeCommission } from "./helpers/commission";
 import { deliverPurchase } from "./helpers/delivery";
@@ -43,15 +43,12 @@ async function assertSellerActive(ctx: MutationCtx, clerkUserId: string) {
 }
 
 // D-11: tier is derived from the SELLER's subscription row, not the caller.
+// AIF-05: delegates to the single shared tier rule.
 async function sellerTierFor(
   ctx: MutationCtx,
   sellerClerkUserId: string,
 ): Promise<"free" | "premium"> {
-  const sub = await ctx.db
-    .query("subscriptions")
-    .withIndex("by_clerkUserId", q => q.eq("clerkUserId", sellerClerkUserId))
-    .unique();
-  return sub?.status === "active" ? "premium" : "free";
+  return await tierFromClerkUserId(ctx, sellerClerkUserId);
 }
 
 const prepareResultValidator = v.object({
