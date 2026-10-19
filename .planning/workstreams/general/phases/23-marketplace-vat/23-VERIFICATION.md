@@ -53,3 +53,16 @@ None blocking found in the phase files (no TBD/FIXME markers in the VAT code). N
 ## Verdict
 
 Code goals (VAT-02..05) achieved and tested. Phase is NOT fully complete: VAT-01 and VAT-06 open. Status: human_needed.
+
+## VAT-06 local run (2026-10-19, Stripe test mode, local dev Convex greedy-ermine-32)
+
+Two real test purchases through Stripe Checkout (test card 4242, `stripe listen` forwarding webhooks to the local app), buyer = `contact@sevalys.com`, seller = `anatholyb@gmail.com` (Free tier, Connect account active). Listing price 10.00 EUR.
+
+| Run | `MARKETPLACE_VAT_RATE_BPS` | Checkout total         | Stripe `application_fee_amount` | Purchase row (commission / VAT / seller net)    | `sellerEarnings` after run                    |
+| --- | -------------------------- | ---------------------- | ------------------------------- | ----------------------------------------------- | --------------------------------------------- |
+| 1   | unset (default 0)          | 10.00 EUR, no tax line | 200                             | 200 / 0 / 800, `vatRateBps` 0, status paid      | gross 1000, commission 200, VAT 0, net 800    |
+| 2   | 2000                       | 10.00 EUR, no tax line | 332                             | 166 / 166 / 668, `vatRateBps` 2000, status paid | gross 2000, commission 366, VAT 166, net 1468 |
+
+Findings: buyer pays exactly the displayed price in both runs; the Stripe fee equals commission + VAT; Convex snapshot matches Stripe; totals add up (800 + 668 = 1468). The env var was removed again after run 2.
+
+Still open for VAT-06: the same purchase in the shared dev/staging deployment and in production (not done here), and a sales-page check logged in as the seller (VAT column with real data). VAT stays disabled by default until VAT-01 is signed.
