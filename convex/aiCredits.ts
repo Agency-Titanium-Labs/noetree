@@ -1,7 +1,6 @@
 import {
   internalQuery,
   internalMutation,
-  mutation,
   query,
   MutationCtx,
   QueryCtx,
@@ -197,39 +196,6 @@ export const deductCredit = internalMutation({
     if (cost === null) throw new ConvexError("UNKNOWN_ACTION");
     await applyDeduction(ctx, args.clerkUserId, cost, args.actionKey);
     return { success: true as const, cost };
-  },
-});
-
-// Security: clerkUserId is derived exclusively from the caller's
-// authenticated Convex identity (never a client-supplied argument). The cost
-// is resolved server-side from the catalog; the client sends only an
-// actionKey (CRED-10). actionKey is v.string() (not a literal union) so
-// unknown keys raise ConvexError UNKNOWN_ACTION, not a validator error (D-04).
-export const runAiAction = mutation({
-  args: { actionKey: v.string() },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("UNAUTHENTICATED");
-    const clerkUserId = identity.subject;
-
-    const cost = costForAction(args.actionKey);
-    if (cost === null) throw new ConvexError("UNKNOWN_ACTION");
-
-    // Deduct + placeholder action + refund all share this single mutation
-    // transaction (never split across mutation calls).
-    const draw = await applyDeduction(ctx, clerkUserId, cost, args.actionKey);
-
-    // Placeholder action (D-06): no real LLM call this phase, always
-    // succeeds. The refund branch is implemented but unreachable while
-    // actionSucceeded is hardcoded true; it exists so a future real action
-    // can flip this without restructuring the transaction.
-    const actionSucceeded = true as boolean;
-
-    if (!actionSucceeded) {
-      await refundDraw(ctx, clerkUserId, draw, args.actionKey);
-    }
-
-    return { success: actionSucceeded, cost };
   },
 });
 

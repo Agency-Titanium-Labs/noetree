@@ -7,7 +7,8 @@ import { Badge } from "../ui/badge";
 import { Skeleton } from "../ui/skeleton";
 import AiActionsMenu from "./AiActionsMenu";
 import { toast } from "sonner";
-import type { ActionKey } from "@/convex/helpers/creditCatalog";
+import { ACTIONS, type ActionKey } from "@/convex/helpers/creditCatalog";
+import AiUpsellDialog from "./AiUpsellDialog";
 import {
   Tooltip,
   TooltipContent,
@@ -35,9 +36,8 @@ import { Label } from "../ui/label";
 import { useState } from "react";
 import { useEditorContext } from "@/providers/EditorProvider";
 import { useTranslations } from "next-intl";
-import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { ConvexError } from "convex/values";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/convex/_generated/api";
 import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
 
@@ -52,6 +52,7 @@ export default function EditorToolbar() {
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
   const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
+  const [upsellAction, setUpsellAction] = useState<ActionKey | null>(null);
 
   // D-03: total = monthly + purchased. undefined while loading (skeleton),
   // null (signed out / no row) is treated as 0.
@@ -60,25 +61,28 @@ export default function EditorToolbar() {
   );
   const total = credits === undefined ? undefined : (credits?.total ?? 0);
 
-  // T-05-02 / CRED-10: the client shows insufficiency visually but never
-  // gates; runAiAction resolves the cost and enforces the balance
-  // server-side, throwing INSUFFICIENT_CREDITS, which opens the dialog below.
-  const runAiActionMutate = useConvexMutation(api.aiCredits.runAiAction);
-  const runAiAction = useMutation({
-    mutationFn: runAiActionMutate,
-    onSuccess: result => {
-      toast.success(tCredits("actionSuccess", { count: result.cost }));
-    },
-    onError: err => {
-      if (err instanceof ConvexError && err.data === "INSUFFICIENT_CREDITS") {
-        setCreditsDialogOpen(true);
-        return;
-      }
-      toast.error(tCredits("actionError"));
-    },
-  });
-  const handleAiAction = (actionKey: ActionKey) =>
-    runAiAction.mutate({ actionKey });
+  const tier = credits === undefined ? undefined : (credits?.tier ?? "free");
+  const { data: availability } = useQuery(
+    convexQuery(api.aiRuns.getAiAvailability, {}),
+  );
+  const aiEnabled = availability?.enabled ?? true;
+
+  // Phase 17 has no LLM yet, so launching an action never debits (the old
+  // placeholder charged for nothing). A Free user picking a Premium action
+  // gets the upsell invitation (AIF-04); the server also refuses it with
+  // PREMIUM_REQUIRED before any ledger write. The real launch (aiRuns.beginRun
+  // then the model call) arrives with the chat phase.
+  const handleAiAction = (actionKey: ActionKey) => {
+    if (ACTIONS[actionKey].tier === "premium" && tier !== "premium") {
+      setUpsellAction(actionKey);
+      return;
+    }
+    if (total !== undefined && total < ACTIONS[actionKey].cost) {
+      setCreditsDialogOpen(true);
+      return;
+    }
+    toast.info(tCredits("comingSoon"));
+  };
 
   if (!editor || !editor.isEditable) return null;
 
@@ -196,8 +200,10 @@ export default function EditorToolbar() {
         {/* AI action + credits balance */}
         <AiActionsMenu
           balance={total}
-          pending={runAiAction.isPending}
+          pending={false}
           onSelect={handleAiAction}
+          tier={tier}
+          aiEnabled={aiEnabled}
         />
         <Tooltip>
           <TooltipTrigger asChild>
@@ -295,6 +301,14 @@ export default function EditorToolbar() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AiUpsellDialog
+          open={upsellAction !== null}
+          onOpenChange={open => {
+            if (!open) setUpsellAction(null);
+          }}
+          actionKey={upsellAction}
+        />
 
         {/* Credits Exhausted Dialog */}
         <CreditsExhaustedDialog

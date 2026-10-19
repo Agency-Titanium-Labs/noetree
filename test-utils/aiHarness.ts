@@ -1,11 +1,15 @@
 // Shared convex-test helpers for the AI metering tests (Phase 17).
 // Lives outside convex/ so it is never bundled as Convex functions.
-import type { convexTest } from "convex-test";
+import { convexTest } from "convex-test";
+import schema from "../convex/schema";
 import { expect } from "vitest";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 
-export type T = ReturnType<typeof convexTest>;
+// Schema-typed test handle (so t.run ctx.db knows the tables and indexes).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used for its type
+const makeT = () => convexTest(schema, {});
+export type T = ReturnType<typeof makeT>;
 
 export const USER = "user_ai";
 export const IDENTITY = {
