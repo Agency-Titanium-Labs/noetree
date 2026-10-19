@@ -508,12 +508,13 @@
     "loadError": "Impossible de charger vos ventes. Actualisez la page ; si le problème persiste, contactez le support."
   },
   "SellerBreakdown": {
-    "title": "Ce que vous recevez",
+    "title": "Estimation de votre part",
     "gross": "Prix payé par l'acheteur",
     "vat": "TVA ({rate})",
     "commission": "Commission Noetree ({rate})",
-    "net": "Vous recevez",
-    "note": "La TVA est incluse dans le prix et retenue sur votre part. L'acheteur paie exactement le prix affiché."
+    "net": "Vous recevez (estimation)",
+    "note": "Estimation au taux de TVA actuel et selon votre offre actuelle. La TVA est incluse dans le prix et retenue sur votre part ; l'acheteur paie exactement le prix affiché. Le calcul définitif est figé quand un acheteur démarre le paiement.",
+    "noteNoVat": "Estimation selon votre offre actuelle. L'acheteur paie exactement le prix affiché. Le calcul définitif est figé quand un acheteur démarre le paiement."
   },
   "SharedNote": {
     "pageTitle": "Note partagée",

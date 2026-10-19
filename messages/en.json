@@ -508,12 +508,13 @@
     "loadError": "We could not load your sales. Refresh the page; if it keeps happening, contact support."
   },
   "SellerBreakdown": {
-    "title": "What you receive",
+    "title": "Estimated payout",
     "gross": "Price paid by the buyer",
     "vat": "VAT ({rate})",
     "commission": "Noetree commission ({rate})",
-    "net": "You receive",
-    "note": "VAT is included in the price and withheld from your share. The buyer pays exactly the displayed price."
+    "net": "You receive (estimate)",
+    "note": "Estimate at the current VAT rate and your current plan. VAT is included in the price and withheld from your share; the buyer pays exactly the displayed price. The final split is fixed when a buyer starts checkout.",
+    "noteNoVat": "Estimate based on your current plan. The buyer pays exactly the displayed price. The final split is fixed when a buyer starts checkout."
   },
   "SharedNote": {
     "pageTitle": "Shared note",
