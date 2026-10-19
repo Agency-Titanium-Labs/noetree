@@ -1,25 +1,24 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Pricing V2 & Fonctionnalités Sociales
-status: Awaiting next milestone
-stopped_at: Phase 16 complete; v1.2 ready for milestone audit/complete
-last_updated: "2026-10-18T22:33:30.024Z"
-last_activity: 2026-10-18 — Milestone v1.2 completed and archived
+milestone: v1.3
+milestone_name: IA et TVA marketplace
+status: planning
+last_updated: "2026-10-19T13:11:47.624Z"
+last_activity: 2026-10-19
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 35
-  completed_plans: 35
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## Current Position
 
-Phase: Milestone v1.2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-10-18 — Milestone v1.2 completed and archived
+Status: Defining requirements
+Last activity: 2026-10-19 — Milestone v1.3 started
 
 ## Project Reference
 

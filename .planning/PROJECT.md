@@ -8,7 +8,20 @@ Noetree est une application web de prise de notes hiérarchique (style Notion/Ob
 
 Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
 
-## Current Milestone: v1.2 Pricing V2 & Fonctionnalités Sociales
+## Current Milestone: v1.3 IA et TVA marketplace
+
+**Goal :** Brancher un vrai LLM (Vercel AI Gateway) sur le système de crédits IA existant, avec des fonctionnalités gratuites et Premium, et trancher la TVA de la marketplace.
+
+**Target features :**
+
+- IA gratuite (utilisateurs Free, quota mensuel de crédits conservé) : chat conversationnel dans l'éditeur, en streaming, avec contexte aucun ou note courante + parents + enfants (NOETREE-36, NOETREE-37)
+- IA Premium : contexte utilisateur + autocomplétion (1 crédit par suggestion acceptée), génération de liens entre notes avec analyse sémantique fusionnée, IA qui voit toute l'arborescence et crée des nœuds (NOETREE-38, NOETREE-39, nouveau ticket)
+- Crédits débités avant l'appel LLM et remboursés en cas d'échec ; un utilisateur Free qui lance une action Premium reçoit une invitation à passer Premium, sans débit
+- Marketplace : TVA absorbée (l'acheteur paie le prix affiché, TVA et commission 20 % / 10 % retirées de la part du vendeur), relecture de la PR commission, réévaluation de Stripe Tax (NOETREE-41)
+
+**Préalable (hors milestone) :** go-live v1.2 (merge PR #35, migration Pro → Premium). **Hors milestone :** docs légaux et RGPD (NOETREE-24/25/26/32/33, à Antoine). Workstream GSD : `general`.
+
+## Shipped Milestone: v1.2 Pricing V2 & Fonctionnalités Sociales (2026-10-18)
 
 **Goal :** Passer à un modèle freemium sans limite de notes, avec de nouvelles fonctionnalités sociales (partage, commentaires, historique) et un système de crédits IA revu.
 
@@ -81,7 +94,9 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 <!-- Scope actif : deux milestones en parallèle (workstreams general = v1.2, marketplace = v1.1). -->
 
-**Milestone v1.2 (Pricing V2 & social) :** voir `.planning/workstreams/general/REQUIREMENTS.md`.
+**Milestone v1.3 (IA et TVA marketplace) :** voir `.planning/workstreams/general/REQUIREMENTS.md`.
+
+**Milestone v1.2 (Pricing V2 & social) :** livré le 2026-10-18 — voir `.planning/workstreams/general/milestones/v1.2-REQUIREMENTS.md`.
 
 **Milestone v1.1 (Marketplace) :** livré le 2026-10-17 — voir Validated et `.planning/milestones/v1.1-ROADMAP.md`.
 
@@ -145,4 +160,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-10-19 — after v1.2 milestone (Pricing V2 & Fonctionnalités Sociales) shipped_
+_Last updated: 2026-10-19 — milestone v1.3 (IA et TVA marketplace) started_
