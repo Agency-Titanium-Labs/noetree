@@ -143,6 +143,9 @@ export default defineSchema({
     fromMonthly: v.number(),
     fromPurchased: v.number(),
     createdAt: v.number(),
+    // Set by beginRun when the run is created: the creating call is the only
+    // one allowed to stream (single owner). Replays never get a claim.
+    streamClaimedAt: v.optional(v.number()),
     settledAt: v.optional(v.number()),
     outcome: v.optional(v.string()),
     refundTransactionId: v.optional(v.id("creditTransactions")),
