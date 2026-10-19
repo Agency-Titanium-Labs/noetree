@@ -225,6 +225,13 @@
     "unavailableTooltip": "AI is temporarily unavailable.",
     "comingSoon": "This AI action is coming soon. You weren't charged.",
     "actionError": "Couldn't run this action. You weren't charged; try again.",
+    "errors": {
+      "CONTEXT_TOO_LARGE": "This note is too large to send to the AI. Shorten it and try again. You weren't charged.",
+      "CONTEXT_TOO_DEEP": "This note is nested too deeply to send to the AI. Move it closer to the top level. You weren't charged.",
+      "NOTE_NOT_FOUND": "This note no longer exists. You weren't charged.",
+      "NOTE_NOT_OWNED": "AI can only be used on your own notes. You weren't charged.",
+      "PURCHASED_CONTENT_EXCLUDED": "Purchased marketplace content can't be sent to the AI. You weren't charged."
+    },
     "packsHeading": "Buy credits",
     "packsHelper": "One-time purchase. Purchased credits never expire.",
     "packsGroupAria": "Credit packs",
