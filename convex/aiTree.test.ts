@@ -15,7 +15,13 @@ import {
   runs,
   seedCredits,
 } from "../test-utils/aiHarness";
-import { seedUser, seedTree, asUser } from "../test-utils/convexSeed";
+import {
+  seedUser,
+  seedTree,
+  asUser,
+  seedListing,
+  preparePendingPurchase,
+} from "../test-utils/convexSeed";
 import {
   PERSONAL_CONTEXT_MAX,
   TREE_MAX_READS,
@@ -70,6 +76,19 @@ async function setup(opts: { premium?: boolean; monthly?: number } = {}) {
     ],
   });
   return { t, userId, rootId, ids };
+}
+
+async function connectSeller(t: T) {
+  await t.run(async ctx => {
+    await ctx.db.insert("connectAccounts", {
+      clerkUserId: USER,
+      stripeAccountId: "acct_seller",
+      status: "active",
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      detailsSubmitted: true,
+    });
+  });
 }
 
 const N = (
@@ -789,6 +808,127 @@ describe("undoAiTree (TREE-05)", () => {
     const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
     expect(out.ok).toBe(false);
     expect(await noteCount(t)).toBe(4);
+  });
+
+  it("replaying an undone batch is refused, not recreated (L1)", async () => {
+    const { t, rootId } = await setup();
+    await apply(t, rootId, [N("a", null)]);
+    await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(await rejects(apply(t, rootId, [N("a", null)]))).toBe(
+      "BATCH_ALREADY_UNDONE",
+    );
+    expect(await noteCount(t)).toBe(3);
+  });
+
+  it("unpublishes the listing of a deleted batch note (M1)", async () => {
+    const { t, userId, rootId } = await setup();
+    const res = await apply(t, rootId, [N("a", null)]);
+    const listingId = await seedListing(t, {
+      noteId: res.noteIds[0],
+      sellerId: userId,
+      sellerKey: USER,
+    });
+    const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(out).toEqual({ ok: true, deleted: 1 });
+    const listing = await t.run(async ctx => ctx.db.get("listings", listingId));
+    expect(listing?.status).toBe("unpublished");
+  });
+
+  it("removes embedding and links of deleted notes (M1)", async () => {
+    const { t, userId, rootId, ids } = await setup();
+    const res = await apply(t, rootId, [N("a", null)]);
+    const gone = res.noteIds[0];
+    await t.run(async ctx => {
+      await ctx.db.insert("noteEmbeddings", {
+        owner: userId,
+        noteId: gone,
+        contentHash: "h",
+        model: "m",
+        embedding: new Array(768).fill(0),
+        updatedAt: 1,
+      });
+      await ctx.db.insert("noteLinks", {
+        owner: userId,
+        noteA: ids[1],
+        noteB: gone,
+        createdAt: 1,
+      });
+    });
+    const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(out).toEqual({ ok: true, deleted: 1 });
+    expect(
+      await t.run(async ctx => ctx.db.query("noteEmbeddings").collect()),
+    ).toHaveLength(0);
+    expect(
+      await t.run(async ctx => ctx.db.query("noteLinks").collect()),
+    ).toHaveLength(0);
+  });
+
+  it("refuses and keeps everything when a batch note has a purchase share (M1)", async () => {
+    const { t, userId, rootId } = await setup();
+    const res = await apply(t, rootId, [N("a", null)]);
+    const buyerId = await seedUser(t, { key: "buyer", email: "buyer@x.com" });
+    const listingId = await seedListing(t, {
+      noteId: res.noteIds[0],
+      sellerId: userId,
+      sellerKey: USER,
+    });
+    await connectSeller(t);
+    const purchaseId = await preparePendingPurchase(t, "buyer", listingId);
+    const shareId = await t.run(async ctx =>
+      ctx.db.insert("shares", {
+        noteId: res.noteIds[0],
+        userId: buyerId,
+        email: "buyer@x.com",
+        role: "view",
+        purchaseId,
+        scope: "note",
+      }),
+    );
+    const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(out).toEqual({ ok: false, blockers: ["Title a"] });
+    expect(
+      await t.run(async ctx => ctx.db.get("shares", shareId)),
+    ).not.toBeNull();
+    expect(
+      await t.run(async ctx => ctx.db.get("notes", res.noteIds[0])),
+    ).not.toBeNull();
+  });
+
+  it("refuses when the root now carries a subtree purchase grant (M1)", async () => {
+    const { t, userId, rootId } = await setup();
+    await apply(t, rootId, [N("a", null)]);
+    const buyerId = await seedUser(t, { key: "buyer", email: "buyer@x.com" });
+    const listingId = await seedListing(t, {
+      noteId: rootId,
+      sellerId: userId,
+      sellerKey: USER,
+      scope: "subtree",
+    });
+    await connectSeller(t);
+    const purchaseId = await preparePendingPurchase(t, "buyer", listingId);
+    await t.run(async ctx =>
+      ctx.db.insert("shares", {
+        noteId: rootId,
+        userId: buyerId,
+        email: "buyer@x.com",
+        role: "view",
+        purchaseId,
+        scope: "subtree",
+      }),
+    );
+    const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(out).toEqual({ ok: false, blockers: ["Root"] });
+    expect(await noteCount(t)).toBe(4);
+  });
+
+  it("does not leak aiBatchId/aiBatchAt to clients (L10)", async () => {
+    const { t, rootId } = await setup();
+    const res = await apply(t, rootId, [N("a", null)]);
+    const tree = await as(t).query(api.notes.getTreeById, {
+      id: res.noteIds[0],
+    });
+    expect(JSON.stringify(tree)).not.toContain("aiBatch");
   });
 
   it("expires after 24 hours", async () => {

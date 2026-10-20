@@ -819,6 +819,7 @@
       "PURCHASED_CONTENT_EXCLUDED": "On ne peut pas ajouter de notes sous du contenu acheté. Rien n'a été créé.",
       "BATCH_ID_INVALID": "Un problème est survenu. Réessayez.",
       "BATCH_ID_REUSED": "Un problème est survenu. Réessayez.",
+      "BATCH_ALREADY_UNDONE": "Ce lot a déjà été annulé. Générez une nouvelle proposition pour le rajouter.",
       "NOTE_NOT_FOUND": "Cette note n'existe plus. Rien n'a été créé.",
       "UNAUTHENTICATED": "Votre session a expiré. Reconnectez-vous.",
       "BATCH_NOT_FOUND": "Ce lot est introuvable.",

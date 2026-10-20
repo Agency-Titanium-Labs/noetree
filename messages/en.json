@@ -819,6 +819,7 @@
       "PURCHASED_CONTENT_EXCLUDED": "Notes can't be added under purchased content. Nothing was created.",
       "BATCH_ID_INVALID": "Something went wrong. Try again.",
       "BATCH_ID_REUSED": "Something went wrong. Try again.",
+      "BATCH_ALREADY_UNDONE": "This batch was already undone. Generate a new proposal to add it again.",
       "NOTE_NOT_FOUND": "This note no longer exists. Nothing was created.",
       "UNAUTHENTICATED": "Your session has expired. Sign in again.",
       "BATCH_NOT_FOUND": "This batch can't be found anymore.",

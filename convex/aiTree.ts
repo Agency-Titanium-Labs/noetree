@@ -5,9 +5,11 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { getUser } from "./helpers/helper";
 import { getUserPermission } from "./helpers/permissions";
 import { isNoteOrAncestorPurchased } from "./helpers/listings";
-import { deleteShareLinkForNote } from "./helpers/sharing";
-import { deleteCommentsForNote } from "./helpers/commentAccess";
-import { deleteVersionsForNote } from "./helpers/noteVersions";
+import {
+  ancestorHasPurchaseGrant,
+  cleanupDeletedNote,
+  noteHasPurchaseShare,
+} from "./helpers/noteDeletion";
 import { cutAtWord, extractNoteText } from "./helpers/noteText";
 import {
   TREE_MAX_READS,
@@ -26,6 +28,7 @@ import { markdownToTiptap } from "../lib/ai/markdownToTiptap";
 
 const BATCH_ID = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_BLOCKER_TITLES = 10;
+const RECENT_BATCHES_MAX = 20;
 
 const nodeValidator = v.object({
   key: v.string(),
@@ -93,6 +96,10 @@ export const applyAiTree = mutation({
     if (existing) {
       if (existing.rootNoteId !== args.rootNoteId) {
         throw new ConvexError("BATCH_ID_REUSED");
+      }
+      // An undone batch must not be "replayed": its notes are gone.
+      if (existing.undoneAt !== undefined) {
+        throw new ConvexError("BATCH_ALREADY_UNDONE");
       }
       return {
         replayed: true,
@@ -208,6 +215,16 @@ export const undoAiTree = mutation({
       }
     };
 
+    // Same purchase-grant guard as notes.deleteNote (D-05): undo must never
+    // delete a purchase share nor notes a buyer was granted.
+    const rootForGuard = await ctx.db.get("notes", batch.rootNoteId);
+    if (
+      rootForGuard &&
+      (await ancestorHasPurchaseGrant(ctx, rootForGuard._id))
+    ) {
+      block(rootForGuard.title);
+    }
+
     const present: Doc<"notes">[] = [];
     for (const id of batch.noteIds) {
       const note = await ctx.db.get("notes", id);
@@ -235,6 +252,8 @@ export const undoAiTree = mutation({
         const foreign = await ctx.db.get("notes", childId);
         if (foreign) block(foreign.title);
       }
+      // A purchase share on a batch note (a buyer holds it).
+      if (await noteHasPurchaseShare(ctx, id)) block(note.title);
       // A comment is user work too.
       const comment = await ctx.db
         .query("comments")
@@ -244,20 +263,17 @@ export const undoAiTree = mutation({
     }
     if (blockers.length > 0) return { ok: false as const, blockers };
 
-    // Safe: delete leaves first is not required (all go in this transaction).
+    // Rights are re-checked: undo edits the root's children list.
+    const root = await ctx.db.get("notes", batch.rootNoteId);
+    if (root) await requireEdit(ctx, root._id, user._id);
+
+    // Same per-note cleanup as notes.deleteNote (listing, share link,
+    // comments, versions, Phase 22 link data). All in this transaction.
     const gone = new Set<string>(present.map(n => n._id));
     for (const note of present) {
-      const shares = await ctx.db
-        .query("shares")
-        .withIndex("by_note", q => q.eq("noteId", note._id))
-        .collect();
-      for (const share of shares) await ctx.db.delete("shares", share._id);
-      await deleteShareLinkForNote(ctx, note._id);
-      await deleteCommentsForNote(ctx, note._id);
-      await deleteVersionsForNote(ctx, note._id);
       await ctx.db.delete("notes", note._id);
+      await cleanupDeletedNote(ctx, note._id);
     }
-    const root = await ctx.db.get("notes", batch.rootNoteId);
     if (root) {
       await ctx.db.patch("notes", root._id, {
         childNotes: (root.childNotes ?? []).filter(id => !gone.has(id)),
@@ -282,20 +298,27 @@ export const recentBatches = query({
     const user = await getUser(ctx);
     if (!user) return [];
     const since = Date.now() - TREE_UNDO_WINDOW_MS;
-    const rows = await ctx.db
+    // Filter by root WHILE scanning (L3): a plain take(20) over all roots could
+    // hide this root's batches. The 24 h window bounds the scan; the result is
+    // capped at RECENT_BATCHES_MAX newest batches of this root (documented).
+    const out: { batchId: string; createdAt: number; count: number }[] = [];
+    for await (const r of ctx.db
       .query("aiTreeBatches")
       .withIndex("by_userId_and_createdAt", q =>
         q.eq("userId", user._id).gt("createdAt", since),
       )
-      .order("desc")
-      .take(20);
-    return rows
-      .filter(r => r.undoneAt === undefined && r.rootNoteId === args.rootNoteId)
-      .map(r => ({
+      .order("desc")) {
+      if (r.undoneAt !== undefined || r.rootNoteId !== args.rootNoteId) {
+        continue;
+      }
+      out.push({
         batchId: r.batchId,
         createdAt: r.createdAt,
         count: r.noteIds.length,
-      }));
+      });
+      if (out.length >= RECENT_BATCHES_MAX) break;
+    }
+    return out;
   },
 });
 
