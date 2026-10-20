@@ -57,4 +57,41 @@ describe("markdownToTiptap (Insert in note)", () => {
   it("returns no nodes for blank input", () => {
     expect(markdownToTiptap("  \n\n ")).toEqual([]);
   });
+
+  describe("underscore italics need non-word characters on both sides (H3)", () => {
+    const marks = (md: string) =>
+      markdownToTiptap(md)[0].content!.map(n => ({
+        text: n.text,
+        italic: !!n.marks?.some(m => m.type === "italic"),
+      }));
+
+    it.each(["my_var_name", "snake_case_name", "a_b_c_d", "__init__ and x_y_"])(
+      "leaves %s intact",
+      md => {
+        const out = marks(md);
+        expect(out.some(n => n.italic)).toBe(false);
+        expect(out.map(n => n.text).join("")).toBe(md);
+      },
+    );
+
+    it("still italicises real _emphasis_", () => {
+      expect(marks("_italic_")).toEqual([{ text: "italic", italic: true }]);
+      expect(marks("a _word_ here")).toEqual([
+        { text: "a ", italic: false },
+        { text: "word", italic: true },
+        { text: " here", italic: false },
+      ]);
+      expect(marks("(_x_)")).toEqual([
+        { text: "(", italic: false },
+        { text: "x", italic: true },
+        { text: ")", italic: false },
+      ]);
+    });
+
+    it("keeps my_var_name literal while still italicising _this_ in one line", () => {
+      const out = marks("call my_var_name then _this_.");
+      expect(out.filter(n => n.italic).map(n => n.text)).toEqual(["this"]);
+      expect(out.map(n => n.text).join("")).toBe("call my_var_name then this.");
+    });
+  });
 });

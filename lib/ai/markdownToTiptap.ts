@@ -17,7 +17,7 @@ export type TiptapNode = {
 };
 
 const INLINE =
-  /(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\s][^*\n]*\*|_[^_\s][^_\n]*_|!?\[[^\]\n]*\]\([^)\n]*\))/g;
+  /(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\s][^*\n]*\*|(?<![A-Za-z0-9_])_[^_\s][^_\n]*_(?![A-Za-z0-9_])|!?\[[^\]\n]*\]\([^)\n]*\))/g;
 
 function text(value: string, mark?: string): TiptapNode[] {
   if (!value) return [];
