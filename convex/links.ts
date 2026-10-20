@@ -34,6 +34,8 @@ import {
   recencyKey,
 } from "./helpers/linkConfig";
 import { rankSuggestions } from "./helpers/linkRanking";
+import { emptyOutcome, searchUntilIndexed } from "./helpers/linkSearch";
+import type { EmptyOutcome } from "./helpers/linkSearch";
 import {
   buildJustificationPrompt,
   sanitizeJustification,
@@ -65,6 +67,8 @@ const ANALYSIS_DEADLINE_MS = MAX_RUN_DURATION_MS;
 const ANCESTOR_WALK_MAX = 64;
 const PAIR_LOOKUP_MAX = 500;
 const SUGGESTION_READ_MAX = 100;
+/** Newest ignored proposals kept (and shown) per note. */
+const IGNORED_KEEP = 100;
 
 async function requireUser(ctx: QueryCtx | MutationCtx): Promise<Doc<"users">> {
   const identity = await ctx.auth.getUserIdentity();
@@ -266,6 +270,7 @@ export const prepareEmbeddings = internalQuery({
         .first();
       const fresh =
         existing !== null &&
+        existing.owner === args.owner &&
         existing.contentHash === hash &&
         existing.model === args.model &&
         existing.embedding.length === EMBEDDING_DIMENSIONS;
@@ -460,8 +465,10 @@ type AnalysisResult = {
   }>;
 };
 
+type AbortCode = "NOTE_GONE" | "TIMEOUT" | "INTERNAL" | EmptyOutcome;
+
 class AnalysisAbort extends Error {
-  constructor(readonly code: "NOTE_GONE" | "TIMEOUT" | "INTERNAL") {
+  constructor(readonly code: AbortCode) {
     super(code);
   }
 }
@@ -618,6 +625,8 @@ async function analyze(
 
   let embeddedCount = 0;
   let skippedCount = 0;
+  // Notes embedded during this run: the vector index may not list them yet.
+  const fresh = new Set<string>();
   for (let i = 0; i < pending.length; i += EMBED_BATCH_SIZE) {
     guard();
     const batch = pending.slice(i, i + EMBED_BATCH_SIZE);
@@ -636,6 +645,7 @@ async function analyze(
         })),
       });
       embeddedCount += batch.length;
+      for (const b of batch) fresh.add(b.noteId);
     } catch (err) {
       const fatal = err instanceof GatewayError ? err.fatal : true;
       const hasSource = batch.some(b => b.noteId === sourceId);
@@ -646,26 +656,51 @@ async function analyze(
     }
   }
 
-  // 4. Vector search, owner-filtered, from the source's stored vector.
+  // Nothing (or only the source) to compare: the charge is not kept (M1).
+  const early = emptyOutcome({
+    comparedCount: usable.size,
+    skippedCount,
+    rankedCount: null,
+    lagging: false,
+  });
+  if (early) throw new AnalysisAbort(early);
+
+  // 4. Vector search, owner-filtered, from the source's stored vector. The
+  // index is eventually consistent: retry (bounded) while notes embedded in
+  // this run are still missing from the results.
   guard();
   const vector: number[] | null = await ctx.runQuery(
     internal.links.getEmbedding,
     { owner, noteId: sourceId },
   );
   if (!vector) throw new AnalysisAbort("INTERNAL");
-  const found = await ctx.vectorSearch("noteEmbeddings", "by_embedding", {
-    vector,
+  const { hits, lagging } = await searchUntilIndexed({
+    search: async () => {
+      const found = await ctx.vectorSearch("noteEmbeddings", "by_embedding", {
+        vector,
+        limit: VECTOR_SEARCH_LIMIT,
+        filter: q => q.eq("owner", owner),
+      });
+      const hydrated: Hydrated = await ctx.runQuery(
+        internal.links.hydrateHits,
+        { owner, ids: found.map(f => f._id) },
+      );
+      const noteOfEmbedding = new Map(
+        hydrated.map(h => [h.embeddingId, h.noteId]),
+      );
+      return found.flatMap(f => {
+        const noteId = noteOfEmbedding.get(f._id);
+        return noteId ? [{ noteId: noteId as string, score: f._score }] : [];
+      });
+    },
+    missing: hs => {
+      const seen = new Set(hs.map(h => h.noteId));
+      let n = 0;
+      for (const id of fresh) if (usable.has(id) && !seen.has(id)) n += 1;
+      return n;
+    },
     limit: VECTOR_SEARCH_LIMIT,
-    filter: q => q.eq("owner", owner),
-  });
-  const hydrated: Hydrated = await ctx.runQuery(internal.links.hydrateHits, {
-    owner,
-    ids: found.map(f => f._id),
-  });
-  const noteOfEmbedding = new Map(hydrated.map(h => [h.embeddingId, h.noteId]));
-  const hits = found.flatMap(f => {
-    const noteId = noteOfEmbedding.get(f._id);
-    return noteId ? [{ noteId: noteId as string, score: f._score }] : [];
+    beforeRetry: guard,
   });
 
   // 5. Rank: structural signals merged with the vector score.
@@ -693,6 +728,13 @@ async function analyze(
     embeddedCount,
     skippedCount,
   };
+  const empty = emptyOutcome({
+    comparedCount: usable.size,
+    skippedCount,
+    rankedCount: ranked.length,
+    lagging,
+  });
+  if (empty) throw new AnalysisAbort(empty);
   if (ranked.length === 0) return { ...base, suggestions: [] };
 
   // 6. One sentence per suggestion, each call seeing ONE pair only.
@@ -754,6 +796,40 @@ async function analyze(
 // Store + settle in ONE transaction
 // ---------------------------------------------------------------------------
 
+/**
+ * Bounds the decided rows kept for a note (M2). Accepted rows of earlier
+ * analyses are not shown any more (the link itself lives in noteLinks and is
+ * never touched here); ignored rows beyond the newest IGNORED_KEEP are
+ * dropped (linkIgnoredPairs still stops the pair from being suggested again).
+ */
+async function pruneDecidedSuggestions(
+  ctx: MutationCtx,
+  noteId: Id<"notes">,
+  currentAnalysis: Id<"linkAnalyses">,
+) {
+  const accepted = await ctx.db
+    .query("linkSuggestions")
+    .withIndex("by_noteId_and_status", q =>
+      q.eq("noteId", noteId).eq("status", "accepted"),
+    )
+    .take(SUGGESTION_READ_MAX);
+  for (const s of accepted) {
+    if (s.analysisId !== currentAnalysis) {
+      await ctx.db.delete("linkSuggestions", s._id);
+    }
+  }
+  const ignored = await ctx.db
+    .query("linkSuggestions")
+    .withIndex("by_noteId_and_status", q =>
+      q.eq("noteId", noteId).eq("status", "ignored"),
+    )
+    .order("desc")
+    .take(IGNORED_KEEP + SUGGESTION_READ_MAX);
+  for (const s of ignored.slice(IGNORED_KEEP)) {
+    await ctx.db.delete("linkSuggestions", s._id);
+  }
+}
+
 export const finishAnalysis = internalMutation({
   args: {
     analysisId: v.id("linkAnalyses"),
@@ -799,13 +875,15 @@ export const finishAnalysis = internalMutation({
     }
 
     // A new analysis replaces the previous PENDING proposals of this note.
+    // Queried by status, so old decided rows can never hide them (M2).
     const previous = await ctx.db
       .query("linkSuggestions")
-      .withIndex("by_noteId", q => q.eq("noteId", analysis.noteId))
+      .withIndex("by_noteId_and_status", q =>
+        q.eq("noteId", analysis.noteId).eq("status", "pending"),
+      )
       .take(SUGGESTION_READ_MAX);
-    for (const s of previous) {
-      if (s.status === "pending") await ctx.db.delete("linkSuggestions", s._id);
-    }
+    for (const s of previous) await ctx.db.delete("linkSuggestions", s._id);
+    await pruneDecidedSuggestions(ctx, analysis.noteId, analysis._id);
 
     let stored = 0;
     const seen = new Set<string>();
@@ -917,10 +995,27 @@ export const getPanel = query({
       }
     }
 
-    const rows = await ctx.db
+    // Rows of the current analysis, plus the newest ignored ones (M2: never
+    // the oldest rows of the note, which stale decisions would fill up).
+    const currentRows = latest
+      ? await ctx.db
+          .query("linkSuggestions")
+          .withIndex("by_analysisId", q => q.eq("analysisId", latest._id))
+          .take(SUGGESTION_READ_MAX * 2)
+      : [];
+    const ignoredRows = await ctx.db
       .query("linkSuggestions")
-      .withIndex("by_noteId", q => q.eq("noteId", args.noteId))
-      .take(SUGGESTION_READ_MAX);
+      .withIndex("by_noteId_and_status", q =>
+        q.eq("noteId", args.noteId).eq("status", "ignored"),
+      )
+      .order("desc")
+      .take(IGNORED_KEEP);
+    const rowIds = new Set<string>();
+    const rows = [...currentRows, ...ignoredRows].filter(r => {
+      if (rowIds.has(r._id)) return false;
+      rowIds.add(r._id);
+      return true;
+    });
     const suggestions: Array<{
       id: Id<"linkSuggestions">;
       targetNoteId: Id<"notes">;
@@ -1142,10 +1237,12 @@ export const removeLink = mutation({
     ] as const) {
       const rows = await ctx.db
         .query("linkSuggestions")
-        .withIndex("by_noteId", q => q.eq("noteId", from))
+        .withIndex("by_noteId_and_status", q =>
+          q.eq("noteId", from).eq("status", "accepted"),
+        )
         .take(SUGGESTION_READ_MAX);
       for (const s of rows) {
-        if (s.targetNoteId === to && s.status === "accepted") {
+        if (s.targetNoteId === to) {
           await ctx.db.delete("linkSuggestions", s._id);
         }
       }
