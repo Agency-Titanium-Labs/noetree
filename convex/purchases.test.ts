@@ -1,9 +1,10 @@
 import { convexTest } from "convex-test";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ConvexError } from "convex/values";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { computeSplit } from "./helpers/commission";
 import { seedTree, preparePendingPurchase } from "../test-utils/convexSeed";
 
 const modules = (
@@ -13,6 +14,15 @@ const modules = (
 ).glob("./**/*.*s");
 
 type T = ReturnType<typeof convexTest>;
+
+// The VAT carve-out is opt-in (default rate 0). Most tests exercise the
+// enabled path at 20%; the "VAT rate config" suite overrides this per test.
+beforeEach(() => {
+  vi.stubEnv("MARKETPLACE_VAT_RATE_BPS", "2000");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 async function seedUser(
   t: T,
@@ -188,12 +198,59 @@ describe("snapshot", () => {
       status: "pending",
       sellerTier: "free",
       commissionRateBps: 2000,
-      commissionCents: 200,
-      sellerNetCents: 800,
+      vatRateBps: 2000,
+      vatCents: 166,
+      commissionCents: 166,
+      sellerNetCents: 668,
       priceCents: 1000,
       destinationAccountId: "acct_seller",
       snapshotVersion: 1,
     });
+  });
+
+  test("returns explicit applicationFeeCents = commission + VAT; buyer price unchanged", async () => {
+    const { t, listingId } = await setup({ price: 1000 });
+    const buyer = asUser(t, "buyer");
+    const res = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    expect(res.priceCents).toBe(1000);
+    expect(res.vatCents).toBe(166);
+    expect(res.commissionCents).toBe(166);
+    expect(res.applicationFeeCents).toBe(332);
+    await buyer.mutation(api.purchases.attachCheckoutSession, {
+      purchaseId: res.purchaseId,
+      stripeCheckoutSessionId: "cs_1",
+      snapshotVersion: res.snapshotVersion,
+    });
+    const again = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    expect(again.applicationFeeCents).toBe(332);
+  });
+
+  test("reuse of a legacy pending row without VAT fields reads VAT as 0", async () => {
+    const { t, listingId } = await setup({ price: 1000 });
+    const buyer = asUser(t, "buyer");
+    const res = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    await buyer.mutation(api.purchases.attachCheckoutSession, {
+      purchaseId: res.purchaseId,
+      stripeCheckoutSessionId: "cs_1",
+      snapshotVersion: res.snapshotVersion,
+    });
+    await t.run(ctx =>
+      ctx.db.patch("purchases", res.purchaseId, {
+        vatRateBps: undefined,
+        vatCents: undefined,
+      }),
+    );
+    const again = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    expect(again.vatCents).toBe(0);
+    expect(again.applicationFeeCents).toBe(again.commissionCents);
   });
 
   test("active subscription means premium 10%", async () => {
@@ -206,7 +263,7 @@ describe("snapshot", () => {
     expect(row).toMatchObject({
       sellerTier: "premium",
       commissionRateBps: 1000,
-      commissionCents: 100,
+      commissionCents: 83,
     });
   });
 
@@ -237,6 +294,139 @@ describe("snapshot", () => {
       t.mutation(api.purchases.preparePurchase, { listingId }),
       "UNAUTHENTICATED",
     );
+  });
+});
+
+describe("VAT rate config (SEC-1, WR-02)", () => {
+  const PRICES = [100, 101, 999, 1000, 1500, 4999, 50_000];
+
+  test("env unset: VAT disabled, fee = commission only (v1.1 behavior)", async () => {
+    vi.stubEnv("MARKETPLACE_VAT_RATE_BPS", "");
+    const { t, listingId } = await setup({ price: 1000 });
+    const res = await asUser(t, "buyer").mutation(
+      api.purchases.preparePurchase,
+      { listingId },
+    );
+    expect(res.vatCents).toBe(0);
+    expect(res.commissionCents).toBe(200);
+    expect(res.applicationFeeCents).toBe(200);
+    const [row] = await purchaseRows(t);
+    expect(row).toMatchObject({
+      vatRateBps: 0,
+      vatCents: 0,
+      commissionCents: 200,
+      sellerNetCents: 800,
+    });
+  });
+
+  test("invalid env value: falls back to 0 and logs", async () => {
+    vi.stubEnv("MARKETPLACE_VAT_RATE_BPS", "20%");
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { t, listingId } = await setup({ price: 1000 });
+    const res = await asUser(t, "buyer").mutation(
+      api.purchases.preparePurchase,
+      { listingId },
+    );
+    expect(res.vatCents).toBe(0);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  for (const tier of ["free", "premium"] as const) {
+    test(`env 2000, ${tier} seller: fee = commission + VAT, row coherent, across prices`, async () => {
+      for (const price of PRICES) {
+        const { t, listingId } = await setup({ price });
+        if (tier === "premium") await seedSubscription(t, "seller", "active");
+        const res = await asUser(t, "buyer").mutation(
+          api.purchases.preparePurchase,
+          { listingId },
+        );
+        const expected = computeSplit(price, tier, 2000);
+        expect(res.priceCents).toBe(price);
+        expect(res.vatCents).toBe(expected.vatCents);
+        expect(res.commissionCents).toBe(expected.commissionCents);
+        expect(res.applicationFeeCents).toBe(
+          expected.commissionCents + expected.vatCents,
+        );
+        const [row] = await purchaseRows(t);
+        expect(row.applicationFeeCents).toBeUndefined();
+        expect(row.commissionCents + (row.vatCents ?? 0)).toBe(
+          res.applicationFeeCents,
+        );
+        expect(
+          (row.vatCents ?? 0) + row.commissionCents + row.sellerNetCents,
+        ).toBe(price);
+        expect(row.vatRateBps).toBe(2000);
+      }
+    });
+  }
+
+  test("re-snapshot after a rate change on session replacement", async () => {
+    const { t, listingId } = await setup({ price: 1000 });
+    const buyer = asUser(t, "buyer");
+    const first = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    expect(first.applicationFeeCents).toBe(332);
+    await buyer.mutation(api.purchases.attachCheckoutSession, {
+      purchaseId: first.purchaseId,
+      stripeCheckoutSessionId: "cs_1",
+      snapshotVersion: first.snapshotVersion,
+    });
+
+    // Rate change while the session is open: the open session keeps its snapshot.
+    vi.stubEnv("MARKETPLACE_VAT_RATE_BPS", "1000");
+    const reused = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+    });
+    expect(reused.existingSessionId).toBe("cs_1");
+    expect(reused.applicationFeeCents).toBe(332);
+
+    // Replacing the (expired) session re-snapshots at the new rate.
+    const second = await buyer.mutation(api.purchases.preparePurchase, {
+      listingId,
+      replaceExpiredSession: true,
+    });
+    const expected = computeSplit(1000, "free", 1000);
+    expect(second.snapshotVersion).toBe(first.snapshotVersion + 1);
+    expect(second.vatCents).toBe(expected.vatCents);
+    expect(second.applicationFeeCents).toBe(expected.applicationFeeCents);
+    expect(second.applicationFeeCents).not.toBe(332);
+    const rows = await purchaseRows(t);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      vatRateBps: 1000,
+      vatCents: expected.vatCents,
+      commissionCents: expected.commissionCents,
+      sellerNetCents: expected.sellerNetCents,
+    });
+  });
+
+  test.each([0, 50])(
+    "IN-02: legacy listing priced %i cents gets a specific error, no row",
+    async price => {
+      const { t, listingId } = await setup({ price });
+      await expectConvexError(
+        asUser(t, "buyer").mutation(api.purchases.preparePurchase, {
+          listingId,
+        }),
+        "PURCHASE_PRICE_BELOW_MINIMUM",
+      );
+      expect(await purchaseRows(t)).toHaveLength(0);
+    },
+  );
+
+  test("price at the 100 cent floor is accepted with net > 0 at max rate", async () => {
+    vi.stubEnv("MARKETPLACE_VAT_RATE_BPS", "5000");
+    const { t, listingId } = await setup({ price: 100 });
+    await seedSubscription(t, "seller", "active");
+    const res = await asUser(t, "buyer").mutation(
+      api.purchases.preparePurchase,
+      { listingId },
+    );
+    expect(res.applicationFeeCents).toBeLessThan(100);
+    const [row] = await purchaseRows(t);
+    expect(row.sellerNetCents).toBeGreaterThan(0);
   });
 });
 
@@ -1242,8 +1432,9 @@ describe("earnings counter (HIST-02)", () => {
     expect(rows[0]).toMatchObject({
       saleCount: 1,
       grossCents: 1000,
-      commissionCents: 200,
-      netCents: 800,
+      commissionCents: 166,
+      netCents: 668,
+      vatCents: 166,
     });
   });
 

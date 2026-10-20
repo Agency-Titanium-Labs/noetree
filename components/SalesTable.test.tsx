@@ -14,6 +14,8 @@ const messages: Record<string, string> = {
   colDate: "Date",
   colListing: "Listing",
   colGross: "Gross",
+  colVat: "VAT",
+  vatNotRecorded: "No VAT recorded for this sale",
   colCommission: "Commission",
   colNet: "Net",
   colPayout: "Payout",
@@ -53,7 +55,13 @@ afterEach(cleanup);
 
 describe("SalesTableView", () => {
   it("renders row values, rate and payout label", () => {
-    render(<SalesTableView rows={[row()]} status="Exhausted" onLoadMore={() => {}} />);
+    render(
+      <SalesTableView
+        rows={[row()]}
+        status="Exhausted"
+        onLoadMore={() => {}}
+      />,
+    );
     expect(screen.getAllByText("Pack A").length).toBeGreaterThan(0);
     expect(screen.getAllByText("€10.00").length).toBeGreaterThan(0);
     expect(screen.getAllByText("€2.00").length).toBeGreaterThan(0);
@@ -65,7 +73,13 @@ describe("SalesTableView", () => {
   it("uses the snapshot rate", () => {
     render(
       <SalesTableView
-        rows={[row({ commissionRateBps: 1000, commissionCents: 100, sellerNetCents: 900 })]}
+        rows={[
+          row({
+            commissionRateBps: 1000,
+            commissionCents: 100,
+            sellerNetCents: 900,
+          }),
+        ]}
         status="Exhausted"
         onLoadMore={() => {}}
       />,
@@ -73,9 +87,62 @@ describe("SalesTableView", () => {
     expect(screen.getAllByText("(10%)").length).toBeGreaterThan(0);
   });
 
+  it("legacy row without VAT data shows a dash, not 0,00 (WR-05)", () => {
+    render(
+      <SalesTableView
+        rows={[row()]}
+        status="Exhausted"
+        onLoadMore={() => {}}
+      />,
+    );
+    // desktop table + mobile card
+    expect(
+      screen.getAllByLabelText("No VAT recorded for this sale").length,
+    ).toBe(2);
+    expect(screen.queryByText("€0.00")).not.toBeInTheDocument();
+  });
+
+  it("row with recorded VAT shows the amount; an explicit zero shows 0.00", () => {
+    const { rerender } = render(
+      <SalesTableView
+        rows={[row({ vatCents: 166, vatRateBps: 2000 })]}
+        status="Exhausted"
+        onLoadMore={() => {}}
+      />,
+    );
+    expect(screen.getAllByText("€1.66").length).toBeGreaterThan(0);
+    expect(
+      screen.queryByLabelText("No VAT recorded for this sale"),
+    ).not.toBeInTheDocument();
+    rerender(
+      <SalesTableView
+        rows={[row({ vatCents: 0, vatRateBps: 0 })]}
+        status="Exhausted"
+        onLoadMore={() => {}}
+      />,
+    );
+    expect(screen.getAllByText("€0.00").length).toBeGreaterThan(0);
+    expect(
+      screen.queryByLabelText("No VAT recorded for this sale"),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders column headers with scope=col", () => {
-    render(<SalesTableView rows={[row()]} status="Exhausted" onLoadMore={() => {}} />);
-    for (const name of ["Date", "Listing", "Gross", "Commission", "Net", "Payout"]) {
+    render(
+      <SalesTableView
+        rows={[row()]}
+        status="Exhausted"
+        onLoadMore={() => {}}
+      />,
+    );
+    for (const name of [
+      "Date",
+      "Listing",
+      "Gross",
+      "Commission",
+      "Net",
+      "Payout",
+    ]) {
       const th = screen.getByRole("columnheader", { name, hidden: true });
       expect(th.tagName).toBe("TH");
       expect(th).toHaveAttribute("scope", "col");
@@ -85,33 +152,61 @@ describe("SalesTableView", () => {
   it("shows Load more only when more is available", () => {
     const onLoadMore = vi.fn();
     const { rerender } = render(
-      <SalesTableView rows={[row()]} status="CanLoadMore" onLoadMore={onLoadMore} />,
+      <SalesTableView
+        rows={[row()]}
+        status="CanLoadMore"
+        onLoadMore={onLoadMore}
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
     expect(onLoadMore).toHaveBeenCalledTimes(1);
-    rerender(<SalesTableView rows={[row()]} status="Exhausted" onLoadMore={onLoadMore} />);
-    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    rerender(
+      <SalesTableView
+        rows={[row()]}
+        status="Exhausted"
+        onLoadMore={onLoadMore}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Load more" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders the footnote when rows exist", () => {
-    render(<SalesTableView rows={[row()]} status="Exhausted" onLoadMore={() => {}} />);
+    render(
+      <SalesTableView
+        rows={[row()]}
+        status="Exhausted"
+        onLoadMore={() => {}}
+      />,
+    );
     expect(screen.getByText(messages.footnote)).toBeInTheDocument();
   });
 
   it("renders the empty state with a listings link and no table", () => {
-    render(<SalesTableView rows={[]} status="Exhausted" onLoadMore={() => {}} />);
+    render(
+      <SalesTableView rows={[]} status="Exhausted" onLoadMore={() => {}} />,
+    );
     expect(screen.getByRole("link", { name: "List a note" })).toHaveAttribute(
       "href",
       "/listings",
     );
-    expect(screen.queryByRole("table", { hidden: true })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { hidden: true }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders skeletons while loading the first page", () => {
     const { container } = render(
-      <SalesTableView rows={[]} status="LoadingFirstPage" onLoadMore={() => {}} />,
+      <SalesTableView
+        rows={[]}
+        status="LoadingFirstPage"
+        onLoadMore={() => {}}
+      />,
     );
     expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(3);
-    expect(screen.queryByRole("table", { hidden: true })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { hidden: true }),
+    ).not.toBeInTheDocument();
   });
 });

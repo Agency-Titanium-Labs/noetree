@@ -16,6 +16,8 @@ import React, {
 import { useDebouncedCallback } from "use-debounce";
 import { useTreeContext } from "./TreeProvider";
 import { useTranslations } from "next-intl";
+import { GhostText } from "@/lib/editor/ghostText";
+import { useAutocompleteBridge } from "@/lib/editor/useAutocompleteBridge";
 
 type saveStatusType = "idle" | "unsaved" | "saving" | "success" | "error";
 
@@ -91,6 +93,11 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
   const initialContent: Content = parseNoteContent(selectedNote?.content);
 
+  // Phase 21: premium ghost-text autocomplete (off unless the account turned
+  // it on; a Free user never makes a request).
+  const { options: autocomplete, enabled: autocompleteEnabled } =
+    useAutocompleteBridge(selectedNote?._id);
+
   const editor = useEditor(
     {
       content: initialContent,
@@ -101,6 +108,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
         }),
         Link,
         Image,
+        GhostText.configure(autocomplete),
       ],
       editorProps: {
         attributes: {
@@ -112,6 +120,17 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     },
     [selectedNote?._id, t],
   );
+
+  // Switching autocomplete off (here or on another device) drops a shown
+  // suggestion and any pending request immediately.
+  useEffect(() => {
+    if (autocompleteEnabled || !editor || editor.isDestroyed) return;
+    (
+      editor.storage as unknown as
+        | { ghostText?: { clear?: () => void } }
+        | undefined
+    )?.ghostText?.clear?.();
+  }, [autocompleteEnabled, editor]);
 
   const saveContent = useCallback(
     async (content: Content) => {

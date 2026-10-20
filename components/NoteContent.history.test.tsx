@@ -51,6 +51,7 @@ vi.mock("./ShareDialog", () => ({ default: () => null }));
 vi.mock("./ListingFormDialog", () => ({ default: () => null }));
 vi.mock("./CommentsButton", () => ({ default: () => null }));
 vi.mock("./CommentsPanel", () => ({ default: () => null }));
+vi.mock("./LinkedNotesBlock", () => ({ default: () => null }));
 vi.mock("./HistoryButton", () => ({
   default: ({ onClick }: { onClick: () => void }) => (
     <button data-testid="history-button" onClick={onClick} />
@@ -70,11 +71,24 @@ import NoteContent from "./NoteContent";
 
 describe("NoteContent history mount", () => {
   beforeEach(() => {
+    // NoteContent always renders a ResizablePanelGroup (chat docking, M1),
+    // which measures with ResizeObserver.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
     tree.selectedNote = { _id: "n1", title: "T", role: "owner" };
     editorCtx.previewVersion = null;
     editorCtx.exitPreview = vi.fn();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it.each(["owner", "admin", "edit"])("shows history for %s", role => {
     tree.selectedNote = { _id: "n1", title: "T", role };
@@ -106,8 +120,7 @@ describe("NoteContent history mount", () => {
     const banner = screen.getByTestId("banner");
     const editor = screen.getByTestId("editor");
     expect(
-      banner.compareDocumentPosition(editor) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      banner.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 

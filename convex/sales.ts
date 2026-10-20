@@ -8,6 +8,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getUser } from "./helpers/helper";
+import { parseVatRateBps } from "./helpers/commission";
 import { EMPTY_EARNINGS, recomputeEarningsForSeller } from "./helpers/earnings";
 
 const SALES_PAGE_MAX = 50;
@@ -24,6 +25,9 @@ export const listMySales = query({
         commissionRateBps: v.number(),
         commissionCents: v.number(),
         sellerNetCents: v.number(),
+        // Absent on legacy (pre-VAT) rows: the UI renders "-", not "0".
+        vatRateBps: v.optional(v.number()),
+        vatCents: v.optional(v.number()),
       }),
     ),
     isDone: v.boolean(),
@@ -62,9 +66,20 @@ export const listMySales = query({
         commissionRateBps: p.commissionRateBps,
         commissionCents: p.commissionCents,
         sellerNetCents: p.sellerNetCents,
+        ...(p.vatRateBps !== undefined ? { vatRateBps: p.vatRateBps } : {}),
+        ...(p.vatCents !== undefined ? { vatCents: p.vatCents } : {}),
       })),
     };
   },
+});
+
+/** Seller-side preview config: the VAT rate the next sale will snapshot. */
+export const getSplitConfig = query({
+  args: {},
+  returns: v.object({ vatRateBps: v.number() }),
+  handler: async () => ({
+    vatRateBps: parseVatRateBps(process.env.MARKETPLACE_VAT_RATE_BPS),
+  }),
 });
 
 const totalsValidator = v.object({
@@ -72,6 +87,7 @@ const totalsValidator = v.object({
   grossCents: v.number(),
   commissionCents: v.number(),
   netCents: v.number(),
+  vatCents: v.number(),
 });
 
 /** D-12: all-time totals from the denormalized sellerEarnings counter. */
@@ -91,6 +107,7 @@ export const getMyTotals = query({
       grossCents: row.grossCents,
       commissionCents: row.commissionCents,
       netCents: row.netCents,
+      vatCents: row.vatCents ?? 0,
     };
   },
 });
@@ -102,6 +119,7 @@ export const recomputeSellerEarnings = internalMutation({
     grossCents: v.number(),
     commissionCents: v.number(),
     netCents: v.number(),
+    vatCents: v.number(),
     truncated: v.boolean(),
   }),
   handler: async (ctx, args) => recomputeEarningsForSeller(ctx, args.sellerId),

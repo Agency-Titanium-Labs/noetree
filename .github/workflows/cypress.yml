@@ -47,3 +47,18 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+          # Clerk test user for the signed-in checkout spec (read by the spec
+          # via Cypress.env("E2E_CLERK_USER_IDENTIFIER" / "..._PASSWORD")).
+          CYPRESS_E2E_CLERK_USER_IDENTIFIER: ${{ secrets.E2E_CLERK_USER_IDENTIFIER }}
+          CYPRESS_E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          # Build-time placeholders for the webhook secrets: `next build` evaluates the Stripe
+          # webhook routes, whose modules construct a Stripe client on import.
+          # No Stripe API call is made in CI, so these never need to be real.
+          # The signed-in checkout spec creates a real (test-mode) Checkout session.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PREMIUM_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_PREMIUM_MONTHLY_PRICE_ID }}
+          STRIPE_PREMIUM_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_PREMIUM_ANNUAL_PRICE_ID }}
+          APP_URL: http://localhost:3000
+          STRIPE_WEBHOOK_SECRET: whsec_ci_build_placeholder
+          STRIPE_CONNECT_WEBHOOK_SECRET: whsec_ci_build_placeholder
+          INTERNAL_WEBHOOK_SECRET: ci-build-placeholder

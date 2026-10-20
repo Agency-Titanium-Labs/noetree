@@ -8,7 +8,13 @@ Noetree est une application web de prise de notes hiérarchique (style Notion/Ob
 
 Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
 
-## Current Milestone: v1.2 Pricing V2 & Fonctionnalités Sociales
+## Completed Milestone: v1.3 IA et TVA marketplace (2026-10-20, mise en production en attente)
+
+**Livré :** IA branchée sur le système de crédits (réservation, règlement, remboursement exactement une fois, règle de plan unique, limites et interrupteur d'urgence) ; chat en streaming gratuit ; contexte IA personnel et agent d'arbre Premium (proposition, aperçu, application atomique, annulation) ; autocomplétion à 1 crédit par suggestion acceptée ; suggestions de liens sémantiques ; TVA marketplace absorbée, taux configurable, désactivée par défaut jusqu'au go-live. Contenus achetés exclus de tout contexte IA.
+
+**État :** 34/34 exigences, 1576 tests, audit `tech_debt` sans bloquant (`.planning/workstreams/general/milestones/v1.3-MILESTONE-AUDIT.md`). Reste le go-live : voir `DEPLOY-CHECKLIST-v1.3.md` (merge PR #35 d'abord, déploiement Convex, backfill, activation TVA, achats de test).
+
+## Shipped Milestone: v1.2 Pricing V2 & Fonctionnalités Sociales (2026-10-18)
 
 **Goal :** Passer à un modèle freemium sans limite de notes, avec de nouvelles fonctionnalités sociales (partage, commentaires, historique) et un système de crédits IA revu.
 
@@ -81,7 +87,9 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 <!-- Scope actif : deux milestones en parallèle (workstreams general = v1.2, marketplace = v1.1). -->
 
-**Milestone v1.2 (Pricing V2 & social) :** voir `.planning/workstreams/general/REQUIREMENTS.md`.
+**Milestone v1.3 (IA et TVA marketplace) :** terminé le 2026-10-20 — voir `.planning/workstreams/general/milestones/v1.3-REQUIREMENTS.md`.
+
+**Milestone v1.2 (Pricing V2 & social) :** livré le 2026-10-18 — voir `.planning/workstreams/general/milestones/v1.2-REQUIREMENTS.md`.
 
 **Milestone v1.1 (Marketplace) :** livré le 2026-10-17 — voir Validated et `.planning/milestones/v1.1-ROADMAP.md`.
 
@@ -145,4 +153,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-10-19 — after v1.2 milestone (Pricing V2 & Fonctionnalités Sociales) shipped_
+_Last updated: 2026-10-20 after v1.3 milestone_
