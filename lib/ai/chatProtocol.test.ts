@@ -84,7 +84,11 @@ describe("client transport <-> route protocol (CHAT-01)", () => {
     const settled = last?.parts.find(p => p.type === "data-settled") as
       | { data: { refunded: boolean; outcome: string } }
       | undefined;
-    expect(settled?.data).toEqual({ outcome: "completed", refunded: false });
+    expect(settled?.data).toEqual({
+      outcome: "completed",
+      refunded: false,
+      failed: false,
+    });
     expect(settles).toEqual(["completed"]);
 
     // The request carries only what the route reads, with a fresh requestId.

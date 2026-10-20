@@ -157,7 +157,7 @@ describe("POST /api/ai/chat core (CHAT-01)", () => {
     const text = await drain(res, h);
     expect(h.settles).toEqual([{ runId: "run_1", outcome: "failed" }]);
     expect(text).toContain('"refunded":true');
-    expect(text).toContain('"errorText":"PROVIDER_ERROR"');
+    expect(text).toContain('"failed":true');
   });
 
   it("provider error AFTER the first token: failed (Phase 17: provider error refunds)", async () => {
@@ -166,7 +166,7 @@ describe("POST /api/ai/chat core (CHAT-01)", () => {
     const text = await drain(res, h);
     expect(h.settles).toEqual([{ runId: "run_1", outcome: "failed" }]);
     expect(text).toContain("Hello");
-    expect(text).toContain('"errorText":"PROVIDER_ERROR"');
+    expect(text).toContain('"failed":true');
   });
 
   it("client abort BEFORE the first token: aborted_before_output (refund)", async () => {
@@ -179,7 +179,7 @@ describe("POST /api/ai/chat core (CHAT-01)", () => {
       { runId: "run_1", outcome: "aborted_before_output" },
     ]);
     expect(text).toContain('"refunded":true');
-    expect(text).not.toContain('"errorText"');
+    expect(text).toContain('"failed":false');
   });
 
   it("client abort AFTER the first token: aborted_after_output (charge stands)", async () => {

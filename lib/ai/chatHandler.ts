@@ -59,8 +59,13 @@ export type ChatDeps = {
   streamTimeoutMs?: number;
 };
 
-/** The final data part the UI uses for the refunded notice. */
-export type SettledData = { outcome: string; refunded: boolean };
+/** The final data part the UI uses for the error and refunded notices. */
+export type SettledData = {
+  outcome: string;
+  refunded: boolean;
+  /** The provider failed (before or after the first token). */
+  failed: boolean;
+};
 
 const REFUNDED: ReadonlySet<string> = new Set([
   "failed",
@@ -197,11 +202,12 @@ export async function handleChatRequest(
           const settled: SettledData = {
             outcome: result.outcome,
             refunded: REFUNDED.has(result.outcome),
+            failed: result.outcome === "failed",
           };
+          // A failure is reported as data, not as a protocol `error` chunk:
+          // the UI shows it as a system message in the thread, and the SDK's
+          // error-chunk path leaves an unhandled rejection behind.
           emit({ type: "data-settled", data: settled });
-          if (result.outcome === "failed") {
-            emit({ type: "error", errorText: "PROVIDER_ERROR" });
-          }
           emit({ type: "finish" });
           if (!closed) {
             try {

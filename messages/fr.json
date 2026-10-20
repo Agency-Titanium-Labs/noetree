@@ -230,7 +230,16 @@
       "CONTEXT_TOO_DEEP": "Cette note est imbriquée trop profondément pour être envoyée à l'IA. Rapprochez-la de la racine. Aucun crédit n'a été débité.",
       "NOTE_NOT_FOUND": "Cette note n'existe plus. Aucun crédit n'a été débité.",
       "NOTE_NOT_OWNED": "L'IA ne peut être utilisée que sur vos propres notes. Aucun crédit n'a été débité.",
-      "PURCHASED_CONTENT_EXCLUDED": "Le contenu acheté sur la place de marché ne peut pas être envoyé à l'IA. Aucun crédit n'a été débité."
+      "PURCHASED_CONTENT_EXCLUDED": "Le contenu acheté sur la place de marché ne peut pas être envoyé à l'IA. Aucun crédit n'a été débité.",
+      "INSUFFICIENT_CREDITS": "Vous n'avez pas assez de crédits IA pour ce message. Aucun crédit n'a été débité.",
+      "AI_DISABLED": "L'IA est temporairement désactivée. Réessayez plus tard. Aucun crédit n'a été débité.",
+      "RATE_LIMITED": "Trop de requêtes. Patientez quelques secondes puis réessayez. Aucun crédit n'a été débité.",
+      "TOO_MANY_RUNS": "Trop de requêtes IA sont déjà en cours. Attendez qu'elles se terminent. Aucun crédit n'a été débité.",
+      "PREMIUM_REQUIRED": "Cette fonction nécessite un abonnement Premium. Aucun crédit n'a été débité.",
+      "UNAUTHENTICATED": "Votre session a expiré. Reconnectez-vous. Aucun crédit n'a été débité.",
+      "PROVIDER_ERROR": "L'IA n'a pas pu terminer cette réponse.",
+      "REPLAYED_RUN": "Ce message a déjà été envoyé. Renvoyez-le pour en lancer un nouveau.",
+      "GENERIC": "Une erreur est survenue. Réessayez."
     },
     "packsHeading": "Acheter des crédits",
     "packsHelper": "Achat unique. Les crédits achetés n'expirent jamais.",
@@ -245,6 +254,52 @@
       "decouverte": "Découverte",
       "boost": "Boost",
       "pro": "Pro"
+    }
+  },
+  "AiChat": {
+    "title": "Chat IA",
+    "close": "Fermer le chat",
+    "emptyTitle": "Demandez à l'IA",
+    "emptyBody": "Posez une question ou demandez un brouillon. Votre conversation n'est pas enregistrée : elle disparaît quand vous quittez cette page.",
+    "costHint": "1 crédit par message",
+    "messagesAria": "Conversation",
+    "inputAria": "Message à l'IA",
+    "placeholder": "Demandez à l'IA...",
+    "send": "Envoyer",
+    "stop": "Arrêter",
+    "copy": "Copier",
+    "copied": "Copié",
+    "insert": "Insérer dans la note",
+    "inserted": "Inséré dans votre note.",
+    "retry": "Réessayer",
+    "userLabel": "Vous",
+    "assistantLabel": "IA",
+    "writing": "Rédaction...",
+    "buyCredits": "Acheter des crédits",
+    "refunded": "La réponse n'a pas pu être terminée, votre crédit a donc été remboursé.",
+    "waitHint": "Réessayez dans environ {seconds, plural, one {# seconde} other {# secondes}}.",
+    "context": {
+      "label": "Contexte",
+      "none": "Aucun contexte",
+      "note": "Cette note, ses parents et ses sous-notes",
+      "loading": "Vérification de ce qui serait envoyé...",
+      "refresh": "Actualiser",
+      "included": "Sera envoyé",
+      "role": {
+        "current": "Note courante",
+        "ancestor": "Parent",
+        "child": "Sous-note"
+      },
+      "shortened": "raccourcie",
+      "untitled": "Sans titre",
+      "dropped": "Non incluses : {count, plural, one {# note} other {# notes}}",
+      "reason": {
+        "budget": "plus de place",
+        "not_owned": "pas à vous",
+        "purchased": "contenu acheté",
+        "missing": "introuvable",
+        "child_cap": "trop de sous-notes"
+      }
     }
   },
   "Editor": {
