@@ -11,6 +11,7 @@
 import type * as aiChat from "../aiChat.js";
 import type * as aiCredits from "../aiCredits.js";
 import type * as aiRuns from "../aiRuns.js";
+import type * as aiSuggestions from "../aiSuggestions.js";
 import type * as comments from "../comments.js";
 import type * as connectAccounts from "../connectAccounts.js";
 import type * as crons from "../crons.js";
@@ -19,6 +20,7 @@ import type * as helpers_aiContextLoad from "../helpers/aiContextLoad.js";
 import type * as helpers_aiErrors from "../helpers/aiErrors.js";
 import type * as helpers_aiRateLimit from "../helpers/aiRateLimit.js";
 import type * as helpers_aiRunState from "../helpers/aiRunState.js";
+import type * as helpers_aiSuggestionState from "../helpers/aiSuggestionState.js";
 import type * as helpers_commentAccess from "../helpers/commentAccess.js";
 import type * as helpers_commission from "../helpers/commission.js";
 import type * as helpers_creditCatalog from "../helpers/creditCatalog.js";
@@ -56,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   aiChat: typeof aiChat;
   aiCredits: typeof aiCredits;
   aiRuns: typeof aiRuns;
+  aiSuggestions: typeof aiSuggestions;
   comments: typeof comments;
   connectAccounts: typeof connectAccounts;
   crons: typeof crons;
@@ -64,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   "helpers/aiErrors": typeof helpers_aiErrors;
   "helpers/aiRateLimit": typeof helpers_aiRateLimit;
   "helpers/aiRunState": typeof helpers_aiRunState;
+  "helpers/aiSuggestionState": typeof helpers_aiSuggestionState;
   "helpers/commentAccess": typeof helpers_commentAccess;
   "helpers/commission": typeof helpers_commission;
   "helpers/creditCatalog": typeof helpers_creditCatalog;

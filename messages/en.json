@@ -248,7 +248,9 @@
       "FORBIDDEN": "This request was blocked. Reload the page and try again. You weren't charged.",
       "UNSUPPORTED_MEDIA_TYPE": "We couldn't read that message. Reload the page and try again. You weren't charged.",
       "PAYLOAD_TOO_LARGE": "This conversation is too long to send. Start a new one or shorten your message. You weren't charged.",
-      "PROMPT_TOO_LARGE": "This conversation is too long to send. Start a new one or shorten your message. You weren't charged."
+      "PROMPT_TOO_LARGE": "This conversation is too long to send. Start a new one or shorten your message. You weren't charged.",
+      "SUGGESTION_NOT_FOUND": "This suggestion is no longer available. You weren't charged.",
+      "SUGGESTION_EXPIRED": "This suggestion expired before it could be accepted. You weren't charged."
     },
     "packsHeading": "Buy credits",
     "packsHelper": "One-time purchase. Purchased credits never expire.",
@@ -313,6 +315,19 @@
     "answerReady": "The answer is ready.",
     "insertFailed": "Couldn't insert into the note. It may be read-only.",
     "truncated": "The answer was cut off because it took too long. Your credit was kept for the part you received."
+  },
+  "Autocomplete": {
+    "title": "Autocomplete",
+    "toggleAria": "Autocomplete settings",
+    "tooltipOn": "Autocomplete is on",
+    "tooltipOff": "Autocomplete is off",
+    "how": "After you pause typing at the end of a paragraph, a grey suggestion appears. Press Tab to accept it, or Esc (or just keep typing) to dismiss it. Seeing a suggestion is free.",
+    "cost": "Accepting a suggestion costs {cost, plural, one {# credit} other {# credits}}.",
+    "privacy": "When it is on, the note title and up to about 2,000 characters before your cursor are sent to our AI provider to write each suggestion. Nothing is sent while it is off. Your choice is saved to your account.",
+    "paused": "Paused for a moment. It resumes on its own.",
+    "lockedAria": "Autocomplete (Premium)",
+    "lockedTooltip": "Autocomplete is a Premium feature",
+    "suggestionAnnounce": "Suggestion: {text}. Press Tab to accept or Escape to dismiss."
   },
   "Editor": {
     "placeholder": "Write something...",

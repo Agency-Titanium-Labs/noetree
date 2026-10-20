@@ -35,6 +35,21 @@ export const ACTION_KEYS: readonly ActionKey[] = [
   "linking",
 ];
 
+/**
+ * Accepted autocomplete suggestion (Phase 21, D-05): the only charge of the
+ * feature, taken by aiSuggestions.accept when the user presses Tab. It is
+ * deliberately NOT a row of ACTIONS: ACTIONS are launchable through
+ * aiRuns.beginRun (reserve, run, settle) and appear in the AI menu, while a
+ * suggestion is shown for free and debited once on accept. Keeping it apart
+ * means `beginRun("autocomplete")` stays UNKNOWN_ACTION. Same cost class as
+ * `basic`; Premium only.
+ */
+export const AUTOCOMPLETE_ACCEPT = {
+  key: "autocomplete",
+  cost: ACTIONS.basic.cost,
+  tier: "premium",
+} as const satisfies { key: string; cost: number; tier: ActionTier };
+
 export const FREE_MONTHLY_QUOTA = 30;
 export const PREMIUM_MONTHLY_QUOTA = 500;
 

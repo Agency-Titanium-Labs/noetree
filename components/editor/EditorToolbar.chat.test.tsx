@@ -32,6 +32,9 @@ vi.mock("@/i18n/routing", () => ({
 const toastInfo = vi.fn();
 vi.mock("sonner", () => ({ toast: { info: (m: string) => toastInfo(m) } }));
 
+// Phase 21: the autocomplete toggle has its own tests (and its own queries).
+vi.mock("./AutocompleteToggle", () => ({ default: () => null }));
+
 vi.mock("@/components/CreditsExhaustedDialog", () => ({
   default: ({ open }: { open: boolean }) =>
     open ? <div data-testid="credits-dialog" /> : null,

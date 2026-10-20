@@ -20,6 +20,9 @@ export const AI_ERROR_CODES = [
   "NOTE_NOT_FOUND",
   "NOTE_NOT_OWNED",
   "PURCHASED_CONTENT_EXCLUDED",
+  // Phase 21: autocomplete accept (raised before any debit)
+  "SUGGESTION_NOT_FOUND",
+  "SUGGESTION_EXPIRED",
 ] as const;
 
 export type AiErrorCode = (typeof AI_ERROR_CODES)[number];

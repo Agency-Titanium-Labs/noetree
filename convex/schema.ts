@@ -185,6 +185,51 @@ export default defineSchema({
     blockedUntil: v.optional(v.number()),
   }).index("by_clerkUserId", ["clerkUserId"]),
 
+  // Autocomplete suggestions (Phase 21). Shown for free; the only charge is
+  // aiSuggestions.accept. Invariants:
+  // - Inserted only by aiSuggestions.issue, which enforces the rate limit and
+  //   the unresolved cap in the same transaction.
+  // - status leaves "issued" exactly once (accepted | dismissed); a replayed
+  //   accept returns the stored text and never debits again.
+  // - `text` is written once, by the secret-guarded fill, never by a client.
+  // - Rows are deleted by the cleanup cron SUGGESTION_CLEANUP_GRACE_MS after
+  //   expiresAt. Holds the model's short output only, never note text.
+  aiSuggestions: defineTable({
+    clerkUserId: v.string(),
+    noteId: v.id("notes"),
+    status: v.union(
+      v.literal("issued"),
+      v.literal("accepted"),
+      v.literal("dismissed"),
+    ),
+    text: v.optional(v.string()),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+    // The 1-credit deduction of an accepted suggestion (audit only).
+    transactionId: v.optional(v.id("creditTransactions")),
+  })
+    .index("by_clerkUserId_and_status_and_expiresAt", [
+      "clerkUserId",
+      "status",
+      "expiresAt",
+    ])
+    .index("by_expiresAt", ["expiresAt"]),
+
+  // Token bucket of suggestion requests, separate from aiRateLimits (chat).
+  aiSuggestionLimits: defineTable({
+    clerkUserId: v.string(),
+    tokens: v.number(),
+    updatedAt: v.number(),
+  }).index("by_clerkUserId", ["clerkUserId"]),
+
+  // Account-level autocomplete preference (D-02), OFF when absent.
+  autocompletePrefs: defineTable({
+    clerkUserId: v.string(),
+    enabled: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_clerkUserId", ["clerkUserId"]),
+
   processedStripeEvents: defineTable({
     stripeEventId: v.string(),
     processedAt: v.number(),
