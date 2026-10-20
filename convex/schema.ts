@@ -253,6 +253,20 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_clerkUserId", ["clerkUserId"]),
 
+  // Per-user, per-UTC-day counters of issued and accepted suggestions
+  // (21-REVIEW M1): `issued` enforces SUGGEST_DAILY_CAP inside
+  // aiSuggestions.issue, `accepted` lets the operator watch the
+  // issued-to-accepted ratio (aiSuggestions.suggestionStats). Swept after
+  // SUGGEST_DAILY_RETENTION_DAYS. Holds counts only.
+  aiSuggestionDaily: defineTable({
+    clerkUserId: v.string(),
+    day: v.number(),
+    issued: v.number(),
+    accepted: v.number(),
+  })
+    .index("by_clerkUserId_and_day", ["clerkUserId", "day"])
+    .index("by_day", ["day"]),
+
   // Account-level autocomplete preference (D-02), OFF when absent.
   autocompletePrefs: defineTable({
     clerkUserId: v.string(),

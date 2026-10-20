@@ -21,6 +21,24 @@ export const MAX_UNRESOLVED_SUGGESTIONS = 5;
 export const SUGGEST_RATE_CAPACITY = 20;
 export const SUGGEST_RATE_REFILL_PER_MS = 20 / 60_000;
 
+/**
+ * Per-user ceiling on issued suggestions per UTC day (21-REVIEW M1). The
+ * suggestion text is shown before it is accepted, so without a ceiling an
+ * abusive Premium account could drive about 28.8k model calls a day through
+ * the 20/min bucket alone. Change it here only.
+ */
+export const SUGGEST_DAILY_CAP = 1_000;
+
+/** Daily counter rows older than this many UTC days are swept. */
+export const SUGGEST_DAILY_RETENTION_DAYS = 7;
+
+const DAY_MS = 86_400_000;
+
+/** UTC day number (days since the epoch) used to key the daily counters. */
+export function utcDay(nowMs: number): number {
+  return Math.floor(nowMs / DAY_MS);
+}
+
 /** A suggestion is one short sentence; the stored text is hard-capped. */
 export const SUGGESTION_MAX_CHARS = 400;
 
@@ -34,13 +52,29 @@ export type PausedReason =
   /** 20 requests per minute reached. */
   | "rate"
   /** 5 unresolved suggestions already outstanding. */
-  | "unresolved";
+  | "unresolved"
+  /** The per-user daily ceiling (SUGGEST_DAILY_CAP) was reached. */
+  | "daily";
 
-/** True when `text` can be stored as a suggestion (non-blank, bounded, one line). */
+/**
+ * Invisible characters that must never be stored or inserted: DEL and C1
+ * controls, zero-width / bidi / invisible formatting, the Unicode tag block
+ * U+E0000..U+E007F ("ASCII smuggling"), and a few separators (21-REVIEW L5).
+ */
+const HIDDEN_CHARS =
+  /[\u007f-\u009f\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff9-\ufffb\u{e0000}-\u{e007f}]/gu;
+
+/** Removes invisible characters (defense in depth on store and insert). */
+export function stripHiddenChars(text: string): string {
+  return text.replace(HIDDEN_CHARS, "");
+}
+
+/** True when `text` can be stored as a suggestion (non-blank, bounded, one line, no invisible characters). */
 export function isValidSuggestionText(text: string): boolean {
   return (
     text.trim().length > 0 &&
     text.length <= SUGGESTION_MAX_CHARS &&
-    !/[\r\n]/.test(text)
+    !/[\r\n]/.test(text) &&
+    stripHiddenChars(text) === text
   );
 }

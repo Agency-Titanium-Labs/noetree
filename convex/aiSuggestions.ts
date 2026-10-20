@@ -1,5 +1,6 @@
 import {
   internalMutation,
+  internalQuery,
   mutation,
   query,
   MutationCtx,
@@ -15,6 +16,9 @@ import {
   MAX_UNRESOLVED_SUGGESTIONS,
   SUGGESTION_CLEANUP_GRACE_MS,
   SUGGESTION_SWEEP_BATCH,
+  SUGGEST_DAILY_CAP,
+  SUGGEST_DAILY_RETENTION_DAYS,
+  utcDay,
   SUGGESTION_TTL_MS,
   SUGGEST_RATE_CAPACITY,
   SUGGEST_RATE_REFILL_PER_MS,
@@ -30,7 +34,7 @@ import { isValidInternalSecret } from "./helpers/internalSecret";
  *  issue    (user)    one transaction: auth, Premium gate, kill switch and
  *                     per-user block, account preference, note eligibility
  *                     (owner, not purchased), credit pre-check, the 5-unresolved
- *                     cap, the 20/min bucket, insert. Debits NOTHING. Beyond a
+ *                     cap, the daily cap, the 20/min bucket, insert. Debits NOTHING. Beyond a
  *                     limit it returns { status: "paused" } instead of throwing
  *                     so the editor stays quiet (D-06).
  *  (the model runs in /api/ai/complete, outside Convex)
@@ -54,6 +58,7 @@ const pausedReasonValidator = v.union(
   v.literal("credits"),
   v.literal("rate"),
   v.literal("unresolved"),
+  v.literal("daily"),
 );
 
 const issueResultValidator = v.union(
@@ -118,6 +123,38 @@ async function assertNoteEligible(
     cursor = node.parentNote;
   }
   return current;
+}
+
+async function dailyRow(
+  ctx: Pick<MutationCtx, "db">,
+  clerkUserId: string,
+  day: number,
+): Promise<Doc<"aiSuggestionDaily"> | null> {
+  return await ctx.db
+    .query("aiSuggestionDaily")
+    .withIndex("by_clerkUserId_and_day", q =>
+      q.eq("clerkUserId", clerkUserId).eq("day", day),
+    )
+    .unique();
+}
+
+async function bumpDaily(
+  ctx: Pick<MutationCtx, "db">,
+  clerkUserId: string,
+  day: number,
+  row: Doc<"aiSuggestionDaily"> | null,
+  field: "issued" | "accepted",
+): Promise<void> {
+  if (row) {
+    await ctx.db.patch(row._id, { [field]: row[field] + 1 });
+  } else {
+    await ctx.db.insert("aiSuggestionDaily", {
+      clerkUserId,
+      day,
+      issued: field === "issued" ? 1 : 0,
+      accepted: field === "accepted" ? 1 : 0,
+    });
+  }
 }
 
 export const issue = mutation({
@@ -191,6 +228,13 @@ export const issue = mutation({
       return { status: "paused", reason: "unresolved" };
     }
 
+    // 6b. Daily ceiling (21-REVIEW M1): a quiet pause until the next UTC day.
+    const day = utcDay(now);
+    const daily = await dailyRow(ctx, clerkUserId, day);
+    if ((daily?.issued ?? 0) >= SUGGEST_DAILY_CAP) {
+      return { status: "paused", reason: "daily" };
+    }
+
     // 7. Own token bucket, 20 per minute, separate from chat (AUTO-03).
     const bucket = await ctx.db
       .query("aiSuggestionLimits")
@@ -215,6 +259,8 @@ export const issue = mutation({
         updatedAt: rate.next.updatedAt,
       });
     }
+
+    await bumpDaily(ctx, clerkUserId, day, daily, "issued");
 
     const expiresAt = now + SUGGESTION_TTL_MS;
     const suggestionId = await ctx.db.insert("aiSuggestions", {
@@ -292,12 +338,31 @@ export const accept = mutation({
     if (!(await isAiEnabled(ctx))) throw new ConvexError("AI_DISABLED");
     const tier = await tierFromClerkUserId(ctx, clerkUserId);
     if (tier !== "premium") throw new ConvexError("PREMIUM_REQUIRED");
+    // The per-user operator block applies to accept as well (21-REVIEW L4).
+    const block = await ctx.db
+      .query("aiRateLimits")
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))
+      .unique();
+    if (block?.blockedUntil !== undefined && block.blockedUntil > Date.now()) {
+      throw new ConvexError("AI_DISABLED");
+    }
 
     // 3. Only a live, filled, unresolved suggestion can be accepted.
     if (row.status === "dismissed" || row.expiresAt <= Date.now()) {
       throw new ConvexError("SUGGESTION_EXPIRED");
     }
     if (row.text === undefined) throw new ConvexError("SUGGESTION_NOT_FOUND");
+
+    // 3b. The note may have become purchased (or moved under a purchased
+    //     branch) since issue: re-check eligibility before charging (L4).
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", q =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
+    if (!user) throw new ConvexError("UNAUTHENTICATED");
+    await assertNoteEligible(ctx, user._id, row.noteId);
 
     // 4. Debit exactly once. INSUFFICIENT_CREDITS throws and rolls the whole
     //    transaction back: the row stays "issued", nothing is charged.
@@ -312,6 +377,14 @@ export const accept = mutation({
       resolvedAt: Date.now(),
       transactionId: draw.transactionId,
     });
+    const day = utcDay(Date.now());
+    await bumpDaily(
+      ctx,
+      clerkUserId,
+      day,
+      await dailyRow(ctx, clerkUserId, day),
+      "accepted",
+    );
     return { text: row.text, cost: AUTOCOMPLETE_ACCEPT.cost, replayed: false };
   },
 });
@@ -350,6 +423,14 @@ export const sweepSuggestions = internalMutation({
       .withIndex("by_expiresAt", q => q.lt("expiresAt", cutoff))
       .take(SUGGESTION_SWEEP_BATCH);
     for (const row of stale) await ctx.db.delete("aiSuggestions", row._id);
+    const oldestDay = utcDay(Date.now()) - SUGGEST_DAILY_RETENTION_DAYS;
+    const oldCounters = await ctx.db
+      .query("aiSuggestionDaily")
+      .withIndex("by_day", q => q.lt("day", oldestDay))
+      .take(SUGGESTION_SWEEP_BATCH);
+    for (const row of oldCounters) {
+      await ctx.db.delete("aiSuggestionDaily", row._id);
+    }
     if (stale.length === SUGGESTION_SWEEP_BATCH) {
       await ctx.scheduler.runAfter(
         0,
@@ -358,6 +439,61 @@ export const sweepSuggestions = internalMutation({
       );
     }
     return stale.length;
+  },
+});
+
+/**
+ * Operator view of the issued-to-accepted ratio for one UTC day (default
+ * today): totals plus the heaviest users. A high issued count with almost no
+ * accepted suggestions is the signature of someone using /api/ai/complete as
+ * a free completion endpoint (21-REVIEW M1). Run it from the Convex
+ * dashboard; internal, so not callable from a client.
+ */
+export const suggestionStats = internalQuery({
+  args: { day: v.optional(v.number()) },
+  returns: v.object({
+    day: v.number(),
+    users: v.number(),
+    issued: v.number(),
+    accepted: v.number(),
+    acceptRatio: v.union(v.number(), v.null()),
+    top: v.array(
+      v.object({
+        clerkUserId: v.string(),
+        issued: v.number(),
+        accepted: v.number(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const day = args.day ?? utcDay(Date.now());
+    // One row per active user per day; bounded read.
+    const rows = await ctx.db
+      .query("aiSuggestionDaily")
+      .withIndex("by_day", q => q.eq("day", day))
+      .take(5_000);
+    let issued = 0;
+    let accepted = 0;
+    for (const r of rows) {
+      issued += r.issued;
+      accepted += r.accepted;
+    }
+    const top = [...rows]
+      .sort((a, b) => b.issued - a.issued)
+      .slice(0, 10)
+      .map(r => ({
+        clerkUserId: r.clerkUserId,
+        issued: r.issued,
+        accepted: r.accepted,
+      }));
+    return {
+      day,
+      users: rows.length,
+      issued,
+      accepted,
+      acceptRatio: issued > 0 ? accepted / issued : null,
+      top,
+    };
   },
 });
 
