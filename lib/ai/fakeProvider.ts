@@ -4,9 +4,22 @@
  * route (Phase 19) and implements the same interface.
  */
 
+export type ChatTurn = { role: "user" | "assistant"; content: string };
+
+/**
+ * What a provider receives. `prompt` is always set (the last user message);
+ * chat adds a system instruction and the capped history (Phase 19).
+ */
+export type ProviderInput = {
+  prompt: string;
+  system?: string;
+  /** Prior turns plus the current one, oldest first. */
+  messages?: ChatTurn[];
+};
+
 export interface LlmProvider {
   /** Yields output chunks. Must stop and throw/return when `signal` aborts. */
-  stream(input: { prompt: string }, signal: AbortSignal): AsyncIterable<string>;
+  stream(input: ProviderInput, signal: AbortSignal): AsyncIterable<string>;
 }
 
 export type FakeMode =

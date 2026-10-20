@@ -19,6 +19,18 @@ import CommentsPanel from "./CommentsPanel";
 import HistoryButton from "./HistoryButton";
 import HistoryPanel from "./HistoryPanel";
 import VersionPreviewBanner from "./VersionPreviewBanner";
+import dynamic from "next/dynamic";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "./ui/resizable";
+
+// Loaded on first open: keeps the AI SDK and the Markdown renderer out of the
+// initial editor bundle.
+const AiChatPanel = dynamic(() => import("./editor/AiChatPanel"), {
+  ssr: false,
+});
 
 function findInTree(id: string, note: NoteTree): NoteTree | null {
   if (note._id === id) return note;
@@ -35,15 +47,11 @@ export default function NoteContent() {
   const { selectedNote, tree, onSelectNote } = useTreeContext();
   const tListing = useTranslations("ListingForm");
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isListingOpen, setIsListingOpen] = useState(false);
 
-  const {
-    editor,
-    saveStatus,
-    getCurrentContent,
-    previewVersion,
-    exitPreview,
-  } = useEditorContext();
+  const { editor, saveStatus, getCurrentContent, previewVersion, exitPreview } =
+    useEditorContext();
 
   const searchParams = useSearchParams();
   const params = useParams();
@@ -97,7 +105,7 @@ export default function NoteContent() {
     [searchParams, router, pathname],
   );
 
-  return (
+  const content = (
     <div className="min-h-full flex flex-col gap-2">
       <div className="flex items-center gap-4">
         <ConditionChecker condition={!selectedNote}>
@@ -171,7 +179,7 @@ export default function NoteContent() {
       </div>
       <div className="grow flex flex-col gap-4">
         <div className="flex flex-col gap-2 grow">
-          <EditorToolbar />
+          <EditorToolbar onOpenChat={() => setIsChatOpen(true)} />
           <ConditionChecker condition={!selectedNote}>
             <div className="flex-1 p-4 flex flex-col gap-4 border rounded-md">
               <Skeleton className="w-56 h-8 mt-4" />
@@ -227,4 +235,27 @@ export default function NoteContent() {
       )}
     </div>
   );
+
+  // The AI chat docks UNDER the note (19-CONTEXT D-01): the note stays
+  // visible and editable, and the split is resizable.
+  if (isChatOpen && selectedNote) {
+    return (
+      <ResizablePanelGroup
+        orientation="vertical"
+        className="h-[calc(100dvh-7rem)] min-h-[480px]"
+      >
+        <ResizablePanel defaultSize="60%" minSize="25%">
+          <div className="h-full overflow-auto pr-1">{content}</div>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize="40%" minSize="25%">
+          <AiChatPanel
+            noteId={selectedNote._id}
+            onClose={() => setIsChatOpen(false)}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    );
+  }
+  return content;
 }

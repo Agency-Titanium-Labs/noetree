@@ -41,7 +41,12 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/convex/_generated/api";
 import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
 
-export default function EditorToolbar() {
+interface EditorToolbarProps {
+  /** Opens the AI chat panel (the free `basic` action, Phase 19). */
+  onOpenChat?: () => void;
+}
+
+export default function EditorToolbar({ onOpenChat }: EditorToolbarProps = {}) {
   const t = useTranslations("Editor");
   const tCredits = useTranslations("AiCredits");
   const { editor } = useEditorContext();
@@ -67,11 +72,11 @@ export default function EditorToolbar() {
   );
   const aiEnabled = availability?.enabled ?? true;
 
-  // Phase 17 has no LLM yet, so launching an action never debits (the old
-  // placeholder charged for nothing). A Free user picking a Premium action
+  // Opening the menu entry never debits. A Free user picking a Premium action
   // gets the upsell invitation (AIF-04); the server also refuses it with
-  // PREMIUM_REQUIRED before any ledger write. The real launch (aiRuns.beginRun
-  // then the model call) arrives with the chat phase.
+  // PREMIUM_REQUIRED before any ledger write. The `basic` action opens the
+  // chat (Phase 19); each message sent there is its own metered run
+  // (aiRuns.beginRun in /api/ai/chat). Other actions are not built yet.
   const handleAiAction = (actionKey: ActionKey) => {
     if (ACTIONS[actionKey].tier === "premium" && tier !== "premium") {
       setUpsellAction(actionKey);
@@ -79,6 +84,10 @@ export default function EditorToolbar() {
     }
     if (total !== undefined && total < ACTIONS[actionKey].cost) {
       setCreditsDialogOpen(true);
+      return;
+    }
+    if (actionKey === "basic" && onOpenChat) {
+      onOpenChat();
       return;
     }
     toast.info(tCredits("comingSoon"));

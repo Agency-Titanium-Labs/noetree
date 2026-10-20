@@ -230,7 +230,16 @@
       "CONTEXT_TOO_DEEP": "This note is nested too deeply to send to the AI. Move it closer to the top level. You weren't charged.",
       "NOTE_NOT_FOUND": "This note no longer exists. You weren't charged.",
       "NOTE_NOT_OWNED": "AI can only be used on your own notes. You weren't charged.",
-      "PURCHASED_CONTENT_EXCLUDED": "Purchased marketplace content can't be sent to the AI. You weren't charged."
+      "PURCHASED_CONTENT_EXCLUDED": "Purchased marketplace content can't be sent to the AI. You weren't charged.",
+      "INSUFFICIENT_CREDITS": "You don't have enough AI credits for this message. You weren't charged.",
+      "AI_DISABLED": "AI is temporarily switched off. Please try again later. You weren't charged.",
+      "RATE_LIMITED": "Too many requests. Wait a few seconds and try again. You weren't charged.",
+      "TOO_MANY_RUNS": "Too many AI requests are already running. Wait for them to finish. You weren't charged.",
+      "PREMIUM_REQUIRED": "This needs a Premium plan. You weren't charged.",
+      "UNAUTHENTICATED": "Your session has expired. Sign in again. You weren't charged.",
+      "PROVIDER_ERROR": "The AI couldn't finish this answer.",
+      "REPLAYED_RUN": "This message was already sent. Send it again to start a new one.",
+      "GENERIC": "Something went wrong. Try again."
     },
     "packsHeading": "Buy credits",
     "packsHelper": "One-time purchase. Purchased credits never expire.",
@@ -245,6 +254,52 @@
       "decouverte": "Découverte",
       "boost": "Boost",
       "pro": "Pro"
+    }
+  },
+  "AiChat": {
+    "title": "AI chat",
+    "close": "Close chat",
+    "emptyTitle": "Ask the AI",
+    "emptyBody": "Ask a question or request a draft. Your conversation isn't saved: it disappears when you leave this page.",
+    "costHint": "1 credit per message",
+    "messagesAria": "Conversation",
+    "inputAria": "Message to the AI",
+    "placeholder": "Ask the AI...",
+    "send": "Send",
+    "stop": "Stop",
+    "copy": "Copy",
+    "copied": "Copied",
+    "insert": "Insert in note",
+    "inserted": "Inserted into your note.",
+    "retry": "Retry",
+    "userLabel": "You",
+    "assistantLabel": "AI",
+    "writing": "Writing...",
+    "buyCredits": "Buy credits",
+    "refunded": "The answer couldn't be completed, so your credit was refunded.",
+    "waitHint": "Try again in about {seconds, plural, one {# second} other {# seconds}}.",
+    "context": {
+      "label": "Context",
+      "none": "No context",
+      "note": "This note, its parents and sub-notes",
+      "loading": "Checking what would be sent...",
+      "refresh": "Refresh",
+      "included": "Will be sent",
+      "role": {
+        "current": "Current note",
+        "ancestor": "Parent",
+        "child": "Sub-note"
+      },
+      "shortened": "shortened",
+      "untitled": "Untitled",
+      "dropped": "Left out: {count, plural, one {# note} other {# notes}}",
+      "reason": {
+        "budget": "no room left",
+        "not_owned": "not yours",
+        "purchased": "purchased content",
+        "missing": "missing",
+        "child_cap": "too many sub-notes"
+      }
     }
   },
   "Editor": {
