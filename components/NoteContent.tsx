@@ -55,7 +55,12 @@ export default function NoteContent() {
   // Phase 22: Related notes panel, docked in the same slot as the chat (one
   // at a time). It auto-starts only when opened from the AI menu.
   const [isLinksOpen, setIsLinksOpen] = useState(false);
-  const [chatMode, setChatMode] = useState<"chat" | "tree">("chat");
+  // `seq` changes on every menu request so the panel re-syncs its mode even
+  // when it is already open (review M3).
+  const [chatRequest, setChatRequest] = useState<{
+    mode: "chat" | "tree";
+    seq: number;
+  }>({ mode: "chat", seq: 0 });
   const [isListingOpen, setIsListingOpen] = useState(false);
 
   const { editor, saveStatus, getCurrentContent, previewVersion, exitPreview } =
@@ -198,12 +203,16 @@ export default function NoteContent() {
         <div className="flex flex-col gap-2 grow">
           <EditorToolbar
             onOpenChat={mode => {
-              setChatMode(mode ?? "chat");
+              setChatRequest(prev => ({
+                mode: mode ?? "chat",
+                seq: prev.seq + 1,
+              }));
               setIsLinksOpen(false);
               setIsChatOpen(true);
             }}
             onOpenLinks={() => {
-              setIsChatOpen(false);
+              // The chat is NOT closed: it stays mounted (hidden) so an
+              // unapplied, already charged proposal survives (review M3).
               setIsLinksOpen(true);
             }}
           />
@@ -278,7 +287,7 @@ export default function NoteContent() {
   // the editor mounted and its state (selection, undo history, unsaved text)
   // survives (review M1).
   const chatOpen = isChatOpen && !!selectedNote;
-  const linksOpen = isLinksOpen && !!selectedNote && !chatOpen;
+  const linksOpen = isLinksOpen && !!selectedNote;
   const dockOpen = chatOpen || linksOpen;
   return (
     <ResizablePanelGroup
@@ -292,33 +301,36 @@ export default function NoteContent() {
       >
         <div className="h-full overflow-auto pr-1">{content}</div>
       </ResizablePanel>
-      {linksOpen && selectedNote ? (
+      {dockOpen && selectedNote ? (
         <>
           <ResizableHandle withHandle />
-          <ResizablePanel id="links" defaultSize="40%" minSize="25%">
-            {/* keyed by note, like the chat: results never re-point */}
-            <RelatedNotesPanel
-              key={selectedNote._id}
-              noteId={selectedNote._id}
-              autoStart
-              onOpenNote={openLinkedNote}
-              onClose={() => setIsLinksOpen(false)}
-            />
-          </ResizablePanel>
-        </>
-      ) : null}
-      {chatOpen && selectedNote ? (
-        <>
-          <ResizableHandle withHandle />
-          <ResizablePanel id="chat" defaultSize="40%" minSize="25%">
-            {/* keyed by note: a conversation never re-points to another
-                note when the selection changes (review M2) */}
-            <AiChatPanel
-              key={selectedNote._id}
-              noteId={selectedNote._id}
-              initialMode={chatMode}
-              onClose={() => setIsChatOpen(false)}
-            />
+          <ResizablePanel id="dock" defaultSize="40%" minSize="25%">
+            {linksOpen ? (
+              <div className="h-full">
+                {/* keyed by note, like the chat: results never re-point */}
+                <RelatedNotesPanel
+                  key={selectedNote._id}
+                  noteId={selectedNote._id}
+                  autoStart
+                  onOpenNote={openLinkedNote}
+                  onClose={() => setIsLinksOpen(false)}
+                />
+              </div>
+            ) : null}
+            {chatOpen ? (
+              // Stays mounted while the links panel is shown, only hidden.
+              <div hidden={linksOpen} className="h-full">
+                {/* keyed by note: a conversation never re-points to another
+                    note when the selection changes (review M2) */}
+                <AiChatPanel
+                  key={selectedNote._id}
+                  noteId={selectedNote._id}
+                  initialMode={chatRequest.mode}
+                  requestedMode={chatRequest}
+                  onClose={() => setIsChatOpen(false)}
+                />
+              </div>
+            ) : null}
           </ResizablePanel>
         </>
       ) : null}

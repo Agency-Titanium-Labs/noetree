@@ -56,7 +56,12 @@ export type OutlineResult = {
   refs: Array<{ ref: string; noteId: string }>;
   included: number;
   omitted: number;
+  /** Notes NOT read because of the read cap or the width cap. */
+  unread: number;
 };
+
+/** Entries plus how many child notes were left unread by the caps. */
+export type OutlineLoad = { entries: OutlineEntry[]; unread: number };
 
 function lineFor(e: OutlineEntry, excerptMax: number): string {
   const title = escapeContextText(
@@ -78,11 +83,16 @@ function lineFor(e: OutlineEntry, excerptMax: number): string {
 export function serializeOutline(
   entries: readonly OutlineEntry[],
   budget: number = OUTLINE_BUDGET_CHARS,
+  unread = 0,
 ): OutlineResult {
   for (const level of LEVELS) {
     const kept = entries.filter(e => e.depth <= level.depth || e.isOpen);
     const lines = kept.map(e => lineFor(e, level.excerpt));
-    const header = `<noetree-outline version="1" notes="${kept.length}" omitted="${entries.length - kept.length}">\n${OUTLINE_STATEMENT}\n`;
+    const unreadNote =
+      unread > 0
+        ? `WARNING: this outline is INCOMPLETE. At least ${unread} more note(s) were not read because the tree is larger than the read limit; do not assume a topic is absent just because it is not listed.\n`
+        : "";
+    const header = `<noetree-outline version="1" notes="${kept.length}" omitted="${entries.length - kept.length}" unread="${unread}">\n${OUTLINE_STATEMENT}\n${unreadNote}`;
     const footer = "</noetree-outline>";
     const total =
       header.length + footer.length + lines.reduce((n, l) => n + l.length, 0);
@@ -92,6 +102,7 @@ export function serializeOutline(
         refs: kept.map(e => ({ ref: e.ref, noteId: e.noteId })),
         included: kept.length,
         omitted: entries.length - kept.length,
+        unread,
       };
     }
   }
@@ -102,14 +113,17 @@ type Reader = Pick<QueryCtx | MutationCtx, "db">;
 
 /**
  * Reads at most OUTLINE_MAX_NODES_READ notes: the ancestor chain of the open
- * note, then a depth-first walk of the top owned ancestor's subtree.
- * Returns entries in outline (tree) order.
+ * note, then a BREADTH-FIRST walk of the top owned ancestor's subtree, so a
+ * large tree is covered fairly level by level instead of the first branch
+ * eating the budget (review M2). The open note and its ancestors are always
+ * kept. Entries come back in outline (tree, pre-order) order; `unread` counts
+ * the child notes skipped by the read cap or the per-note width cap.
  */
 export async function loadOutlineEntries(
   ctx: Reader,
   requesterId: Id<"users">,
   openId: Id<"notes">,
-): Promise<OutlineEntry[]> {
+): Promise<OutlineLoad> {
   let reads = 0;
   const read = async (id: Id<"notes">): Promise<Doc<"notes"> | null> => {
     if (reads >= OUTLINE_MAX_NODES_READ) return null;
@@ -126,6 +140,7 @@ export async function loadOutlineEntries(
 
   // Walk up to the top of the tree; every ancestor is checked, owned or not.
   let top: Doc<"notes"> = open;
+  const chain = new Map<string, Doc<"notes">>([[open._id, open]]);
   const seen = new Set<string>([open._id]);
   let hops = 0;
   while (top.parentNote !== undefined) {
@@ -146,35 +161,60 @@ export async function loadOutlineEntries(
     // A shared-in tree: stop at the highest note the requester owns.
     if (parent.owner !== requesterId) break;
     top = parent;
+    chain.set(parent._id, parent);
   }
 
+  // Breadth-first by level. Chain notes were already read (and counted).
+  type Node = { note: Doc<"notes">; depth: number; children: Node[] };
+  const rootNode: Node = { note: top, depth: 0, children: [] };
+  const visited = new Set<string>([top._id]);
+  let unread = 0;
+  let level: Node[] = [rootNode];
+  while (level.length > 0) {
+    const next: Node[] = [];
+    for (const node of level) {
+      if (node.depth >= LEVELS[0].depth) continue;
+      const all = node.note.childNotes ?? [];
+      unread += Math.max(0, all.length - OUTLINE_MAX_WIDTH);
+      for (const childId of all.slice(0, OUTLINE_MAX_WIDTH)) {
+        if (visited.has(childId)) continue;
+        const cached = chain.get(childId);
+        const child = cached ?? (await read(childId));
+        if (!child) {
+          unread += 1;
+          continue;
+        }
+        if (child.parentNote !== node.note._id) continue;
+        if (child.owner !== requesterId) continue;
+        if (isPurchasedNote(child)) continue;
+        visited.add(child._id);
+        const childNode: Node = {
+          note: child,
+          depth: node.depth + 1,
+          children: [],
+        };
+        node.children.push(childNode);
+        next.push(childNode);
+      }
+    }
+    level = next;
+  }
+
+  // Pre-order flatten so refs and indentation follow the tree.
   const entries: OutlineEntry[] = [];
-  const visited = new Set<string>();
-  const walk = async (note: Doc<"notes">, depth: number): Promise<void> => {
-    if (visited.has(note._id)) return;
-    visited.add(note._id);
+  const flatten = (node: Node): void => {
     entries.push({
       ref: `n${entries.length + 1}`,
-      noteId: note._id,
-      depth,
-      title: note.title,
-      excerpt: extractNoteText(note.content, 300),
-      isOpen: note._id === open._id,
+      noteId: node.note._id,
+      depth: node.depth,
+      title: node.note.title,
+      excerpt: extractNoteText(node.note.content, 300),
+      isOpen: node.note._id === open._id,
     });
-    if (depth >= LEVELS[0].depth) return;
-    const ids = (note.childNotes ?? []).slice(0, OUTLINE_MAX_WIDTH);
-    for (const childId of ids) {
-      if (reads >= OUTLINE_MAX_NODES_READ) return;
-      const child = await read(childId);
-      if (!child) continue;
-      if (child.parentNote !== note._id) continue;
-      if (child.owner !== requesterId) continue;
-      if (isPurchasedNote(child)) continue;
-      await walk(child, depth + 1);
-    }
+    for (const c of node.children) flatten(c);
   };
-  await walk(top, 0);
-  return entries;
+  flatten(rootNode);
+  return { entries, unread };
 }
 
 export async function buildTreeOutline(
@@ -182,6 +222,10 @@ export async function buildTreeOutline(
   requesterId: Id<"users">,
   openId: Id<"notes">,
 ): Promise<OutlineResult> {
-  const entries = await loadOutlineEntries(ctx, requesterId, openId);
-  return serializeOutline(entries);
+  const { entries, unread } = await loadOutlineEntries(
+    ctx,
+    requesterId,
+    openId,
+  );
+  return serializeOutline(entries, OUTLINE_BUDGET_CHARS, unread);
 }

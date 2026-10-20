@@ -16,7 +16,10 @@ interface AiTreePreviewProps {
 }
 
 /**
- * Checkbox tree of an AI proposal (TREE-03). Nothing here creates a note: it
+ * Checkbox tree of an AI proposal (TREE-03). Rendered as a plain list of
+ * labelled checkboxes (the level is read out in each label) instead of an ARIA
+ * tree: no tree keyboard model is promised, every control is a native
+ * checkbox or button reachable with Tab (review M4). Nothing here creates a note: it
  * only shows the proposal and reports toggles. Unchecking a parent unchecks
  * its descendants (the rule lives in lib/ai/treeClient.toggleNode). Node
  * content goes through the same sanitized markdown renderer as chat answers
@@ -41,7 +44,7 @@ export default function AiTreePreview({
     });
 
   return (
-    <ul role="tree" aria-label={t("treeAria")} className="flex flex-col gap-1">
+    <ul aria-label={t("treeAria")} className="flex flex-col gap-1">
       {ordered.map(node => {
         const level = depthOf(nodes, node.key);
         const isOpen = open.has(node.key);
@@ -50,9 +53,6 @@ export default function AiTreePreview({
         return (
           <li
             key={node.key}
-            role="treeitem"
-            aria-level={level}
-            aria-selected={checked}
             style={{ marginLeft: `${(level - 1) * 16}px` }}
             className="flex flex-col gap-1"
           >

@@ -9,24 +9,30 @@ import { internal } from "./_generated/api";
 import { v, ConvexError } from "convex/values";
 import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
+import { isNoteOrAncestorPurchased } from "./helpers/listings";
 import {
-  isNoteOrAncestorPurchased,
-  unpublishListingForNote,
-} from "./helpers/listings";
-import { deleteShareLinkForNote } from "./helpers/sharing";
-import { deleteCommentsForNote } from "./helpers/commentAccess";
-import { deleteLinkDataForNote } from "./helpers/linkCleanup";
+  ancestorHasPurchaseGrant,
+  cleanupDeletedNote,
+  noteHasPurchaseShare,
+} from "./helpers/noteDeletion";
 import { planCopy, writeCopy } from "./helpers/delivery";
-import {
-  deleteVersionsForNote,
-  writeNoteContent,
-} from "./helpers/noteVersions";
+import { writeNoteContent } from "./helpers/noteVersions";
 import {
   getInheritedPermission,
   getUserPermission,
 } from "./helpers/permissions";
 
 type Notes = Doc<"notes">;
+
+/** AI-batch bookkeeping (Phase 20) is server-only; never sent to clients. */
+function stripAiBatch<T extends Notes>(
+  note: T,
+): Omit<T, "aiBatchId" | "aiBatchAt"> {
+  const { aiBatchId: _id, aiBatchAt: _at, ...rest } = note;
+  void _id;
+  void _at;
+  return rest;
+}
 
 interface NotesToSend extends Omit<Notes, "childNotes"> {
   childNotes: NotesToSend[] | Id<"notes">[] | undefined;
@@ -157,7 +163,7 @@ export const getTreeById = query({
 
     //step 5 - map current notes to be as NotesToSend
     const noteToSend: NotesToSend = {
-      ...note,
+      ...stripAiBatch(note),
       childNotes: topSeesChildren ? note.childNotes || [] : [],
       shareId,
       isShared,
@@ -376,7 +382,7 @@ export const getTreesByMe = query({
         .collect();
       for (const child of children) {
         sharedNotesDescendants.push({
-          ...child,
+          ...stripAiBatch(child),
           shareId: parentShareId,
           isShared: true,
           isPurchased,
@@ -453,7 +459,7 @@ export const getTreesByMe = query({
         );
         if (!seesChildren) hiddenChildren.add(note._id);
         return {
-          ...note,
+          ...stripAiBatch(note),
           childNotes: seesChildren ? note.childNotes || [] : [],
           nestedNotesCount: seesChildren ? countDescendants(note._id) : 0,
           shareId,
@@ -710,33 +716,14 @@ export const deleteNote = mutation({
     }
 
     // D-05: read-only sales must not lose their source. Pre-scan, no writes.
-    // Ancestors: a purchase share with scope other than "note" covers this
-    // subtree. Undefined sorts lowest in index order, so descending yields every
-    // purchase-share row before any manual row (see shareIndexes.test.ts).
-    let ancestorId = rootNote.parentNote;
-    for (let hops = 0; ancestorId && hops < 64; hops++) {
-      for await (const share of ctx.db
-        .query("shares")
-        .withIndex("by_note_and_purchaseId", q => q.eq("noteId", ancestorId!))
-        .order("desc")) {
-        if (share.purchaseId === undefined) break;
-        if (share.scope !== "note") {
-          throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
-        }
-      }
-      const ancestor: Doc<"notes"> | null = await ctx.db.get(ancestorId);
-      ancestorId = ancestor?.parentNote;
+    if (await ancestorHasPurchaseGrant(ctx, rootNote.parentNote)) {
+      throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
     }
     // Subtree: any note carrying a purchase share blocks deletion.
     const queue: Id<"notes">[] = [args.id];
     while (queue.length > 0) {
       const current = queue.shift()!;
-      const top = await ctx.db
-        .query("shares")
-        .withIndex("by_note_and_purchaseId", q => q.eq("noteId", current))
-        .order("desc")
-        .first();
-      if (top && top.purchaseId !== undefined) {
+      if (await noteHasPurchaseShare(ctx, current)) {
         throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
       }
       for await (const child of ctx.db
@@ -757,23 +744,7 @@ export const deleteNote = mutation({
       }
       await ctx.db.delete(noteId);
 
-      // Delete any shares associated with the deleted note
-      const shares = await ctx.db
-        .query("shares")
-        .withIndex("by_note", q => q.eq("noteId", noteId))
-        .collect();
-      for (const share of shares) {
-        await ctx.db.delete(share._id);
-      }
-
-      // D-18: auto-unpublish (never delete) the listing for every deleted note — same transaction; purchases keep pointing at the row (D-16)
-      await unpublishListingForNote(ctx, noteId);
-      await deleteShareLinkForNote(ctx, noteId);
-      await deleteCommentsForNote(ctx, noteId);
-      await deleteVersionsForNote(ctx, noteId);
-      // Phase 22 (LINK-04): embedding, links in both directions, suggestions
-      // and ignored pairs. Bounded; reschedules itself when a batch is full.
-      await deleteLinkDataForNote(ctx, noteId);
+      await cleanupDeletedNote(ctx, noteId);
     };
 
     if (rootNote.parentNote) {

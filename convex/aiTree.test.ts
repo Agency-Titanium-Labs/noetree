@@ -15,13 +15,24 @@ import {
   runs,
   seedCredits,
 } from "../test-utils/aiHarness";
-import { seedUser, seedTree, asUser } from "../test-utils/convexSeed";
+import {
+  seedUser,
+  seedTree,
+  asUser,
+  seedListing,
+  preparePendingPurchase,
+} from "../test-utils/convexSeed";
 import {
   PERSONAL_CONTEXT_MAX,
   TREE_MAX_READS,
   TREE_UNDO_WINDOW_MS,
   type ProposalNode,
 } from "./helpers/aiTreeProposal";
+import {
+  OUTLINE_MAX_NODES_READ,
+  buildTreeOutline,
+  loadOutlineEntries,
+} from "./helpers/aiTreeOutline";
 
 const modules = (
   import.meta as unknown as {
@@ -70,6 +81,19 @@ async function setup(opts: { premium?: boolean; monthly?: number } = {}) {
     ],
   });
   return { t, userId, rootId, ids };
+}
+
+async function connectSeller(t: T) {
+  await t.run(async ctx => {
+    await ctx.db.insert("connectAccounts", {
+      clerkUserId: USER,
+      stripeAccountId: "acct_seller",
+      status: "active",
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      detailsSubmitted: true,
+    });
+  });
 }
 
 const N = (
@@ -398,6 +422,64 @@ describe("tree action gate and outline (TREE-02)", () => {
     ).toBe("CONTEXT_TOO_LARGE");
     expect(await balances(t)).toMatchObject({ monthly: 50 });
     expect(await runs(t)).toHaveLength(0);
+  });
+});
+
+describe("outline on large trees (review M2)", () => {
+  async function bigTree() {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t, { key: USER });
+    const branches = Array.from({ length: 10 }, (_, b) => ({
+      title: `B${b}`,
+      content: doc("x"),
+      children: Array.from({ length: 30 }, (_, c) => ({
+        title: `B${b}c${c}`,
+        content: doc("y"),
+      })),
+    }));
+    const { rootId, ids } = await seedTree(t, userId, {
+      title: "Big",
+      content: doc("r"),
+      children: branches,
+    });
+    return { t, userId, rootId, ids };
+  }
+
+  it("covers every top-level branch of a 300+ note tree and reports the unread rest", async () => {
+    const { t, userId, rootId } = await bigTree();
+    const { entries, unread } = await t.run(ctx =>
+      loadOutlineEntries(ctx, userId, rootId),
+    );
+    expect(entries.length).toBeLessThanOrEqual(OUTLINE_MAX_NODES_READ);
+    const titles = entries.map(e => e.title);
+    for (let b = 0; b < 10; b++) expect(titles).toContain(`B${b}`);
+    // Pre-order: refs and depth follow the tree.
+    expect(entries[0]).toMatchObject({ ref: "n1", depth: 0 });
+    expect(unread).toBeGreaterThan(0);
+  });
+
+  it("tells the model the outline is incomplete", async () => {
+    const { t, userId, rootId } = await bigTree();
+    const out = await t.run(ctx => buildTreeOutline(ctx, userId, rootId));
+    expect(out.unread).toBeGreaterThan(0);
+    expect(out.serialized).toContain("INCOMPLETE");
+    expect(out.serialized).toContain(`unread="${out.unread}"`);
+  });
+
+  it("a small tree reports nothing unread", async () => {
+    const { t, userId, rootId } = await setup();
+    const out = await t.run(ctx => buildTreeOutline(ctx, userId, rootId));
+    expect(out.unread).toBe(0);
+    expect(out.serialized).not.toContain("INCOMPLETE");
+  });
+
+  it("keeps the open note even when it sits deep in a big tree", async () => {
+    const { t, userId, ids } = await bigTree();
+    const deepOpen = ids[ids.length - 1];
+    const { entries } = await t.run(ctx =>
+      loadOutlineEntries(ctx, userId, deepOpen),
+    );
+    expect(entries.some(e => e.isOpen)).toBe(true);
   });
 });
 
@@ -789,6 +871,127 @@ describe("undoAiTree (TREE-05)", () => {
     const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
     expect(out.ok).toBe(false);
     expect(await noteCount(t)).toBe(4);
+  });
+
+  it("replaying an undone batch is refused, not recreated (L1)", async () => {
+    const { t, rootId } = await setup();
+    await apply(t, rootId, [N("a", null)]);
+    await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(await rejects(apply(t, rootId, [N("a", null)]))).toBe(
+      "BATCH_ALREADY_UNDONE",
+    );
+    expect(await noteCount(t)).toBe(3);
+  });
+
+  it("unpublishes the listing of a deleted batch note (M1)", async () => {
+    const { t, userId, rootId } = await setup();
+    const res = await apply(t, rootId, [N("a", null)]);
+    const listingId = await seedListing(t, {
+      noteId: res.noteIds[0],
+      sellerId: userId,
+      sellerKey: USER,
+    });
+    const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(out).toEqual({ ok: true, deleted: 1 });
+    const listing = await t.run(async ctx => ctx.db.get("listings", listingId));
+    expect(listing?.status).toBe("unpublished");
+  });
+
+  it("removes embedding and links of deleted notes (M1)", async () => {
+    const { t, userId, rootId, ids } = await setup();
+    const res = await apply(t, rootId, [N("a", null)]);
+    const gone = res.noteIds[0];
+    await t.run(async ctx => {
+      await ctx.db.insert("noteEmbeddings", {
+        owner: userId,
+        noteId: gone,
+        contentHash: "h",
+        model: "m",
+        embedding: new Array(768).fill(0),
+        updatedAt: 1,
+      });
+      await ctx.db.insert("noteLinks", {
+        owner: userId,
+        noteA: ids[1],
+        noteB: gone,
+        createdAt: 1,
+      });
+    });
+    const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(out).toEqual({ ok: true, deleted: 1 });
+    expect(
+      await t.run(async ctx => ctx.db.query("noteEmbeddings").collect()),
+    ).toHaveLength(0);
+    expect(
+      await t.run(async ctx => ctx.db.query("noteLinks").collect()),
+    ).toHaveLength(0);
+  });
+
+  it("refuses and keeps everything when a batch note has a purchase share (M1)", async () => {
+    const { t, userId, rootId } = await setup();
+    const res = await apply(t, rootId, [N("a", null)]);
+    const buyerId = await seedUser(t, { key: "buyer", email: "buyer@x.com" });
+    const listingId = await seedListing(t, {
+      noteId: res.noteIds[0],
+      sellerId: userId,
+      sellerKey: USER,
+    });
+    await connectSeller(t);
+    const purchaseId = await preparePendingPurchase(t, "buyer", listingId);
+    const shareId = await t.run(async ctx =>
+      ctx.db.insert("shares", {
+        noteId: res.noteIds[0],
+        userId: buyerId,
+        email: "buyer@x.com",
+        role: "view",
+        purchaseId,
+        scope: "note",
+      }),
+    );
+    const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(out).toEqual({ ok: false, blockers: ["Title a"] });
+    expect(
+      await t.run(async ctx => ctx.db.get("shares", shareId)),
+    ).not.toBeNull();
+    expect(
+      await t.run(async ctx => ctx.db.get("notes", res.noteIds[0])),
+    ).not.toBeNull();
+  });
+
+  it("refuses when the root now carries a subtree purchase grant (M1)", async () => {
+    const { t, userId, rootId } = await setup();
+    await apply(t, rootId, [N("a", null)]);
+    const buyerId = await seedUser(t, { key: "buyer", email: "buyer@x.com" });
+    const listingId = await seedListing(t, {
+      noteId: rootId,
+      sellerId: userId,
+      sellerKey: USER,
+      scope: "subtree",
+    });
+    await connectSeller(t);
+    const purchaseId = await preparePendingPurchase(t, "buyer", listingId);
+    await t.run(async ctx =>
+      ctx.db.insert("shares", {
+        noteId: rootId,
+        userId: buyerId,
+        email: "buyer@x.com",
+        role: "view",
+        purchaseId,
+        scope: "subtree",
+      }),
+    );
+    const out = await as(t).mutation(api.aiTree.undoAiTree, { batchId: BATCH });
+    expect(out).toEqual({ ok: false, blockers: ["Root"] });
+    expect(await noteCount(t)).toBe(4);
+  });
+
+  it("does not leak aiBatchId/aiBatchAt to clients (L10)", async () => {
+    const { t, rootId } = await setup();
+    const res = await apply(t, rootId, [N("a", null)]);
+    const tree = await as(t).query(api.notes.getTreeById, {
+      id: res.noteIds[0],
+    });
+    expect(JSON.stringify(tree)).not.toContain("aiBatch");
   });
 
   it("expires after 24 hours", async () => {

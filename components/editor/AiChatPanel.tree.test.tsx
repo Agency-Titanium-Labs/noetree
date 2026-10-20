@@ -120,6 +120,48 @@ describe("mode selector (TREE-02)", () => {
     expect(modeButton("tree")).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("a later menu request switches an already open panel to tree and back (M3)", () => {
+    const { rerender } = render(
+      <AiChatPanel
+        noteId="n1"
+        initialMode="chat"
+        requestedMode={{ mode: "chat", seq: 1 }}
+        onClose={() => {}}
+      />,
+    );
+    expect(modeButton("chat")).toHaveAttribute("aria-pressed", "true");
+    rerender(
+      <AiChatPanel
+        noteId="n1"
+        initialMode="tree"
+        requestedMode={{ mode: "tree", seq: 2 }}
+        onClose={() => {}}
+      />,
+    );
+    expect(modeButton("tree")).toHaveAttribute("aria-pressed", "true");
+    // The user goes back to chat by hand; the same request does not re-fire.
+    fireEvent.click(modeButton("chat"));
+    rerender(
+      <AiChatPanel
+        noteId="n1"
+        initialMode="tree"
+        requestedMode={{ mode: "tree", seq: 2 }}
+        onClose={() => {}}
+      />,
+    );
+    expect(modeButton("chat")).toHaveAttribute("aria-pressed", "true");
+    // A NEW request (same mode, new seq) switches again.
+    rerender(
+      <AiChatPanel
+        noteId="n1"
+        initialMode="tree"
+        requestedMode={{ mode: "tree", seq: 3 }}
+        onClose={() => {}}
+      />,
+    );
+    expect(modeButton("tree")).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("a Free user sees the Premium invitation and can not send (no request)", async () => {
     tier = "free";
     const { fetchImpl, bodies } = treeFetch(GOOD);
@@ -157,7 +199,7 @@ describe("mode selector (TREE-02)", () => {
     fireEvent.click(screen.getByRole("button", { name: /AiChat.send/ }));
     expect(await screen.findByTestId("ai-tree-proposal")).toBeInTheDocument();
     expect(bodies[0]).toMatchObject({ mode: "tree", noteId: "n1" });
-    expect(screen.getAllByRole("treeitem")).toHaveLength(2);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
   });
 
   it("chat mode requests carry no tree mode", async () => {

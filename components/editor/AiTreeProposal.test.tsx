@@ -48,19 +48,32 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("checkbox preview (TREE-03)", () => {
-  it("renders every proposed note as a checked, leveled tree item", () => {
+  it("renders every proposed note as a checked, leveled list item", () => {
     render(<AiTreeProposal noteId="root" nodes={NODES} />);
-    const items = screen.getAllByRole("treeitem");
+    const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(4);
-    expect(items[0]).toHaveAttribute("aria-level", "1");
-    expect(items[1]).toHaveAttribute("aria-level", "2");
-    expect(items[2]).toHaveAttribute("aria-level", "3");
+    expect(items[0]).toHaveTextContent(/"level":1/);
+    expect(items[1]).toHaveTextContent(/"level":2/);
+    expect(items[2]).toHaveTextContent(/"level":3/);
     for (const box of screen.getAllByRole("checkbox")) {
       expect(box).toBeChecked();
     }
     expect(screen.getByText(/proposalCount/)).toHaveTextContent(
       '{"selected":4,"total":4}',
     );
+  });
+
+  it("is a plain list with labelled checkboxes, not an ARIA tree (M4)", () => {
+    render(<AiTreeProposal noteId="root" nodes={NODES} />);
+    expect(screen.queryByRole("tree")).toBeNull();
+    expect(screen.queryAllByRole("treeitem")).toHaveLength(0);
+    expect(screen.getByRole("list")).toBeInTheDocument();
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes).toHaveLength(4);
+    for (const box of boxes) {
+      // Every checkbox has an accessible name (its label).
+      expect(box).toHaveAccessibleName(/\S/);
+    }
   });
 
   it("unchecking a parent unchecks all its descendants, not its siblings", () => {
