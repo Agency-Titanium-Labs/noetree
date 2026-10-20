@@ -37,6 +37,8 @@ const messagePart = z.object({
 export const chatBodySchema = z.object({
   requestId: z.string().min(1).max(128),
   locale: z.enum(CHAT_LOCALES),
+  /** Phase 20: "tree" = propose a tree of notes (needs noteId). */
+  mode: z.enum(["chat", "tree"]).optional(),
   /** Only an id: the server rebuilds the context itself. */
   noteId: z
     .string()
@@ -128,7 +130,14 @@ export function buildSystemPrompt(locale: ChatLocale): string {
  * user's question into the final user turn. Without context the text is
  * unchanged.
  */
-export function withContext(text: string, serializedContext?: string): string {
-  if (!serializedContext) return text;
-  return `${serializedContext}\n\nUser request:\n${text}`;
+export function withContext(
+  text: string,
+  serializedContext?: string,
+  personalContext?: string,
+): string {
+  const head = [personalContext, serializedContext]
+    .filter((p): p is string => Boolean(p))
+    .join("\n\n");
+  if (!head) return text;
+  return `${head}\n\nUser request:\n${text}`;
 }

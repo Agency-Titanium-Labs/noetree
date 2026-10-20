@@ -44,7 +44,7 @@ import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
 
 interface EditorToolbarProps {
   /** Opens the AI chat panel (the free `basic` action, Phase 19). */
-  onOpenChat?: () => void;
+  onOpenChat?: (mode?: "chat" | "tree") => void;
   /** Opens the Related notes panel (the Premium `linking` action, Phase 22). */
   onOpenLinks?: () => void;
 }
@@ -98,6 +98,11 @@ export default function EditorToolbar({
     }
     if (actionKey === "linking" && onOpenLinks) {
       onOpenLinks();
+      return;
+    }
+    // Phase 20: the tree agent is a mode of the same panel.
+    if (actionKey === "tree" && onOpenChat) {
+      onOpenChat("tree");
       return;
     }
     toast.info(tCredits("comingSoon"));

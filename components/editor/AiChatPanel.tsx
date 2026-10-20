@@ -30,6 +30,9 @@ import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import SafeMarkdown from "./SafeMarkdown";
+import AiTreeProposal from "./AiTreeProposal";
+import AiTreeBatches from "./AiTreeBatches";
+import type { ProposalData } from "@/lib/ai/treeRun";
 import { isChatErrorCode, parseChatError } from "@/lib/ai/chatErrors";
 import { createChatTransport, type ChatMessage } from "@/lib/ai/chatTransport";
 import { insertAnswer, trackUserCursor } from "@/lib/ai/insertAnswer";
@@ -106,6 +109,14 @@ function textOf(message: ChatMessage): string {
     .join("");
 }
 
+/** The tree proposal (Phase 20) carried by an assistant message, if any. */
+function proposalOf(message: ChatMessage): ProposalData | undefined {
+  const part = message.parts.find(p => p.type === "data-proposal") as
+    | { data?: ProposalData }
+    | undefined;
+  return part?.data;
+}
+
 function settledOf(
   message: ChatMessage,
 ): { refunded?: boolean; failed?: boolean; truncated?: boolean } | undefined {
@@ -131,6 +142,8 @@ function wasFailed(message: ChatMessage): boolean {
 interface AiChatPanelProps {
   /** The open note: the only id ever sent, and only if context is chosen. */
   noteId: string;
+  /** Phase 20: open straight in "Propose a tree" (from the AI actions menu). */
+  initialMode?: "chat" | "tree";
   onClose: () => void;
   /** Test seam: replaces the network call of the transport. */
   fetchImpl?: typeof fetch;
@@ -142,10 +155,12 @@ interface AiChatPanelProps {
  */
 export default function AiChatPanel({
   noteId,
+  initialMode = "chat",
   onClose,
   fetchImpl,
 }: AiChatPanelProps) {
   const t = useTranslations("AiChat");
+  const tTree = useTranslations("AiTree");
   const tCredits = useTranslations("AiCredits");
   const locale = useLocale();
   const convex = useConvex();
@@ -158,13 +173,25 @@ export default function AiChatPanel({
   const [notices, setNotices] = useState<Record<string, Notice>>({});
   const [creditsOpen, setCreditsOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Phase 20: "Chat" or "Propose a tree". Tree mode always uses the open note.
+  const [mode, setMode] = useState<"chat" | "tree">(initialMode);
+  const [tier, setTier] = useState<"free" | "premium" | "unknown">("unknown");
+  const [appliedIds, setAppliedIds] = useState<ReadonlySet<string>>(new Set());
+  const [batchesKey, setBatchesKey] = useState(0);
 
   // Read at send time by the transport.
-  const optionsRef = useRef<{ locale: string; noteId?: string }>({ locale });
-  optionsRef.current = {
-    locale,
-    ...(contextMode === "note" ? { noteId } : {}),
-  };
+  const optionsRef = useRef<{
+    locale: string;
+    noteId?: string;
+    mode?: "chat" | "tree";
+  }>({ locale });
+  optionsRef.current =
+    mode === "tree"
+      ? { locale, noteId, mode: "tree" }
+      : {
+          locale,
+          ...(contextMode === "note" ? { noteId } : {}),
+        };
   const transport = useMemo(
     () =>
       createChatTransport({
@@ -213,6 +240,27 @@ export default function AiChatPanel({
       cancelled = true;
     };
   }, [convex, noteId, refreshKey]);
+
+  // Tree mode is Premium: look the tier up once, when it is first chosen. The
+  // server stays authoritative (PREMIUM_REQUIRED, no debit); this only decides
+  // whether to show the invitation instead of a send button that would fail.
+  useEffect(() => {
+    if (mode !== "tree" || tier !== "unknown") return;
+    let cancelled = false;
+    convex
+      .query(api.aiCredits.getMyCredits, {})
+      .then(res => {
+        if (cancelled) return;
+        const value = (res as { tier?: string } | null)?.tier;
+        setTier(value === "free" ? "free" : "premium");
+      })
+      .catch(() => {
+        if (!cancelled) setTier("premium");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [convex, mode, tier]);
 
   // A context choice that became unusable (other note selected) falls back.
   useEffect(() => {
@@ -510,8 +558,47 @@ export default function AiChatPanel({
           const isLast = i === messages.length - 1;
           const streaming = busy && isLast;
           const body = textOf(m);
+          const proposal = proposalOf(m);
           return (
             <div key={m.id} className="flex flex-col gap-2">
+              {proposal?.ok ? (
+                <AiTreeProposal
+                  noteId={noteId}
+                  nodes={proposal.nodes}
+                  onApplied={id => {
+                    setAppliedIds(prev => new Set(prev).add(id));
+                    setBatchesKey(k => k + 1);
+                  }}
+                  onUndone={() => setBatchesKey(k => k + 1)}
+                />
+              ) : null}
+              {proposal && !proposal.ok && !streaming ? (
+                <div
+                  role="status"
+                  data-notice="proposal-invalid"
+                  className="rounded-md border bg-muted px-3 py-2 text-sm"
+                >
+                  <p>
+                    {proposal.reason === "EMPTY"
+                      ? tTree("empty")
+                      : tTree("invalid")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {tTree(`reason.${proposal.reason}`)}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-2"
+                    disabled={busy}
+                    onClick={() => retry(userId)}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    {t("retry")}
+                  </Button>
+                </div>
+              ) : null}
               {body || streaming ? (
                 <div className="max-w-[95%] rounded-lg bg-muted px-3 py-2 text-sm">
                   <span className="sr-only">{t("assistantLabel")}: </span>
@@ -598,97 +685,150 @@ export default function AiChatPanel({
       </div>
 
       <div className="flex flex-col gap-2 border-t px-3 py-2">
-        <fieldset className="flex flex-col gap-1 text-sm">
-          <legend className="sr-only">{t("context.label")}</legend>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                name="ai-chat-context"
-                checked={contextMode === "none"}
-                onChange={() => setContextMode("none")}
-              />
-              {t("context.none")}
-            </label>
-            <label
-              className={`flex items-center gap-1.5 ${
-                contextDisabled ? "text-muted-foreground" : ""
-              }`}
-            >
-              <input
-                type="radio"
-                name="ai-chat-context"
-                checked={contextMode === "note"}
-                disabled={contextDisabled}
-                onChange={() => {
-                  setContextMode("note");
-                  setRefreshKey(k => k + 1);
-                }}
-              />
-              {t("context.note")}
-            </label>
-          </div>
-          {preview.status === "refused" ? (
-            <p
-              data-testid="context-reason"
-              className="text-xs text-muted-foreground"
-            >
-              {tCredits(`errors.${preview.code}`)}
-            </p>
+        <div
+          role="group"
+          aria-label={t("mode.label")}
+          className="flex flex-wrap items-center gap-2 text-sm"
+        >
+          <Button
+            type="button"
+            size="sm"
+            variant={mode === "chat" ? "default" : "outline"}
+            aria-pressed={mode === "chat"}
+            disabled={busy}
+            onClick={() => setMode("chat")}
+          >
+            {t("mode.chat")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={mode === "tree" ? "default" : "outline"}
+            aria-pressed={mode === "tree"}
+            disabled={busy}
+            onClick={() => setMode("tree")}
+          >
+            {t("mode.tree")}
+          </Button>
+          {mode === "tree" ? (
+            <span className="text-xs text-muted-foreground">
+              {t("mode.treeCost")}
+            </span>
           ) : null}
-          {contextMode === "note" && preview.status === "loading" ? (
-            <p className="text-xs text-muted-foreground">
-              {t("context.loading")}
-            </p>
-          ) : null}
-          {contextMode === "note" && preview.status === "ok" ? (
-            <div data-testid="context-report" className="text-xs">
-              <p className="font-medium">{t("context.included")}</p>
-              <ul className="ml-4 list-disc">
-                {preview.report.included.map(n => (
-                  <li key={n.noteId}>
-                    <span className="text-muted-foreground">
-                      {t(`context.role.${n.role}`)}:
-                    </span>{" "}
-                    {n.title || t("context.untitled")}
-                    {n.truncated ? (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        ({t("context.shortened")})
-                      </span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-              {preview.report.dropped.length > 0 ? (
-                <p className="text-muted-foreground">
-                  {t("context.dropped", {
-                    count: preview.report.dropped.reduce(
-                      (n, d) => n + (d.count ?? 1),
-                      0,
-                    ),
-                  })}
-                  {" ("}
-                  {Array.from(
-                    new Set(
-                      preview.report.dropped.map(d =>
-                        t(`context.reason.${d.reason}`),
-                      ),
-                    ),
-                  ).join(", ")}
-                  {")"}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                className="underline"
-                onClick={() => setRefreshKey(k => k + 1)}
+        </div>
+        {mode === "tree" ? (
+          <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <p>{t("mode.treeBody")}</p>
+            {tier === "free" ? (
+              <p
+                role="status"
+                data-notice="tree-premium"
+                className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-foreground"
               >
-                {t("context.refresh")}
-              </button>
+                {t("mode.treePremium")}
+              </p>
+            ) : null}
+            <AiTreeBatches
+              noteId={noteId}
+              hide={appliedIds}
+              refreshKey={batchesKey}
+              onChanged={() => setBatchesKey(k => k + 1)}
+            />
+          </div>
+        ) : null}
+        {mode === "chat" ? (
+          <fieldset className="flex flex-col gap-1 text-sm">
+            <legend className="sr-only">{t("context.label")}</legend>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="ai-chat-context"
+                  checked={contextMode === "none"}
+                  onChange={() => setContextMode("none")}
+                />
+                {t("context.none")}
+              </label>
+              <label
+                className={`flex items-center gap-1.5 ${
+                  contextDisabled ? "text-muted-foreground" : ""
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="ai-chat-context"
+                  checked={contextMode === "note"}
+                  disabled={contextDisabled}
+                  onChange={() => {
+                    setContextMode("note");
+                    setRefreshKey(k => k + 1);
+                  }}
+                />
+                {t("context.note")}
+              </label>
             </div>
-          ) : null}
-        </fieldset>
+            {preview.status === "refused" ? (
+              <p
+                data-testid="context-reason"
+                className="text-xs text-muted-foreground"
+              >
+                {tCredits(`errors.${preview.code}`)}
+              </p>
+            ) : null}
+            {contextMode === "note" && preview.status === "loading" ? (
+              <p className="text-xs text-muted-foreground">
+                {t("context.loading")}
+              </p>
+            ) : null}
+            {contextMode === "note" && preview.status === "ok" ? (
+              <div data-testid="context-report" className="text-xs">
+                <p className="font-medium">{t("context.included")}</p>
+                <ul className="ml-4 list-disc">
+                  {preview.report.included.map(n => (
+                    <li key={n.noteId}>
+                      <span className="text-muted-foreground">
+                        {t(`context.role.${n.role}`)}:
+                      </span>{" "}
+                      {n.title || t("context.untitled")}
+                      {n.truncated ? (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          ({t("context.shortened")})
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+                {preview.report.dropped.length > 0 ? (
+                  <p className="text-muted-foreground">
+                    {t("context.dropped", {
+                      count: preview.report.dropped.reduce(
+                        (n, d) => n + (d.count ?? 1),
+                        0,
+                      ),
+                    })}
+                    {" ("}
+                    {Array.from(
+                      new Set(
+                        preview.report.dropped.map(d =>
+                          t(`context.reason.${d.reason}`),
+                        ),
+                      ),
+                    ).join(", ")}
+                    {")"}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => setRefreshKey(k => k + 1)}
+                >
+                  {t("context.refresh")}
+                </button>
+              </div>
+            ) : null}
+          </fieldset>
+        ) : null}
 
         <div className="flex items-end gap-2">
           <Textarea
@@ -696,7 +836,9 @@ export default function AiChatPanel({
             onChange={e => setInput(e.target.value)}
             onKeyDown={onKeyDown}
             aria-label={t("inputAria")}
-            placeholder={t("placeholder")}
+            placeholder={
+              mode === "tree" ? t("mode.treePlaceholder") : t("placeholder")
+            }
             rows={2}
             className="min-h-0 resize-none"
           />
@@ -706,7 +848,11 @@ export default function AiChatPanel({
               {t("stop")}
             </Button>
           ) : (
-            <Button type="button" onClick={send} disabled={!input.trim()}>
+            <Button
+              type="button"
+              onClick={send}
+              disabled={!input.trim() || (mode === "tree" && tier === "free")}
+            >
               <Send className="h-4 w-4" />
               {t("send")}
             </Button>

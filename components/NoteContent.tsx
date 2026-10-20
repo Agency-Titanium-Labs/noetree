@@ -55,6 +55,7 @@ export default function NoteContent() {
   // Phase 22: Related notes panel, docked in the same slot as the chat (one
   // at a time). It auto-starts only when opened from the AI menu.
   const [isLinksOpen, setIsLinksOpen] = useState(false);
+  const [chatMode, setChatMode] = useState<"chat" | "tree">("chat");
   const [isListingOpen, setIsListingOpen] = useState(false);
 
   const { editor, saveStatus, getCurrentContent, previewVersion, exitPreview } =
@@ -196,7 +197,8 @@ export default function NoteContent() {
       <div className="grow flex flex-col gap-4">
         <div className="flex flex-col gap-2 grow">
           <EditorToolbar
-            onOpenChat={() => {
+            onOpenChat={mode => {
+              setChatMode(mode ?? "chat");
               setIsLinksOpen(false);
               setIsChatOpen(true);
             }}
@@ -314,6 +316,7 @@ export default function NoteContent() {
             <AiChatPanel
               key={selectedNote._id}
               noteId={selectedNote._id}
+              initialMode={chatMode}
               onClose={() => setIsChatOpen(false)}
             />
           </ResizablePanel>

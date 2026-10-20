@@ -16,6 +16,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: queryData }),
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
+vi.mock("./AutocompleteToggle", () => ({ default: () => null }));
 
 let editor: Editor | null = null;
 vi.mock("@/providers/EditorProvider", () => ({

@@ -1,5 +1,6 @@
 import { DefaultChatTransport, type UIMessage } from "ai";
 import type { SettledData } from "./chatHandler";
+import type { ProposalData } from "./treeRun";
 
 /**
  * Client side of /api/ai/chat. Every request is a NEW metered run: a fresh
@@ -9,11 +10,18 @@ import type { SettledData } from "./chatHandler";
  * note id: the server rebuilds the context itself (D-07).
  */
 
-export type ChatMessage = UIMessage<unknown, { settled: SettledData }>;
+export type ChatMessage = UIMessage<
+  unknown,
+  { settled: SettledData; proposal: ProposalData }
+>;
 
 export type ChatRequestOptions = {
   /** Read at send time so the panel always sends its current choices. */
-  getOptions: () => { locale: string; noteId?: string };
+  getOptions: () => {
+    locale: string;
+    noteId?: string;
+    mode?: "chat" | "tree";
+  };
   api?: string;
   fetch?: typeof globalThis.fetch;
 };
@@ -30,12 +38,13 @@ export function createChatTransport(opts: ChatRequestOptions) {
     api: opts.api ?? "/api/ai/chat",
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
     prepareSendMessagesRequest: ({ messages }) => {
-      const { locale, noteId } = opts.getOptions();
+      const { locale, noteId, mode } = opts.getOptions();
       return {
         body: {
           requestId: crypto.randomUUID(),
           locale,
           ...(noteId ? { noteId } : {}),
+          ...(mode === "tree" ? { mode } : {}),
           // Only the fields the route reads: role and text parts.
           messages: messages.map(m => ({
             role: m.role,

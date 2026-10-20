@@ -5,7 +5,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { ChatDeps } from "./chatHandler";
 import { createGatewayProvider } from "./gatewayProvider";
-import { chatModelId } from "./models";
+import { chatModelId, treeModelId } from "./models";
+import { createTreeGenerator } from "./treeGenerator";
 
 /**
  * Real dependencies of POST /api/ai/chat, kept out of the route file (Next
@@ -39,6 +40,13 @@ export function realChatDeps(): ChatDeps {
             actionKey: args.actionKey,
             ...(args.noteId ? { noteId: args.noteId as Id<"notes"> } : {}),
           }),
+        // Phase 20: bounded read-only tool, carries the user's token so the
+        // owner / purchased checks run as the user. Counted per run server-side.
+        readNote: (runId, noteId) =>
+          convex.mutation(api.aiTree.readNoteForRun, {
+            runId: runId as Id<"aiRuns">,
+            noteId: noteId as Id<"notes">,
+          }),
       };
     },
     createSettleClient() {
@@ -54,6 +62,7 @@ export function realChatDeps(): ChatDeps {
     },
     // Plain "provider/model" string, resolved by the Vercel AI Gateway.
     provider: createGatewayProvider(chatModelId()),
+    treeGenerator: createTreeGenerator(treeModelId()),
     after: promise => after(() => promise),
   };
 }

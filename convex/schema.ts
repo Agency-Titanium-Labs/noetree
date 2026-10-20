@@ -45,6 +45,11 @@ export default defineSchema({
     // Phase 15: user who last saved the current content (author of the next
     // snapshot of this content). Optional so no migration is needed.
     lastEditedBy: v.optional(v.id("users")),
+    // Phase 20: batch marker on notes created by an applied AI tree proposal
+    // (aiTree.applyAiTree). Lets the batch be found and undone within 24 h.
+    // Optional so no migration is needed.
+    aiBatchId: v.optional(v.string()),
+    aiBatchAt: v.optional(v.number()),
   })
     .index("by_owner", ["owner", "parentNote"])
     .index("by_parent", ["parentNote"])
@@ -154,6 +159,8 @@ export default defineSchema({
     // Set by the reaper when expiring this run threw; the sweep skips it for
     // REAP_RETRY_MS so one poisoned run cannot starve the rest of the batch.
     reapFailedAt: v.optional(v.number()),
+    // Phase 20: readNote calls used by a tree run (cap TREE_MAX_READS).
+    readCount: v.optional(v.number()),
     settledAt: v.optional(v.number()),
     outcome: v.optional(v.string()),
     refundTransactionId: v.optional(v.id("creditTransactions")),
@@ -167,6 +174,29 @@ export default defineSchema({
     .index("by_clerkUserId_and_requestId", ["clerkUserId", "requestId"])
     .index("by_clerkUserId_and_status", ["clerkUserId", "status"])
     .index("by_status_and_createdAt", ["status", "createdAt"]),
+
+  // Phase 20: personal AI context (TREE-01). One row per user, plain text,
+  // max 1 500 characters. Sent to the AI provider only for Premium users while
+  // `enabled`, framed as data (Phase 18 D-07).
+  aiUserContext: defineTable({
+    userId: v.id("users"),
+    text: v.string(),
+    enabled: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
+
+  // Phase 20: one row per applied AI tree batch (TREE-04/05). Idempotency key
+  // is (userId, batchId); noteIds lets undo find the batch without scanning.
+  aiTreeBatches: defineTable({
+    userId: v.id("users"),
+    batchId: v.string(),
+    rootNoteId: v.id("notes"),
+    noteIds: v.array(v.id("notes")),
+    createdAt: v.number(),
+    undoneAt: v.optional(v.number()),
+  })
+    .index("by_userId_and_batchId", ["userId", "batchId"])
+    .index("by_userId_and_createdAt", ["userId", "createdAt"]),
 
   // Operator kill switch (Phase 17). Singleton row keyed "global"; absent
   // means AI is enabled. Flipped from the Convex dashboard through the

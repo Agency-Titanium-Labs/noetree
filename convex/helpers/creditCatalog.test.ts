@@ -32,7 +32,7 @@ describe("costForAction", () => {
 
 describe("constants", () => {
   test("keys and quotas", () => {
-    expect([...ACTION_KEYS]).toEqual(["basic", "semantic", "linking"]);
+    expect([...ACTION_KEYS]).toEqual(["basic", "semantic", "linking", "tree"]);
     expect([...PACK_KEYS]).toEqual(["decouverte", "boost", "pro"]);
     expect(FREE_MONTHLY_QUOTA).toBe(30);
     expect(PREMIUM_MONTHLY_QUOTA).toBe(500);

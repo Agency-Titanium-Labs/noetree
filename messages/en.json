@@ -213,7 +213,8 @@
     "actions": {
       "basic": "Generate suggestion",
       "semantic": "Analyze semantics",
-      "linking": "Generate note links"
+      "linking": "Generate note links",
+      "tree": "Propose a tree"
     },
     "costAria": "{count, plural, one {# credit} other {# credits}}",
     "insufficientTooltip": "Not enough credits: needs {cost}, you have {balance}.",
@@ -314,7 +315,18 @@
     },
     "answerReady": "The answer is ready.",
     "insertFailed": "Couldn't insert into the note. It may be read-only.",
-    "truncated": "The answer was cut off because it took too long. Your credit was kept for the part you received."
+    "truncated": "The answer was cut off because it took too long. Your credit was kept for the part you received.",
+    "mode": {
+      "label": "Mode",
+      "chat": "Chat",
+      "tree": "Propose a tree",
+      "treeCost": "5 credits per proposal (Premium)",
+      "treeBody": "The AI reads your note tree (your own notes only, never purchased content) and proposes new notes under the open note. Nothing is created until you click Apply.",
+      "treePlaceholder": "What should the tree cover?",
+      "treePremium": "Proposing a tree is a Premium feature. You won't be charged.",
+      "treeUpgrade": "See Premium",
+      "treeWriting": "Building a proposal..."
+    }
   },
   "Autocomplete": {
     "title": "Autocomplete",
@@ -405,7 +417,26 @@
     "manageListings": "Manage listings",
     "creditsSplit": "{monthly} monthly · {purchased} purchased",
     "creditsSplitCaption": "Monthly credits reset on {date}. Purchased credits never expire.",
-    "creditsSplitCaptionNoDate": "Purchased credits never expire."
+    "creditsSplitCaptionNoDate": "Purchased credits never expire.",
+    "aiContext": {
+      "title": "Personal AI context",
+      "premiumOnly": "Personal AI context is a Premium feature.",
+      "description": "Tell the AI about yourself: your field, the tone you like, your level. It is added to your chat messages and tree proposals, and only for Premium.",
+      "disclosure": "This text is sent to the AI provider with every chat message and tree proposal while the switch is on. Don't put secrets or other people's personal data in it.",
+      "label": "About you",
+      "placeholder": "For example: I'm a nurse writing study notes in English. Keep explanations simple.",
+      "counter": "{count} / {max}",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved.",
+      "delete": "Delete",
+      "switchLabel": "Use it with the AI",
+      "switchOnHint": "The text is sent to the AI provider.",
+      "switchOffHint": "The text is kept but never sent.",
+      "inactiveHint": "Your plan has ended: the text is kept but not sent until you are Premium again.",
+      "errorInvalid": "The text must be between 1 and {max} characters.",
+      "error": "Couldn't save. Try again."
+    }
   },
   "Marketplace": {
     "headerLabel": "Marketplace",
@@ -740,5 +771,59 @@
     "removeAria": "Remove link to {title}",
     "removeError": "Couldn't remove the link. Try again.",
     "untitled": "Untitled"
+  },
+  "AiTree": {
+    "proposalTitle": "Proposed notes",
+    "proposalCount": "{selected} of {total} selected",
+    "treeAria": "Proposed notes",
+    "nodeAria": "{title}",
+    "levelAria": "Level {level}",
+    "preview": "Show content",
+    "hidePreview": "Hide content",
+    "emptyContent": "No content",
+    "apply": "Apply ({count})",
+    "applying": "Applying...",
+    "applied": "Created {count, plural, one {# note} other {# notes}} under this note.",
+    "appliedNote": "Created {count, plural, one {# note} other {# notes}}.",
+    "undo": "Undo this batch",
+    "undoing": "Undoing...",
+    "undone": "Batch undone. The notes were removed.",
+    "undoAvailable": "You can undo this batch for 24 hours.",
+    "undoBlocked": "Can't undo: these notes have been edited or have content you added.",
+    "undoExpired": "The 24-hour undo window has passed. Delete the notes normally if you don't want them.",
+    "selectAll": "Select all",
+    "selectNone": "Select none",
+    "recentBatches": "Recent batches you can undo",
+    "recentBatch": "{count, plural, one {# note} other {# notes}}, {when}",
+    "invalid": "The AI's proposal didn't pass our checks, so your credits were refunded. Try again with a clearer request.",
+    "empty": "The AI didn't propose any note, so your credits were refunded.",
+    "notEditable": "You can't edit this note, so nothing was created.",
+    "reason": {
+      "EMPTY": "no notes proposed",
+      "TOO_MANY_NODES": "more than 25 notes",
+      "TOO_DEEP": "more than 3 levels",
+      "UNKNOWN_PARENT": "broken parent link",
+      "CYCLE": "circular structure",
+      "BAD_TITLE": "invalid title",
+      "CONTENT_TOO_LONG": "a note is too long",
+      "DUPLICATE_KEY": "duplicate entries",
+      "BAD_KEY": "invalid entry",
+      "BAD_NODE": "invalid entry",
+      "NOT_AN_ARRAY": "invalid format",
+      "GENERATION_FAILED": "the AI couldn't finish",
+      "NO_OUTLINE": "your tree couldn't be read"
+    },
+    "errors": {
+      "PROPOSAL_INVALID": "This proposal is no longer valid, so nothing was created.",
+      "APPLY_NOT_EDITABLE": "You can't edit this note, so nothing was created.",
+      "PURCHASED_CONTENT_EXCLUDED": "Notes can't be added under purchased content. Nothing was created.",
+      "BATCH_ID_INVALID": "Something went wrong. Try again.",
+      "BATCH_ID_REUSED": "Something went wrong. Try again.",
+      "NOTE_NOT_FOUND": "This note no longer exists. Nothing was created.",
+      "UNAUTHENTICATED": "Your session has expired. Sign in again.",
+      "BATCH_NOT_FOUND": "This batch can't be found anymore.",
+      "UNDO_EXPIRED": "The 24-hour undo window has passed.",
+      "GENERIC": "Something went wrong. Try again."
+    }
   }
 }

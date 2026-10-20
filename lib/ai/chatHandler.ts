@@ -14,7 +14,10 @@ import {
 import { chatErrorResponse, type ChatErrorCode } from "./chatErrors";
 import { executeRun, type RunHost, type SettleOutcome } from "./executeRun";
 import type { LlmProvider, ProviderInput } from "./fakeProvider";
-import { chatMaxOutputTokens } from "./models";
+import { chatMaxOutputTokens, treeMaxOutputTokens } from "./models";
+import { buildTreeSystemPrompt, buildTreeUserTurn } from "./treePrompt";
+import type { TreeGenerator } from "./treeGenerator";
+import { createTreeProvider, type ReadOutcome } from "./treeRun";
 
 /**
  * Framework-free core of POST /api/ai/chat (19-CONTEXT D-07, D-10, D-12).
@@ -35,6 +38,7 @@ import { chatMaxOutputTokens } from "./models";
  */
 
 export const CHAT_ACTION_KEY = "basic" as const;
+export const TREE_ACTION_KEY = "tree" as const;
 /**
  * Stream budget. The route's maxDuration is MAX_RUN_DURATION_MS (120 s); the
  * timer leaves headroom so settlement in after() still runs, and everything
@@ -46,6 +50,13 @@ export const CHAT_SETTLE_TIMEOUT_MS = 10_000;
 
 export type BeginResult = Awaited<ReturnType<RunHost["begin"]>> & {
   context?: { serialized: string };
+  /** Phase 20: framed personal context, Premium + switch on only. */
+  personal?: { serialized: string };
+  /** Phase 20: whole-tree outline and its ref -> note id map. */
+  tree?: {
+    outline: string;
+    refs: Array<{ ref: string; noteId: string }>;
+  };
 };
 
 /** Authenticated with the user's token: only `beginRun`. */
@@ -55,6 +66,8 @@ export type RunClient = {
     actionKey: string;
     noteId?: string;
   }): Promise<BeginResult>;
+  /** Phase 20: the tree agent's bounded, read-only tool (user token). */
+  readNote?(runId: string, noteId: string): Promise<ReadOutcome>;
 };
 
 /** Unauthenticated: `settleRun` is guarded by the shared secret instead. */
@@ -71,6 +84,8 @@ export type ChatDeps = {
   /** Client WITHOUT user auth, created per settle (never the user's token). */
   createSettleClient(): SettleClient;
   provider: LlmProvider;
+  /** Phase 20: structured tree proposal generator (absent = tree mode off). */
+  treeGenerator?: TreeGenerator;
   /** next/server `after`: extends the invocation until the promise settles. */
   after(promise: Promise<unknown>): void;
   streamTimeoutMs?: number;
@@ -222,6 +237,13 @@ export async function handleChatRequest(
   const body = parsed.data;
   const turns = buildChatTurns(body.messages);
   if (!turns) return chatErrorResponse("BAD_REQUEST");
+  // Tree mode (Phase 20) always works under the open note.
+  const treeMode = body.mode === "tree";
+  if (treeMode && !body.noteId) return chatErrorResponse("BAD_REQUEST");
+  if (treeMode && !deps.treeGenerator) {
+    console.error("[ai/chat] tree mode requested but no generator configured");
+    return chatErrorResponse("INTERNAL");
+  }
   if (promptChars(turns) > CHAT_MAX_PROMPT_CHARS) {
     return chatErrorResponse("PROMPT_TOO_LARGE");
   }
@@ -232,7 +254,7 @@ export async function handleChatRequest(
   try {
     begun = await client.begin({
       requestId: body.requestId,
-      actionKey: CHAT_ACTION_KEY,
+      actionKey: treeMode ? TREE_ACTION_KEY : CHAT_ACTION_KEY,
       ...(body.noteId ? { noteId: body.noteId } : {}),
     });
   } catch (err) {
@@ -248,13 +270,46 @@ export async function handleChatRequest(
 
   const last = turns[turns.length - 1];
   const messages = turns.slice(0, -1);
-  const finalText = withContext(last.content, begun.context?.serialized);
-  const input: ProviderInput = {
+  const finalText = withContext(
+    last.content,
+    begun.context?.serialized,
+    begun.personal?.serialized,
+  );
+  let input: ProviderInput = {
     prompt: finalText,
     system: buildSystemPrompt(body.locale),
     messages: [...messages, { role: "user", content: finalText }],
     maxOutputTokens: deps.maxOutputTokens ?? chatMaxOutputTokens(),
   };
+  // Tree mode: one structured proposal, adapted to the same provider seam so
+  // executeRun settles it with the Phase 17 policy (see treeRun.ts).
+  let treeRun: ReturnType<typeof createTreeProvider> | undefined;
+  if (treeMode) {
+    const turn = buildTreeUserTurn({
+      request: last.content,
+      outline: begun.tree?.outline ?? "",
+      personal: begun.personal?.serialized,
+      noteContext: begun.context?.serialized,
+    });
+    input = {
+      prompt: turn,
+      system: buildTreeSystemPrompt(body.locale),
+      messages: [{ role: "user", content: turn }],
+      maxOutputTokens: deps.maxOutputTokens ?? treeMaxOutputTokens(),
+    };
+    const runId = begun.runId;
+    treeRun = createTreeProvider(
+      begun.tree && deps.treeGenerator
+        ? {
+            generator: deps.treeGenerator,
+            refs: new Map(begun.tree.refs.map(r => [r.ref, r.noteId])),
+            ...(client.readNote
+              ? { readNote: (id: string) => client.readNote!(runId, id) }
+              : {}),
+          }
+        : null,
+    );
+  }
 
   // One signal for: client Stop / disconnect, and the stream time budget.
   // `timedOut` tells a server timeout apart from a user abort (H4).
@@ -282,6 +337,9 @@ export async function handleChatRequest(
   let emit: (chunk: UIMessageChunk) => void = () => {};
   const teed: LlmProvider = {
     stream(inp, signal) {
+      // The tree proposal is delivered as ONE data part after settlement
+      // bookkeeping, never as text deltas.
+      if (treeRun) return treeRun.provider.stream(inp, signal);
       const inner = deps.provider.stream(inp, signal);
       return (async function* () {
         // text-start is lazy (first delta) and text-end is always emitted
@@ -343,6 +401,9 @@ export async function handleChatRequest(
           // A failure is reported as data, not as a protocol `error` chunk:
           // the UI shows it as a system message in the thread, and the SDK's
           // error-chunk path leaves an unhandled rejection behind.
+          if (treeRun) {
+            emit({ type: "data-proposal", data: treeRun.result() });
+          }
           emit({ type: "data-settled", data: settled });
           emit({ type: "finish" });
           if (!closed) {

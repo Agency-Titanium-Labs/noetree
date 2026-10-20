@@ -213,7 +213,8 @@
     "actions": {
       "basic": "Générer une suggestion",
       "semantic": "Analyser la sémantique",
-      "linking": "Générer des liens entre notes"
+      "linking": "Générer des liens entre notes",
+      "tree": "Proposer une arborescence"
     },
     "costAria": "{count, plural, one {# crédit} other {# crédits}}",
     "insufficientTooltip": "Crédits insuffisants : {cost} requis, vous avez {balance}.",
@@ -314,7 +315,18 @@
     },
     "answerReady": "La réponse est prête.",
     "insertFailed": "Impossible d'insérer dans la note. Elle est peut-être en lecture seule.",
-    "truncated": "La réponse a été coupée car elle a pris trop de temps. Votre crédit est conservé pour la partie reçue."
+    "truncated": "La réponse a été coupée car elle a pris trop de temps. Votre crédit est conservé pour la partie reçue.",
+    "mode": {
+      "label": "Mode",
+      "chat": "Discuter",
+      "tree": "Proposer une arborescence",
+      "treeCost": "5 crédits par proposition (Premium)",
+      "treeBody": "L'IA lit votre arborescence (vos propres notes uniquement, jamais le contenu acheté) et propose de nouvelles notes sous la note ouverte. Rien n'est créé tant que vous n'avez pas cliqué sur Appliquer.",
+      "treePlaceholder": "Que doit couvrir l'arborescence ?",
+      "treePremium": "Proposer une arborescence est une fonctionnalité Premium. Vous ne serez pas débité.",
+      "treeUpgrade": "Voir Premium",
+      "treeWriting": "Construction de la proposition..."
+    }
   },
   "Autocomplete": {
     "title": "Saisie semi-automatique",
@@ -405,7 +417,26 @@
     "manageListings": "Gérer les annonces",
     "creditsSplit": "{monthly} mensuels · {purchased} achetés",
     "creditsSplitCaption": "Les crédits mensuels sont réinitialisés le {date}. Les crédits achetés n'expirent jamais.",
-    "creditsSplitCaptionNoDate": "Les crédits achetés n'expirent jamais."
+    "creditsSplitCaptionNoDate": "Les crédits achetés n'expirent jamais.",
+    "aiContext": {
+      "title": "Contexte IA personnel",
+      "premiumOnly": "Le contexte IA personnel est une fonctionnalité Premium.",
+      "description": "Parlez de vous à l'IA : votre domaine, le ton que vous aimez, votre niveau. Il est ajouté à vos messages de chat et à vos propositions d'arborescence, et seulement pour Premium.",
+      "disclosure": "Ce texte est envoyé au fournisseur d'IA avec chaque message de chat et chaque proposition d'arborescence tant que l'interrupteur est activé. N'y mettez ni secrets ni données personnelles d'autres personnes.",
+      "label": "À propos de vous",
+      "placeholder": "Par exemple : je suis infirmière et je rédige mes fiches de révision en français. Gardez les explications simples.",
+      "counter": "{count} / {max}",
+      "save": "Enregistrer",
+      "saving": "Enregistrement...",
+      "saved": "Enregistré.",
+      "delete": "Supprimer",
+      "switchLabel": "L'utiliser avec l'IA",
+      "switchOnHint": "Le texte est envoyé au fournisseur d'IA.",
+      "switchOffHint": "Le texte est conservé mais jamais envoyé.",
+      "inactiveHint": "Votre abonnement est terminé : le texte est conservé mais n'est pas envoyé tant que vous n'êtes pas de nouveau Premium.",
+      "errorInvalid": "Le texte doit contenir entre 1 et {max} caractères.",
+      "error": "Enregistrement impossible. Réessayez."
+    }
   },
   "Marketplace": {
     "headerLabel": "Marketplace",
@@ -740,5 +771,59 @@
     "removeAria": "Supprimer le lien vers {title}",
     "removeError": "Impossible de supprimer le lien. Réessayez.",
     "untitled": "Sans titre"
+  },
+  "AiTree": {
+    "proposalTitle": "Notes proposées",
+    "proposalCount": "{selected} sur {total} sélectionnées",
+    "treeAria": "Notes proposées",
+    "nodeAria": "{title}",
+    "levelAria": "Niveau {level}",
+    "preview": "Afficher le contenu",
+    "hidePreview": "Masquer le contenu",
+    "emptyContent": "Aucun contenu",
+    "apply": "Appliquer ({count})",
+    "applying": "Application...",
+    "applied": "{count, plural, one {# note créée} other {# notes créées}} sous cette note.",
+    "appliedNote": "{count, plural, one {# note créée} other {# notes créées}}.",
+    "undo": "Annuler ce lot",
+    "undoing": "Annulation...",
+    "undone": "Lot annulé. Les notes ont été supprimées.",
+    "undoAvailable": "Vous pouvez annuler ce lot pendant 24 heures.",
+    "undoBlocked": "Annulation impossible : ces notes ont été modifiées ou contiennent du contenu que vous avez ajouté.",
+    "undoExpired": "Le délai d'annulation de 24 heures est dépassé. Supprimez les notes normalement si vous n'en voulez pas.",
+    "selectAll": "Tout sélectionner",
+    "selectNone": "Tout désélectionner",
+    "recentBatches": "Lots récents que vous pouvez annuler",
+    "recentBatch": "{count, plural, one {# note} other {# notes}}, {when}",
+    "invalid": "La proposition de l'IA n'a pas passé nos vérifications, vos crédits ont donc été remboursés. Réessayez avec une demande plus précise.",
+    "empty": "L'IA n'a proposé aucune note, vos crédits ont donc été remboursés.",
+    "notEditable": "Vous ne pouvez pas modifier cette note, rien n'a été créé.",
+    "reason": {
+      "EMPTY": "aucune note proposée",
+      "TOO_MANY_NODES": "plus de 25 notes",
+      "TOO_DEEP": "plus de 3 niveaux",
+      "UNKNOWN_PARENT": "lien de parenté cassé",
+      "CYCLE": "structure circulaire",
+      "BAD_TITLE": "titre invalide",
+      "CONTENT_TOO_LONG": "une note est trop longue",
+      "DUPLICATE_KEY": "entrées en double",
+      "BAD_KEY": "entrée invalide",
+      "BAD_NODE": "entrée invalide",
+      "NOT_AN_ARRAY": "format invalide",
+      "GENERATION_FAILED": "l'IA n'a pas pu terminer",
+      "NO_OUTLINE": "votre arborescence n'a pas pu être lue"
+    },
+    "errors": {
+      "PROPOSAL_INVALID": "Cette proposition n'est plus valide, rien n'a été créé.",
+      "APPLY_NOT_EDITABLE": "Vous ne pouvez pas modifier cette note, rien n'a été créé.",
+      "PURCHASED_CONTENT_EXCLUDED": "On ne peut pas ajouter de notes sous du contenu acheté. Rien n'a été créé.",
+      "BATCH_ID_INVALID": "Un problème est survenu. Réessayez.",
+      "BATCH_ID_REUSED": "Un problème est survenu. Réessayez.",
+      "NOTE_NOT_FOUND": "Cette note n'existe plus. Rien n'a été créé.",
+      "UNAUTHENTICATED": "Votre session a expiré. Reconnectez-vous.",
+      "BATCH_NOT_FOUND": "Ce lot est introuvable.",
+      "UNDO_EXPIRED": "Le délai d'annulation de 24 heures est dépassé.",
+      "GENERIC": "Un problème est survenu. Réessayez."
+    }
   }
 }

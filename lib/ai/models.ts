@@ -31,6 +31,29 @@ export function chatModelId(
 }
 
 /**
+ * Tree agent (Phase 20). Same free-tier-safe default as chat; STACK.md
+ * recommends `anthropic/claude-sonnet-5.5` for multi-step tool quality, which
+ * needs AI Gateway credits. Switch with AI_TREE_MODEL, no code change.
+ */
+export function treeModelId(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  return resolveModelId(env.AI_TREE_MODEL, chatModelId(env));
+}
+
+/** A proposal of up to 25 notes needs more room than a chat answer. */
+export const DEFAULT_TREE_MAX_OUTPUT_TOKENS = 6000;
+
+export function treeMaxOutputTokens(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const raw = env.AI_TREE_MAX_OUTPUT_TOKENS?.trim();
+  const n = raw && /^\d+$/.test(raw) ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_TREE_MAX_OUTPUT_TOKENS;
+  return Math.min(16000, Math.max(512, n));
+}
+
+/**
  * Output ceiling for one chat answer (review H2): one credit must not buy an
  * unbounded generation. About 2 000 tokens is a long Markdown answer; an
  * operator can change it with AI_CHAT_MAX_OUTPUT_TOKENS (clamped).
