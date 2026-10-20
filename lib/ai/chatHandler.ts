@@ -1,6 +1,6 @@
 import type { UIMessageChunk } from "ai";
-import { aiErrorCode } from "@/convex/helpers/aiErrors";
-import { MAX_RUN_DURATION_MS } from "@/convex/helpers/aiRunState";
+import { aiErrorCode } from "../../convex/helpers/aiErrors";
+import { MAX_RUN_DURATION_MS } from "../../convex/helpers/aiRunState";
 import {
   buildChatTurns,
   buildSystemPrompt,

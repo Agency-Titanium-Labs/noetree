@@ -1,4 +1,4 @@
-import { isAiErrorCode, type AiErrorCode } from "@/convex/helpers/aiErrors";
+import { isAiErrorCode, type AiErrorCode } from "../../convex/helpers/aiErrors";
 
 /**
  * Typed errors of the chat route and how they travel to the UI: the route
