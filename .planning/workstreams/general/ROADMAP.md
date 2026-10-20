@@ -51,7 +51,7 @@ Full phase details archived: `.planning/workstreams/general/milestones/v1.2-ROAD
 - [x] **Phase 20: Premium Context and Tree Agent** - Personal AI context and AI-proposed node trees applied atomically with undo
 - [x] **Phase 21: Autocomplete (Premium)** - Ghost-text suggestions charged 1 credit on accept
 - [x] **Phase 22: Embeddings and Link Suggestions (Premium)** - Semantic link suggestions the user accepts or ignores
-- [ ] **Phase 23: Marketplace VAT** - Absorbed VAT split (parallel track, decision gate first; does not block Phases 17-22)
+- [x] **Phase 23: Marketplace VAT** - Absorbed VAT split (parallel track, decision gate first; does not block Phases 17-22). Built and verified; VAT stays disabled until VAT-01 accountant sign-off
 
 ## Phase Details
 

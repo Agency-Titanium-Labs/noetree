@@ -52,3 +52,7 @@ Still to do when shipping, per environment (dev/staging, production):
   - `@tiptap/core` 3.26.1: `>=3.30.4` (mergeAttributes `__proto__`) and `>=3.30.5` (Markdown attribute parsing ReDoS). `prosemirror-view`: high, XSS in paste handling, patched in `>=1.42.3` (pulled through `@tiptap/pm`). Upgrade the whole `@tiptap/*` set together and re-run the editor tests; this is the most relevant one for the note editor.
   - Lower priority transitive items from the same audit: `ws` (via `convex`) `>=8.21.0`, `sharp` `>=0.35.5`, `postcss`, `nanoid`, `browserslist`, `source-map-js`, `baseline-browser-mapping`.
   - Evidence: re-run `pnpm audit --prod`; the list above is its output at the date of the review.
+
+## 6. Close-out verification (2026-10-20)
+
+Gate on `milestone/v1.3`: 1575 tests green, `tsc` root and convex clean, eslint clean. Real browser test of tree undo on local dev: a batch with an edited note is refused with an explicit message listing the blocking note, nothing deleted (TREE-05 blocker case). Happy-path undo of an untouched batch is covered by `convex/aiTree.test.ts`.
