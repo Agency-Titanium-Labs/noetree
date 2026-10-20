@@ -144,6 +144,11 @@ interface AiChatPanelProps {
   noteId: string;
   /** Phase 20: open straight in "Propose a tree" (from the AI actions menu). */
   initialMode?: "chat" | "tree";
+  /**
+   * A later request from the menu while the panel is already open: a new
+   * `seq` switches the mode (initialMode is only read on mount).
+   */
+  requestedMode?: { mode: "chat" | "tree"; seq: number };
   onClose: () => void;
   /** Test seam: replaces the network call of the transport. */
   fetchImpl?: typeof fetch;
@@ -156,6 +161,7 @@ interface AiChatPanelProps {
 export default function AiChatPanel({
   noteId,
   initialMode = "chat",
+  requestedMode,
   onClose,
   fetchImpl,
 }: AiChatPanelProps) {
@@ -176,6 +182,12 @@ export default function AiChatPanel({
   // Phase 20: "Chat" or "Propose a tree". Tree mode always uses the open note.
   const [mode, setMode] = useState<"chat" | "tree">(initialMode);
   const [tier, setTier] = useState<"free" | "premium" | "unknown">("unknown");
+  const lastSeq = useRef(requestedMode?.seq);
+  useEffect(() => {
+    if (!requestedMode || requestedMode.seq === lastSeq.current) return;
+    lastSeq.current = requestedMode.seq;
+    setMode(requestedMode.mode);
+  }, [requestedMode]);
   const [appliedIds, setAppliedIds] = useState<ReadonlySet<string>>(new Set());
   const [batchesKey, setBatchesKey] = useState(0);
 
