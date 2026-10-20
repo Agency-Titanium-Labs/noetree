@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type UIEvent,
 } from "react";
 import { useChat } from "@ai-sdk/react";
 import { useConvex } from "convex/react";
@@ -29,9 +30,9 @@ import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import SafeMarkdown from "./SafeMarkdown";
-import { parseChatError } from "@/lib/ai/chatErrors";
+import { isChatErrorCode, parseChatError } from "@/lib/ai/chatErrors";
 import { createChatTransport, type ChatMessage } from "@/lib/ai/chatTransport";
-import { insertAnswer } from "@/lib/ai/insertAnswer";
+import { insertAnswer, trackUserCursor } from "@/lib/ai/insertAnswer";
 
 type Preview =
   | { status: "loading" }
@@ -80,9 +81,15 @@ const CONTEXT_CODES = new Set([
   "PURCHASED_CONTENT_EXCLUDED",
 ]);
 
+/**
+ * Maps any failure to a notice. An unknown or missing code falls back to the
+ * generic message, so a code the UI has no text for can never throw a
+ * missing-translation error (review H1).
+ */
 function toNotice(err: unknown): Notice {
   const parsed = parseChatError(err);
-  const code = parsed?.error ?? "GENERIC";
+  const code =
+    parsed && isChatErrorCode(parsed.error) ? parsed.error : "GENERIC";
   if (code === "INSUFFICIENT_CREDITS") return { kind: "credits" };
   if (code === "AI_DISABLED") return { kind: "suspended" };
   if (code === "RATE_LIMITED" || code === "TOO_MANY_RUNS") {
@@ -101,11 +108,16 @@ function textOf(message: ChatMessage): string {
 
 function settledOf(
   message: ChatMessage,
-): { refunded?: boolean; failed?: boolean } | undefined {
+): { refunded?: boolean; failed?: boolean; truncated?: boolean } | undefined {
   const part = message.parts.find(p => p.type === "data-settled") as
-    | { data?: { refunded?: boolean; failed?: boolean } }
+    | { data?: { refunded?: boolean; failed?: boolean; truncated?: boolean } }
     | undefined;
   return part?.data;
+}
+
+/** The server time budget cut the answer off; the credit is kept (H4). */
+function wasTruncated(message: ChatMessage): boolean {
+  return settledOf(message)?.truncated === true;
 }
 
 function wasRefunded(message: ChatMessage): boolean {
@@ -175,6 +187,8 @@ export default function AiChatPanel({
       },
     });
   messagesRef.current = messages;
+  const stopRef = useRef(stop);
+  stopRef.current = stop;
   const busy = status === "submitted" || status === "streaming";
 
   // What would be sent, shown BEFORE sending (CHAT-02). Read-only query: no
@@ -205,29 +219,76 @@ export default function AiChatPanel({
     if (preview.status === "refused") setContextMode("none");
   }, [preview]);
 
-  // "No cursor" = the editor was never focused for this note.
-  const hasCursor = useRef(false);
+  // A conversation never re-points to another note (review M2). The parent
+  // also keys the panel by note id; this reset covers any other host.
+  const lastNoteId = useRef(noteId);
   useEffect(() => {
-    hasCursor.current = false;
+    if (lastNoteId.current === noteId) return;
+    lastNoteId.current = noteId;
+    stop();
+    setMessages([]);
+    setNotices({});
+    setContextMode("none");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId]);
+
+  // Leaving the panel ends an in-flight answer (the server settles it).
+  useEffect(
+    () => () => {
+      stopRef.current();
+    },
+    [],
+  );
+
+  // "Cursor" = the user placed a selection in the note (selection-based, not
+  // focus-based: programmatic focus at position 0 does not count, M4).
+  const cursorRef = useRef<ReturnType<typeof trackUserCursor> | null>(null);
+  useEffect(() => {
     if (!editor) return;
-    const onFocus = () => {
-      hasCursor.current = true;
-    };
-    editor.on("focus", onFocus);
+    const tracker = trackUserCursor(editor);
+    cursorRef.current = tracker;
     return () => {
-      editor.off("focus", onFocus);
+      tracker.dispose();
+      cursorRef.current = null;
     };
   }, [editor, noteId]);
 
+  // Auto-scroll only while the user is already near the bottom (L7).
   const bottomRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+  const onLogScroll = (e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    stickToBottom.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
   useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ block: "end" });
+    if (stickToBottom.current) {
+      bottomRef.current?.scrollIntoView?.({ block: "end" });
+    }
   }, [messages, notices]);
+
+  // Screen readers hear one announcement when an answer finishes instead of
+  // every streamed token (L8).
+  const [announcement, setAnnouncement] = useState("");
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (busy) {
+      wasBusy.current = true;
+      setAnnouncement("");
+    } else if (wasBusy.current) {
+      wasBusy.current = false;
+      const last = messagesRef.current[messagesRef.current.length - 1];
+      if (last?.role === "assistant" && textOf(last)) {
+        setAnnouncement(t("answerReady"));
+      }
+    }
+  }, [busy, t]);
 
   const send = useCallback(() => {
     const text = input.trim();
     if (!text || busy) return;
     setInput("");
+    stickToBottom.current = true;
     void sendMessage({ text });
   }, [input, busy, sendMessage]);
 
@@ -267,12 +328,38 @@ export default function AiChatPanel({
 
   const insert = (message: ChatMessage) => {
     if (!editor) return;
-    if (insertAnswer(editor, textOf(message), hasCursor.current)) {
+    if (
+      insertAnswer(editor, textOf(message), cursorRef.current?.has() ?? false)
+    ) {
       toast.success(t("inserted"));
+    } else {
+      // Never fail silently (M3): read-only note, empty answer or a command
+      // the editor rejected.
+      toast.error(t("insertFailed"));
     }
   };
 
-  const canInsert = !!editor && editor.isEditable;
+  // Reactive to the editor's editable state (M3): a note that becomes
+  // read-only (or editable) updates the button without a re-render of the
+  // host.
+  // `setEditable` emits `update` (not `transaction`), so both are observed;
+  // `useEditorState` alone would miss a read-only toggle.
+  const [editable, setEditable] = useState(editor?.isEditable ?? false);
+  useEffect(() => {
+    if (!editor) {
+      setEditable(false);
+      return;
+    }
+    const sync = () => setEditable(editor.isEditable);
+    sync();
+    editor.on("update", sync);
+    editor.on("transaction", sync);
+    return () => {
+      editor.off("update", sync);
+      editor.off("transaction", sync);
+    };
+  }, [editor]);
+  const canInsert = !!editor && editable;
 
   const renderNotice = (notice: Notice | undefined, userId: string) => {
     if (!notice) return null;
@@ -393,7 +480,8 @@ export default function AiChatPanel({
       <div
         role="log"
         aria-label={t("messagesAria")}
-        aria-live="polite"
+        aria-busy={busy}
+        onScroll={onLogScroll}
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-2"
       >
         {messages.length === 0 ? (
@@ -474,6 +562,15 @@ export default function AiChatPanel({
                   </Button>
                 </div>
               ) : null}
+              {!streaming && wasTruncated(m) ? (
+                <div
+                  role="status"
+                  data-notice="truncated"
+                  className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm"
+                >
+                  {t("truncated")}
+                </div>
+              ) : null}
               {!streaming && wasRefunded(m) ? (
                 <div
                   role="status"
@@ -495,6 +592,9 @@ export default function AiChatPanel({
           );
         })}
         <div ref={bottomRef} />
+      </div>
+      <div role="status" aria-live="polite" className="sr-only">
+        {announcement}
       </div>
 
       <div className="flex flex-col gap-2 border-t px-3 py-2">

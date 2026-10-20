@@ -233,7 +233,7 @@ describe("settlement hardening (security F-01, review M6)", () => {
   it("settles through the unauthenticated client, never the user-token one", async () => {
     const h = harness({});
     const userClientSettle = vi.fn();
-    const runClient = vi.fn((_token: string) => ({
+    const runClient = vi.fn(() => ({
       begin: async () => OK_BEGIN,
       settle: userClientSettle,
     }));

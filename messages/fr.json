@@ -309,7 +309,10 @@
         "missing": "introuvable",
         "child_cap": "trop de sous-notes"
       }
-    }
+    },
+    "answerReady": "La réponse est prête.",
+    "insertFailed": "Impossible d'insérer dans la note. Elle est peut-être en lecture seule.",
+    "truncated": "La réponse a été coupée car elle a pris trop de temps. Votre crédit est conservé pour la partie reçue."
   },
   "Editor": {
     "placeholder": "Écrivez quelque chose...",

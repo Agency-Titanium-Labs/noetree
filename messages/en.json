@@ -309,7 +309,10 @@
         "missing": "missing",
         "child_cap": "too many sub-notes"
       }
-    }
+    },
+    "answerReady": "The answer is ready.",
+    "insertFailed": "Couldn't insert into the note. It may be read-only.",
+    "truncated": "The answer was cut off because it took too long. Your credit was kept for the part you received."
   },
   "Editor": {
     "placeholder": "Write something...",

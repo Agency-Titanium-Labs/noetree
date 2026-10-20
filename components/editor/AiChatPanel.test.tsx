@@ -40,8 +40,12 @@ vi.mock("@/components/CreditsExhaustedDialog", () => ({
 }));
 
 const toastSuccess = vi.fn();
+const toastError = vi.fn();
 vi.mock("sonner", () => ({
-  toast: { success: (m: string) => toastSuccess(m) },
+  toast: {
+    success: (m: string) => toastSuccess(m),
+    error: (m: string) => toastError(m),
+  },
 }));
 
 import AiChatPanel from "./AiChatPanel";
@@ -100,7 +104,12 @@ function pushText(live: Live, id: string, delta: string, first = false) {
 function finish(
   live: Live,
   id: string,
-  settled: { outcome: string; refunded: boolean; failed?: boolean },
+  settled: {
+    outcome: string;
+    refunded: boolean;
+    failed?: boolean;
+    truncated?: boolean;
+  },
   error?: string,
 ) {
   live.controller.enqueue(sseLine({ type: "text-end", id }));
@@ -185,6 +194,7 @@ beforeEach(() => {
   queryMock.mockReset();
   queryMock.mockResolvedValue(previewOk());
   toastSuccess.mockReset();
+  toastError.mockReset();
   testEditor = null;
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -545,6 +555,191 @@ describe("AiChatPanel context selector (CHAT-02)", () => {
       "AiCredits.errors.CONTEXT_TOO_LARGE",
     );
     expect(screen.getByLabelText("AiChat.context.note")).toBeDisabled();
+  });
+});
+
+async function answered(live: ReturnType<typeof liveFetch>, text = "A") {
+  await send("Q");
+  await waitFor(() => expect(live.calls).toHaveLength(1));
+  await act(async () => pushText(live.calls[0], "t1", text, true));
+  await act(async () =>
+    finish(live.calls[0], "t1", { outcome: "completed", refunded: false }),
+  );
+  await screen.findByRole("button", { name: /AiChat\.copy/ });
+}
+
+describe("AiChatPanel review fixes", () => {
+  it("H1: an unknown error code falls back to the generic message", async () => {
+    setup(errorFetch(500, { error: "SOMETHING_NEW" }));
+    await send("Q");
+    await waitFor(() =>
+      expect(document.querySelector('[data-notice="error"]')).toHaveTextContent(
+        "AiCredits.errors.GENERIC",
+      ),
+    );
+  });
+
+  it("H1: chat-only codes use their own message", async () => {
+    setup(errorFetch(400, { error: "PROMPT_TOO_LARGE" }));
+    await send("Q");
+    await waitFor(() =>
+      expect(document.querySelector('[data-notice="error"]')).toHaveTextContent(
+        "AiCredits.errors.PROMPT_TOO_LARGE",
+      ),
+    );
+  });
+
+  it("H4: a server timeout after output shows the cut-off notice, not a refund", async () => {
+    const live = liveFetch();
+    setup(live.fetchImpl);
+    await send("Q");
+    await waitFor(() => expect(live.calls).toHaveLength(1));
+    await act(async () => pushText(live.calls[0], "t1", "Half", true));
+    await act(async () =>
+      finish(live.calls[0], "t1", {
+        outcome: "aborted_after_output",
+        refunded: false,
+        truncated: true,
+      }),
+    );
+    expect(
+      await waitFor(() => {
+        const n = document.querySelector('[data-notice="truncated"]');
+        expect(n).not.toBeNull();
+        return n;
+      }),
+    ).toHaveTextContent("AiChat.truncated");
+    expect(document.querySelector('[data-notice="refunded"]')).toBeNull();
+    expect(document.querySelector('[data-notice="error"]')).toBeNull();
+  });
+
+  it("M2: pointing the panel at another note clears the conversation", async () => {
+    const live = liveFetch();
+    const { rerender } = render(
+      <AiChatPanel
+        noteId="note_1"
+        onClose={vi.fn()}
+        fetchImpl={live.fetchImpl}
+      />,
+    );
+    await answered(live, "About note one");
+    expect(screen.getByText("About note one")).toBeInTheDocument();
+    rerender(
+      <AiChatPanel
+        noteId="note_2"
+        onClose={vi.fn()}
+        fetchImpl={live.fetchImpl}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("About note one")).toBeNull(),
+    );
+    expect(screen.getByLabelText("AiChat.context.none")).toBeChecked();
+    expect(screen.getByText("AiChat.emptyBody")).toBeInTheDocument();
+  });
+
+  it("M3: Insert follows the editor's editable state live", async () => {
+    testEditor = new Editor({
+      element: document.createElement("div"),
+      extensions: [StarterKit],
+      content: "<p>x</p>",
+    });
+    const live = liveFetch();
+    setup(live.fetchImpl);
+    await answered(live);
+    expect(
+      screen.getByRole("button", { name: /AiChat\.insert/ }),
+    ).toBeInTheDocument();
+    await act(async () => {
+      testEditor!.setEditable(false);
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /AiChat\.insert/ }),
+      ).toBeNull(),
+    );
+    await act(async () => {
+      testEditor!.setEditable(true);
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /AiChat\.insert/ }),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("M3: a rejected insert tells the user instead of staying silent", async () => {
+    testEditor = new Editor({
+      element: document.createElement("div"),
+      extensions: [StarterKit],
+      content: "<p>x</p>",
+    });
+    vi.spyOn(testEditor, "chain").mockReturnValue({
+      insertContentAt: () => ({ focus: () => ({ run: () => false }) }),
+    } as never);
+    const live = liveFetch();
+    setup(live.fetchImpl);
+    await answered(live);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /AiChat\.insert/ }));
+    });
+    expect(toastError).toHaveBeenCalledWith("AiChat.insertFailed");
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("L8: the log is busy while streaming and the answer is announced once, at the end", async () => {
+    const live = liveFetch();
+    setup(live.fetchImpl);
+    const log = screen.getByRole("log");
+    expect(log).not.toHaveAttribute("aria-live");
+    await send("Q");
+    await waitFor(() => expect(live.calls).toHaveLength(1));
+    await act(async () => pushText(live.calls[0], "t1", "Tok", true));
+    await screen.findByText("Tok");
+    expect(log).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("AiChat.answerReady")).toBeNull();
+    await act(async () =>
+      finish(live.calls[0], "t1", { outcome: "completed", refunded: false }),
+    );
+    await screen.findByText("AiChat.answerReady");
+    expect(log).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("L7: streaming does not yank the view when the user scrolled up", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const live = liveFetch();
+    setup(live.fetchImpl);
+    const log = screen.getByRole("log");
+    await send("Q");
+    await waitFor(() => expect(live.calls).toHaveLength(1));
+    await act(async () => pushText(live.calls[0], "t1", "one", true));
+    await screen.findByText("one");
+    // user scrolls far from the bottom
+    Object.defineProperty(log, "scrollHeight", {
+      value: 2000,
+      configurable: true,
+    });
+    Object.defineProperty(log, "clientHeight", {
+      value: 300,
+      configurable: true,
+    });
+    Object.defineProperty(log, "scrollTop", { value: 0, configurable: true });
+    fireEvent.scroll(log);
+    scrollIntoView.mockClear();
+    await act(async () => pushText(live.calls[0], "t1", " two"));
+    await screen.findByText("one two");
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    // back near the bottom: following resumes
+    Object.defineProperty(log, "scrollTop", {
+      value: 1690,
+      configurable: true,
+    });
+    fireEvent.scroll(log);
+    await act(async () => pushText(live.calls[0], "t1", " three"));
+    await screen.findByText("one two three");
+    expect(scrollIntoView).toHaveBeenCalled();
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   });
 });
 
