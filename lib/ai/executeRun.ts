@@ -1,4 +1,4 @@
-import type { LlmProvider } from "./fakeProvider";
+import type { LlmProvider, ProviderInput } from "./fakeProvider";
 
 /**
  * Orchestrates one metered AI run: reserve, stream, settle. This is the
@@ -42,7 +42,7 @@ function isAbort(err: unknown, signal: AbortSignal): boolean {
 export async function executeRun(args: {
   host: RunHost;
   provider: LlmProvider;
-  input: { prompt: string };
+  input: ProviderInput;
   signal: AbortSignal;
 }): Promise<ExecuteResult> {
   const { host, provider, input, signal } = args;
