@@ -25,6 +25,8 @@ interface RelatedNotesPanelProps {
    * A note that already has a result is never re-run automatically.
    */
   autoStart?: boolean;
+  /** Called once when the one-shot autoStart has been used up. */
+  onAutoStartConsumed?: () => void;
 }
 
 function newRequestId(): string {
@@ -46,6 +48,7 @@ export default function RelatedNotesPanel({
   onClose,
   onOpenNote,
   autoStart = false,
+  onAutoStartConsumed,
 }: RelatedNotesPanelProps) {
   const t = useTranslations("RelatedNotes");
   const tCredits = useTranslations("AiCredits");
@@ -93,9 +96,19 @@ export default function RelatedNotesPanel({
   };
 
   // Menu entry => first analysis starts once the panel knows there is none.
+  // This is the ONLY paid call made from an effect. It is a one-shot: the
+  // request is consumed on the first loaded result (started or not) and the
+  // host is told, so a later note switch can never replay it.
+  const onConsumedRef = useRef(onAutoStartConsumed);
+  onConsumedRef.current = onAutoStartConsumed;
   useEffect(() => {
-    if (!autoStart || autoStarted.current || data === undefined) return;
+    if (!autoStart) {
+      autoStarted.current = false;
+      return;
+    }
+    if (autoStarted.current || data === undefined) return;
     autoStarted.current = true;
+    onConsumedRef.current?.();
     if (data !== null && data.analysis === null) void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, data]);

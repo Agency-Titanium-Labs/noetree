@@ -55,6 +55,14 @@ export default function NoteContent() {
   // Phase 22: Related notes panel, docked in the same slot as the chat (one
   // at a time). It auto-starts only when opened from the AI menu.
   const [isLinksOpen, setIsLinksOpen] = useState(false);
+  // One-shot request set ONLY by the menu entry, bound to the note that was
+  // open at that moment. Consumed by the panel on first use, and dropped as
+  // soon as another note is selected: switching notes never starts a paid
+  // analysis.
+  const [linksRequest, setLinksRequest] = useState<{
+    noteId: string;
+    seq: number;
+  } | null>(null);
   // `seq` changes on every menu request so the panel re-syncs its mode even
   // when it is already open (review M3).
   const [chatRequest, setChatRequest] = useState<{
@@ -94,6 +102,11 @@ export default function NoteContent() {
     setIsCommentsOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commentsParam, focusCommentId, routeNoteId]);
+
+  const selectedId = selectedNote?._id;
+  useEffect(() => {
+    setLinksRequest(req => (req && req.noteId !== selectedId ? null : req));
+  }, [selectedId]);
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   // Client mirror of D-12; the server is authoritative.
@@ -208,11 +221,18 @@ export default function NoteContent() {
                 seq: prev.seq + 1,
               }));
               setIsLinksOpen(false);
+              setLinksRequest(null);
               setIsChatOpen(true);
             }}
             onOpenLinks={() => {
               // The chat is NOT closed: it stays mounted (hidden) so an
               // unapplied, already charged proposal survives (review M3).
+              if (selectedNote) {
+                setLinksRequest(prev => ({
+                  noteId: selectedNote._id,
+                  seq: (prev?.seq ?? 0) + 1,
+                }));
+              }
               setIsLinksOpen(true);
             }}
           />
@@ -311,9 +331,13 @@ export default function NoteContent() {
                 <RelatedNotesPanel
                   key={selectedNote._id}
                   noteId={selectedNote._id}
-                  autoStart
+                  autoStart={linksRequest?.noteId === selectedNote._id}
+                  onAutoStartConsumed={() => setLinksRequest(null)}
                   onOpenNote={openLinkedNote}
-                  onClose={() => setIsLinksOpen(false)}
+                  onClose={() => {
+                    setLinksRequest(null);
+                    setIsLinksOpen(false);
+                  }}
                 />
               </div>
             ) : null}
