@@ -737,8 +737,9 @@ async function analyze(
       }),
     );
     for (const s of settled) {
-      if (s === null || s === "empty") continue;
-      if (s === "error") failed += 1;
+      if (s === null) continue;
+      // An unusable answer (empty after sanitizing) counts like a failure.
+      if (s === "error" || s === "empty") failed += 1;
       else suggestions.push(s);
     }
   }
@@ -1066,7 +1067,17 @@ export const restoreSuggestion = mutation({
     const existing = await findIgnored(ctx, s.noteId, s.targetNoteId);
     if (existing) await ctx.db.delete("linkIgnoredPairs", existing._id);
     if (s.status !== "pending") {
-      await ctx.db.patch("linkSuggestions", s._id, { status: "pending" });
+      // Re-attach to the latest analysis of the note so the panel lists it
+      // again even if the note was analysed since.
+      const latest = await ctx.db
+        .query("linkAnalyses")
+        .withIndex("by_noteId_and_createdAt", q => q.eq("noteId", s.noteId))
+        .order("desc")
+        .first();
+      await ctx.db.patch("linkSuggestions", s._id, {
+        status: "pending",
+        ...(latest ? { analysisId: latest._id } : {}),
+      });
     }
     return { status: "pending" as const };
   },
