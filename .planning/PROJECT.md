@@ -8,18 +8,11 @@ Noetree est une application web de prise de notes hiérarchique (style Notion/Ob
 
 Un utilisateur peut créer, organiser et naviguer dans ses notes en structure arborescente — la navigation et la hiérarchie doivent toujours fonctionner.
 
-## Current Milestone: v1.3 IA et TVA marketplace
+## Completed Milestone: v1.3 IA et TVA marketplace (2026-10-20, mise en production en attente)
 
-**Goal :** Brancher un vrai LLM (Vercel AI Gateway) sur le système de crédits IA existant, avec des fonctionnalités gratuites et Premium, et trancher la TVA de la marketplace.
+**Livré :** IA branchée sur le système de crédits (réservation, règlement, remboursement exactement une fois, règle de plan unique, limites et interrupteur d'urgence) ; chat en streaming gratuit ; contexte IA personnel et agent d'arbre Premium (proposition, aperçu, application atomique, annulation) ; autocomplétion à 1 crédit par suggestion acceptée ; suggestions de liens sémantiques ; TVA marketplace absorbée, taux configurable, désactivée par défaut jusqu'au go-live. Contenus achetés exclus de tout contexte IA.
 
-**Target features :**
-
-- IA gratuite (utilisateurs Free, quota mensuel de crédits conservé) : chat conversationnel dans l'éditeur, en streaming, avec contexte aucun ou note courante + parents + enfants (NOETREE-36, NOETREE-37)
-- IA Premium : contexte utilisateur + autocomplétion (1 crédit par suggestion acceptée), génération de liens entre notes avec analyse sémantique fusionnée, IA qui voit toute l'arborescence et crée des nœuds (NOETREE-38, NOETREE-39, nouveau ticket)
-- Crédits débités avant l'appel LLM et remboursés en cas d'échec ; un utilisateur Free qui lance une action Premium reçoit une invitation à passer Premium, sans débit
-- Marketplace : TVA absorbée (l'acheteur paie le prix affiché, TVA et commission 20 % / 10 % retirées de la part du vendeur), relecture de la PR commission, réévaluation de Stripe Tax (NOETREE-41)
-
-**Préalable (hors milestone) :** go-live v1.2 (merge PR #35, migration Pro → Premium). **Hors milestone :** docs légaux et RGPD (NOETREE-24/25/26/32/33, à Antoine). Workstream GSD : `general`.
+**État :** 34/34 exigences, 1576 tests, audit `tech_debt` sans bloquant (`.planning/workstreams/general/milestones/v1.3-MILESTONE-AUDIT.md`). Reste le go-live : voir `DEPLOY-CHECKLIST-v1.3.md` (merge PR #35 d'abord, déploiement Convex, backfill, activation TVA, achats de test).
 
 ## Shipped Milestone: v1.2 Pricing V2 & Fonctionnalités Sociales (2026-10-18)
 
@@ -94,7 +87,7 @@ Un utilisateur peut créer, organiser et naviguer dans ses notes en structure ar
 
 <!-- Scope actif : deux milestones en parallèle (workstreams general = v1.2, marketplace = v1.1). -->
 
-**Milestone v1.3 (IA et TVA marketplace) :** voir `.planning/workstreams/general/REQUIREMENTS.md`.
+**Milestone v1.3 (IA et TVA marketplace) :** terminé le 2026-10-20 — voir `.planning/workstreams/general/milestones/v1.3-REQUIREMENTS.md`.
 
 **Milestone v1.2 (Pricing V2 & social) :** livré le 2026-10-18 — voir `.planning/workstreams/general/milestones/v1.2-REQUIREMENTS.md`.
 
@@ -160,4 +153,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-10-19 — milestone v1.3 (IA et TVA marketplace) started_
+_Last updated: 2026-10-20 after v1.3 milestone_

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: IA et TVA marketplace
-status: audited
-stopped_at: Milestone v1.3 audited (tech_debt), ready to complete
-last_updated: "2026-10-20T09:56:32.435Z"
-last_activity: 2026-10-19 — v1.3 roadmap created (7 phases, 34 requirements mapped)
+status: Awaiting next milestone
+stopped_at: Phase 20 context gathered
+last_updated: "2026-10-20T15:42:21.600Z"
+last_activity: 2026-10-20 — Milestone v1.3 completed and archived
 progress:
   total_phases: 7
-  completed_phases: 7
-  total_plans: 8
+  completed_phases: 1
+  total_plans: 11
   completed_plans: 1
-  percent: 100
+  percent: 9
 ---
 
 ## Project Reference
@@ -23,12 +23,10 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 
 ## Current Position
 
-Phase: 17 of 23 (AI Foundation)
+Phase: Milestone v1.3 complete
 Plan: —
-Status: Phase 17 complete (verified)
-Last activity: 2026-10-19 — v1.3 roadmap created (7 phases, 34 requirements mapped)
-
-Progress: [░░░░░░░░░░] 0%
+Status: Awaiting next milestone
+Last activity: 2026-10-20 — Milestone v1.3 completed and archived
 
 ## Performance Metrics
 
@@ -79,3 +77,21 @@ Last session: 2026-10-20T09:56:32.410Z
 Stopped at: Phase 20 context gathered
 Resume file:
 .planning/workstreams/general/phases/20-premium-context-tree-agent/20-CONTEXT.md
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone close on 2026-10-20:
+
+| Category     | Item                                                                         | Status       |
+| ------------ | ---------------------------------------------------------------------------- | ------------ |
+| uat          | Phase 12 HUMAN-UAT (2 open scenarios)                                        | partial      |
+| uat          | Phase 15 UAT                                                                 | partial      |
+| verification | Phases 12, 13, 16                                                            | human_needed |
+| verification | Phase 18 (oversized note, purchased copy on live deployment)                 | human_needed |
+| verification | Phase 19 (Stop timing, FR UI, Free zero-credit, mobile/a11y, Vercel runtime) | human_needed |
+| verification | Phase 23 (test purchases on dev/staging and production)                      | human_needed |
+| go-live      | Deploy, backfill, enable VAT, test purchases: see DEPLOY-CHECKLIST-v1.3.md   | pending      |
