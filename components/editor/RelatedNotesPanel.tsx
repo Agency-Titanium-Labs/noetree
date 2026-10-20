@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -50,6 +50,7 @@ export default function RelatedNotesPanel({
   const t = useTranslations("RelatedNotes");
   const tCredits = useTranslations("AiCredits");
   const locale = useLocale();
+  const ignoredListId = useId();
 
   const data = useQuery(api.links.getPanel, { noteId });
   const request = useMutation(api.links.requestAnalysis);
@@ -189,7 +190,13 @@ export default function RelatedNotesPanel({
 
         {!running && analysis?.status === "refunded" ? (
           <p role="status" data-testid="related-failed">
-            {t("failed")}
+            {analysis.errorCode === "INDEXING"
+              ? t("failedIndexing")
+              : analysis.errorCode === "NOTHING_TO_COMPARE"
+                ? t("failedNothingToCompare")
+                : analysis.errorCode === "INCOMPLETE"
+                  ? t("failedIncomplete")
+                  : t("failed")}
           </p>
         ) : null}
 
@@ -286,6 +293,7 @@ export default function RelatedNotesPanel({
               type="button"
               className="text-xs underline"
               aria-expanded={showIgnored}
+              aria-controls={ignoredListId}
               onClick={() => setShowIgnored(v => !v)}
             >
               {showIgnored
@@ -293,7 +301,11 @@ export default function RelatedNotesPanel({
                 : t("showIgnored", { count: ignored.length })}
             </button>
             {showIgnored ? (
-              <ul aria-label={t("ignoredAria")} className="mt-2 space-y-2">
+              <ul
+                id={ignoredListId}
+                aria-label={t("ignoredAria")}
+                className="mt-2 space-y-2"
+              >
                 {ignored.map(s => (
                   <li
                     key={s.id}

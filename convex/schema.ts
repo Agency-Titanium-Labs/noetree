@@ -614,6 +614,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_noteId", ["noteId"])
+    .index("by_noteId_and_status", ["noteId", "status"])
     .index("by_targetNoteId", ["targetNoteId"])
     .index("by_analysisId", ["analysisId"]),
 

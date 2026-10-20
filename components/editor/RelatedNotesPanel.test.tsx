@@ -159,6 +159,19 @@ describe("RelatedNotesPanel (D-08)", () => {
     expect(screen.queryByTestId("related-none")).toBeNull();
   });
 
+  it.each([
+    ["INDEXING", "RelatedNotes.failedIndexing"],
+    ["NOTHING_TO_COMPARE", "RelatedNotes.failedNothingToCompare"],
+    ["INCOMPLETE", "RelatedNotes.failedIncomplete"],
+  ])("explains the refund reason %s", (errorCode, key) => {
+    panelData = {
+      analysis: done({ status: "refunded", errorCode }),
+      suggestions: [],
+    };
+    mount();
+    expect(screen.getByTestId("related-failed")).toHaveTextContent(key);
+  });
+
   it("shows 'none found' for a completed analysis without suggestions", () => {
     panelData = { analysis: done(), suggestions: [] };
     mount();
