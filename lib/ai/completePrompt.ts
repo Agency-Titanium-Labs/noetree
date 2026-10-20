@@ -86,6 +86,13 @@ function isHiddenChar(cp: number): boolean {
     (cp >= 0x200b && cp <= 0x200f) ||
     (cp >= 0x2028 && cp <= 0x202e) ||
     (cp >= 0x2060 && cp <= 0x206f) ||
+    // Mongolian vowel separator, interlinear annotation anchors.
+    cp === 0x180e ||
+    (cp >= 0xfff9 && cp <= 0xfffb) ||
+    // Arabic letter mark, and the Unicode tag block (invisible "ASCII
+    // smuggling" that survives copy/paste, 21-REVIEW L5).
+    cp === 0x061c ||
+    (cp >= 0xe0000 && cp <= 0xe007f) ||
     cp === 0xfeff
   );
 }
