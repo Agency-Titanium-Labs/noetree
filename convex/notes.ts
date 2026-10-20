@@ -15,6 +15,7 @@ import {
 } from "./helpers/listings";
 import { deleteShareLinkForNote } from "./helpers/sharing";
 import { deleteCommentsForNote } from "./helpers/commentAccess";
+import { deleteLinkDataForNote } from "./helpers/linkCleanup";
 import { planCopy, writeCopy } from "./helpers/delivery";
 import {
   deleteVersionsForNote,
@@ -770,6 +771,9 @@ export const deleteNote = mutation({
       await deleteShareLinkForNote(ctx, noteId);
       await deleteCommentsForNote(ctx, noteId);
       await deleteVersionsForNote(ctx, noteId);
+      // Phase 22 (LINK-04): embedding, links in both directions, suggestions
+      // and ignored pairs. Bounded; reschedules itself when a batch is full.
+      await deleteLinkDataForNote(ctx, noteId);
     };
 
     if (rootNote.parentNote) {

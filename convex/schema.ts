@@ -488,4 +488,98 @@ export default defineSchema({
     // Phase 23: undefined reads as 0.
     vatCents: v.optional(v.number()),
   }).index("by_sellerId", ["sellerId"]),
+
+  // Phase 22 (embeddings and link suggestions). Invariants:
+  // - noteEmbeddings: one row per note, written only inside a paid link
+  //   analysis (never on save). `contentHash` covers model + title + text, so
+  //   an unchanged note is never re-embedded. The vector index is filtered by
+  //   `owner`: a search can never see another user's vectors. Dimension 768
+  //   (google/text-embedding-005); changing it needs a new index.
+  // - noteLinks: one row per UNORDERED pair, stored once with noteA < noteB
+  //   (id string order); shown from both notes. Written only by acceptance.
+  // - linkAnalyses: one row per paid run (1:1 with its aiRuns row).
+  // - linkSuggestions / linkIgnoredPairs: proposals and remembered "ignore"
+  //   decisions. Every row is owner-scoped and removed by the deleteNote
+  //   cascade (helpers/linkCleanup.ts).
+  noteEmbeddings: defineTable({
+    owner: v.id("users"),
+    noteId: v.id("notes"),
+    contentHash: v.string(),
+    model: v.string(),
+    embedding: v.array(v.float64()),
+    updatedAt: v.number(),
+  })
+    .index("by_noteId", ["noteId"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: 768,
+      filterFields: ["owner"],
+    }),
+
+  noteLinks: defineTable({
+    owner: v.id("users"),
+    noteA: v.id("notes"),
+    noteB: v.id("notes"),
+    // Plain-text justification kept from the accepted suggestion (optional).
+    reason: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_noteA", ["noteA"])
+    .index("by_noteB", ["noteB"])
+    .index("by_noteA_and_noteB", ["noteA", "noteB"]),
+
+  linkAnalyses: defineTable({
+    owner: v.id("users"),
+    runId: v.id("aiRuns"),
+    noteId: v.id("notes"),
+    locale: v.union(v.literal("en"), v.literal("fr")),
+    status: v.union(
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    createdAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    // More eligible notes than the per-analysis cap (D-02).
+    truncated: v.optional(v.boolean()),
+    eligibleCount: v.optional(v.number()),
+    comparedCount: v.optional(v.number()),
+    embeddedCount: v.optional(v.number()),
+    // Notes whose embedding batch failed and were left out of the comparison.
+    skippedCount: v.optional(v.number()),
+    suggestionCount: v.optional(v.number()),
+    errorCode: v.optional(v.string()),
+  })
+    .index("by_runId", ["runId"])
+    .index("by_noteId_and_createdAt", ["noteId", "createdAt"]),
+
+  linkSuggestions: defineTable({
+    owner: v.id("users"),
+    analysisId: v.id("linkAnalyses"),
+    // The note the analysis was run for, and the proposed counterpart.
+    noteId: v.id("notes"),
+    targetNoteId: v.id("notes"),
+    // Plain text, one sentence, sanitized before storage.
+    justification: v.string(),
+    score: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("ignored"),
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_noteId", ["noteId"])
+    .index("by_targetNoteId", ["targetNoteId"])
+    .index("by_analysisId", ["analysisId"]),
+
+  linkIgnoredPairs: defineTable({
+    owner: v.id("users"),
+    noteA: v.id("notes"),
+    noteB: v.id("notes"),
+    createdAt: v.number(),
+  })
+    .index("by_noteA", ["noteA"])
+    .index("by_noteB", ["noteB"])
+    .index("by_noteA_and_noteB", ["noteA", "noteB"]),
 });

@@ -698,5 +698,47 @@
     "textReply": "<b>{actor}</b> a répondu à votre commentaire sur « {title} »",
     "unread": "Non lu",
     "unknownActor": "Quelqu'un"
+  },
+  "RelatedNotes": {
+    "title": "Notes liées",
+    "close": "Fermer les notes liées",
+    "costHint": "{count, plural, one {Une analyse coûte # crédit.} other {Une analyse coûte # crédits.}} Accepter ou ignorer une suggestion est gratuit.",
+    "run": "Trouver des notes liées",
+    "runAgain": "Relancer",
+    "running": "Recherche de notes liées en cours...",
+    "noneFound": "Aucune note liée trouvée. Rien n'a été lié. Vos crédits ont servi à cette analyse.",
+    "failed": "L'analyse n'a pas pu aboutir, vos crédits ont donc été remboursés. Réessayez dans un instant.",
+    "truncated": "Vous avez plus de {max} notes : seules les {max} modifiées le plus récemment ont été comparées.",
+    "skipped": "{count, plural, one {# note n'a pas pu être analysée} other {# notes n'ont pas pu être analysées}} cette fois et ont été écartées.",
+    "suggestionsAria": "Liens suggérés",
+    "ignoredAria": "Suggestions ignorées",
+    "score": "Correspondance {percent} %",
+    "accept": "Lier",
+    "acceptAria": "Lier à {title}",
+    "ignore": "Ignorer",
+    "ignoreAria": "Ignorer {title}",
+    "accepted": "Liée",
+    "showIgnored": "Afficher les ignorées ({count})",
+    "hideIgnored": "Masquer les ignorées",
+    "showAgain": "Réafficher",
+    "showAgainAria": "Réafficher {title}",
+    "open": "Ouvrir {title}",
+    "untitled": "Sans titre",
+    "actionError": "Impossible d'enregistrer votre choix. Réessayez.",
+    "premiumTitle": "Les notes liées sont une fonctionnalité Premium",
+    "premiumBody": "Passez à Premium pour obtenir des liens suggérés entre vos notes. Aucun crédit n'a été débité.",
+    "upgrade": "Passer à Premium",
+    "errors": {
+      "LINK_NOTE_EMPTY": "Cette note ne contient pas encore de texte, il n'y a rien à comparer. Aucun crédit n'a été débité."
+    }
+  },
+  "LinkedNotes": {
+    "title": "Notes liées",
+    "listAria": "Notes liées",
+    "open": "Ouvrir {title}",
+    "remove": "Supprimer le lien",
+    "removeAria": "Supprimer le lien vers {title}",
+    "removeError": "Impossible de supprimer le lien. Réessayez.",
+    "untitled": "Sans titre"
   }
 }
