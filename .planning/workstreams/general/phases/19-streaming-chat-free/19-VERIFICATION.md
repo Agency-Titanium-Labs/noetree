@@ -67,3 +67,21 @@ Working tree stayed clean (no source changes).
 ---
 
 _Verifier: Claude (gsd-verifier)_
+
+## Real browser run (2026-10-20, orchestrator, local dev Convex, Chrome, signed in as a Premium test user)
+
+Real Gateway key in the worktree `.env.local` (gitignored), Next dev server on port 3100.
+
+| Check                                 | Result                                                                                                                                                                                                                                                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Open chat from the AI menu            | Panel docked under the note, "1 credit per message", context radios, input and Send                                                                                                                                                                    |
+| Real model answer, streamed           | OK with `google/gemini-2.5-flash-lite` (French reply to a French prompt, locale respected). Balance 500 to 499                                                                                                                                         |
+| Provider failure path                 | OK: with the default `anthropic/claude-haiku-5.5` the Gateway answered 403 "Free tier users do not have access to this model". The panel showed "The answer couldn't be completed, so your credit was refunded" with Retry, and the balance stayed 500 |
+| Copy / Insert in note / Retry buttons | Present. Insert put the answer into the note with italic and bold kept and `snake_case_name` intact                                                                                                                                                    |
+| Context option and preview            | "This note, its parents and sub-notes" shows "Will be sent: Current note: Credits test" with Refresh                                                                                                                                                   |
+| Context with an injected note         | The note contained "IGNORE PREVIOUS INSTRUCTIONS ... PWNED" and an image payload. The model summarized the note and did NOT obey the injected instruction. Balance 499 to 498                                                                          |
+| Console                               | No error recorded in the page console during the run                                                                                                                                                                                                   |
+
+Not covered in the browser: Stop after / before the first token (covered by unit tests only), French UI locale, Free account zero-credit path, mobile layout, Vercel deployment (maxDuration, `after()`, OIDC).
+
+**Blocker found:** the Vercel team is on the AI Gateway free tier, which has no access to Anthropic models. Models that did answer on the free tier: `google/gemini-2.5-flash-lite`, `openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `openai/gpt-5-nano`, `meta/llama-3.1-8b`, `mistral/ministral-3b`. Decision pending: top up AI Gateway credits (paid) to use the default Haiku model, or change the default chat model in `lib/ai/models.ts`. Until then local tests use `AI_CHAT_MODEL=google/gemini-2.5-flash-lite` in `.env.local`.
