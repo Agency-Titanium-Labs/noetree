@@ -97,7 +97,7 @@ const REFUNDED: ReadonlySet<string> = new Set([
   "aborted_before_output",
 ]);
 
-const JSON_TYPE = /^application\/json\s*(;|$)/i;
+export const JSON_TYPE = /^application\/json\s*(;|$)/i;
 const SAME_SITE_VALUES: ReadonlySet<string> = new Set([
   "same-origin",
   "same-site",
@@ -105,7 +105,7 @@ const SAME_SITE_VALUES: ReadonlySet<string> = new Set([
 ]);
 
 /** Browser-enforced cross-site signals; a CSRF-style call is refused. */
-function isCrossSite(req: Request): boolean {
+export function isCrossSite(req: Request): boolean {
   const fetchSite = req.headers.get("sec-fetch-site");
   if (fetchSite && !SAME_SITE_VALUES.has(fetchSite.toLowerCase())) return true;
   const origin = req.headers.get("origin");
@@ -129,7 +129,7 @@ function isCrossSite(req: Request): boolean {
  * the declared content-length is checked first, then the stream is counted
  * (covers chunked bodies and a lying header). null = over the cap.
  */
-async function readBodyCapped(
+export async function readBodyCapped(
   req: Request,
   maxBytes: number,
 ): Promise<string | null> {
@@ -170,7 +170,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 /** The typed AI code of a ConvexError (L2: data/instance, never message text). */
-function beginErrorCode(err: unknown): ChatErrorCode | null {
+export function beginErrorCode(err: unknown): ChatErrorCode | null {
   const data =
     err instanceof ConvexError
       ? (err.data as unknown)
@@ -178,7 +178,7 @@ function beginErrorCode(err: unknown): ChatErrorCode | null {
   return isAiErrorCode(data) ? data : null;
 }
 
-function errorName(err: unknown): string {
+export function errorName(err: unknown): string {
   return err instanceof Error ? err.name : "unknown";
 }
 
