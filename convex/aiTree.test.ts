@@ -28,6 +28,11 @@ import {
   TREE_UNDO_WINDOW_MS,
   type ProposalNode,
 } from "./helpers/aiTreeProposal";
+import {
+  OUTLINE_MAX_NODES_READ,
+  buildTreeOutline,
+  loadOutlineEntries,
+} from "./helpers/aiTreeOutline";
 
 const modules = (
   import.meta as unknown as {
@@ -417,6 +422,64 @@ describe("tree action gate and outline (TREE-02)", () => {
     ).toBe("CONTEXT_TOO_LARGE");
     expect(await balances(t)).toMatchObject({ monthly: 50 });
     expect(await runs(t)).toHaveLength(0);
+  });
+});
+
+describe("outline on large trees (review M2)", () => {
+  async function bigTree() {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t, { key: USER });
+    const branches = Array.from({ length: 10 }, (_, b) => ({
+      title: `B${b}`,
+      content: doc("x"),
+      children: Array.from({ length: 30 }, (_, c) => ({
+        title: `B${b}c${c}`,
+        content: doc("y"),
+      })),
+    }));
+    const { rootId, ids } = await seedTree(t, userId, {
+      title: "Big",
+      content: doc("r"),
+      children: branches,
+    });
+    return { t, userId, rootId, ids };
+  }
+
+  it("covers every top-level branch of a 300+ note tree and reports the unread rest", async () => {
+    const { t, userId, rootId } = await bigTree();
+    const { entries, unread } = await t.run(ctx =>
+      loadOutlineEntries(ctx, userId, rootId),
+    );
+    expect(entries.length).toBeLessThanOrEqual(OUTLINE_MAX_NODES_READ);
+    const titles = entries.map(e => e.title);
+    for (let b = 0; b < 10; b++) expect(titles).toContain(`B${b}`);
+    // Pre-order: refs and depth follow the tree.
+    expect(entries[0]).toMatchObject({ ref: "n1", depth: 0 });
+    expect(unread).toBeGreaterThan(0);
+  });
+
+  it("tells the model the outline is incomplete", async () => {
+    const { t, userId, rootId } = await bigTree();
+    const out = await t.run(ctx => buildTreeOutline(ctx, userId, rootId));
+    expect(out.unread).toBeGreaterThan(0);
+    expect(out.serialized).toContain("INCOMPLETE");
+    expect(out.serialized).toContain(`unread="${out.unread}"`);
+  });
+
+  it("a small tree reports nothing unread", async () => {
+    const { t, userId, rootId } = await setup();
+    const out = await t.run(ctx => buildTreeOutline(ctx, userId, rootId));
+    expect(out.unread).toBe(0);
+    expect(out.serialized).not.toContain("INCOMPLETE");
+  });
+
+  it("keeps the open note even when it sits deep in a big tree", async () => {
+    const { t, userId, ids } = await bigTree();
+    const deepOpen = ids[ids.length - 1];
+    const { entries } = await t.run(ctx =>
+      loadOutlineEntries(ctx, userId, deepOpen),
+    );
+    expect(entries.some(e => e.isOpen)).toBe(true);
   });
 });
 
