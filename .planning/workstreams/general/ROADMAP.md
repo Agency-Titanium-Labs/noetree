@@ -47,7 +47,7 @@ Full phase details archived: `.planning/workstreams/general/milestones/v1.2-ROAD
 
 - [x] **Phase 17: AI Foundation** - Reserve/settle/refund metering, single tier source, rate limits and kill switch, cost catalog
 - [x] **Phase 18: Context Assembly** - Budgeted, permission-aware, injection-safe note context for the LLM
-- [ ] **Phase 19: Streaming Chat (Free)** - Streaming AI chat in the editor with selectable context
+- [x] **Phase 19: Streaming Chat (Free)** - Streaming AI chat in the editor with selectable context
 - [ ] **Phase 20: Premium Context and Tree Agent** - Personal AI context and AI-proposed node trees applied atomically with undo
 - [ ] **Phase 21: Autocomplete (Premium)** - Ghost-text suggestions charged 1 credit on accept
 - [ ] **Phase 22: Embeddings and Link Suggestions (Premium)** - Semantic link suggestions the user accepts or ignores

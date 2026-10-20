@@ -25,10 +25,10 @@
 
 ### Chat gratuit (CHAT)
 
-- [ ] **CHAT-01**: L'utilisateur ouvre un chat dans l'éditeur et voit la réponse arriver en streaming (arrêter, copier, réessayer).
-- [ ] **CHAT-02**: Il choisit le contexte : aucun, ou note courante + parents + enfants, et voit ce qui est envoyé.
-- [ ] **CHAT-03**: Il voit les états « crédits insuffisants », « erreur » et « crédit remboursé ».
-- [ ] **CHAT-04**: Les réponses suivent la langue de l'interface. L'historique n'est pas conservé après la session.
+- [x] **CHAT-01**: L'utilisateur ouvre un chat dans l'éditeur et voit la réponse arriver en streaming (arrêter, copier, réessayer).
+- [x] **CHAT-02**: Il choisit le contexte : aucun, ou note courante + parents + enfants, et voit ce qui est envoyé.
+- [x] **CHAT-03**: Il voit les états « crédits insuffisants », « erreur » et « crédit remboursé ».
+- [x] **CHAT-04**: Les réponses suivent la langue de l'interface. L'historique n'est pas conservé après la session.
 
 ### Premium : contexte et arborescence (TREE)
 
@@ -85,7 +85,7 @@
 | ----------------- | -------- | -------- |
 | AIF-01 … AIF-07   | Phase 17 | Complete |
 | CTX-01 … CTX-05   | Phase 18 | Complete |
-| CHAT-01 … CHAT-04 | Phase 19 | Pending  |
+| CHAT-01 … CHAT-04 | Phase 19 | Complete |
 | TREE-01 … TREE-05 | Phase 20 | Pending  |
 | AUTO-01 … AUTO-03 | Phase 21 | Pending  |
 | LINK-01 … LINK-04 | Phase 22 | Pending  |
