@@ -239,7 +239,16 @@
       "UNAUTHENTICATED": "Your session has expired. Sign in again. You weren't charged.",
       "PROVIDER_ERROR": "The AI couldn't finish this answer.",
       "REPLAYED_RUN": "This message was already sent. Send it again to start a new one.",
-      "GENERIC": "Something went wrong. Try again."
+      "GENERIC": "Something went wrong. Try again.",
+      "BAD_REQUEST": "We couldn't read that message. Try again. You weren't charged.",
+      "INTERNAL": "Something went wrong on our side. Try again. You weren't charged.",
+      "UNKNOWN_ACTION": "This AI action isn't available. You weren't charged.",
+      "INVALID_REQUEST_ID": "This request couldn't be processed. Send it again. You weren't charged.",
+      "REQUEST_ID_REUSED": "This request was already used. Send your message again. You weren't charged.",
+      "FORBIDDEN": "This request was blocked. Reload the page and try again. You weren't charged.",
+      "UNSUPPORTED_MEDIA_TYPE": "We couldn't read that message. Reload the page and try again. You weren't charged.",
+      "PAYLOAD_TOO_LARGE": "This conversation is too long to send. Start a new one or shorten your message. You weren't charged.",
+      "PROMPT_TOO_LARGE": "This conversation is too long to send. Start a new one or shorten your message. You weren't charged."
     },
     "packsHeading": "Buy credits",
     "packsHelper": "One-time purchase. Purchased credits never expire.",

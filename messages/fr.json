@@ -239,7 +239,16 @@
       "UNAUTHENTICATED": "Votre session a expiré. Reconnectez-vous. Aucun crédit n'a été débité.",
       "PROVIDER_ERROR": "L'IA n'a pas pu terminer cette réponse.",
       "REPLAYED_RUN": "Ce message a déjà été envoyé. Renvoyez-le pour en lancer un nouveau.",
-      "GENERIC": "Une erreur est survenue. Réessayez."
+      "GENERIC": "Une erreur est survenue. Réessayez.",
+      "BAD_REQUEST": "Nous n'avons pas pu lire ce message. Réessayez. Vous n'avez pas été débité.",
+      "INTERNAL": "Un problème est survenu de notre côté. Réessayez. Vous n'avez pas été débité.",
+      "UNKNOWN_ACTION": "Cette action IA n'est pas disponible. Vous n'avez pas été débité.",
+      "INVALID_REQUEST_ID": "Cette demande n'a pas pu être traitée. Renvoyez-la. Vous n'avez pas été débité.",
+      "REQUEST_ID_REUSED": "Cette demande a déjà été utilisée. Renvoyez votre message. Vous n'avez pas été débité.",
+      "FORBIDDEN": "Cette requête a été bloquée. Rechargez la page et réessayez. Vous n'avez pas été débité.",
+      "UNSUPPORTED_MEDIA_TYPE": "Nous n'avons pas pu lire ce message. Rechargez la page et réessayez. Vous n'avez pas été débité.",
+      "PAYLOAD_TOO_LARGE": "Cette conversation est trop longue pour être envoyée. Commencez-en une nouvelle ou raccourcissez votre message. Vous n'avez pas été débité.",
+      "PROMPT_TOO_LARGE": "Cette conversation est trop longue pour être envoyée. Commencez-en une nouvelle ou raccourcissez votre message. Vous n'avez pas été débité."
     },
     "packsHeading": "Acheter des crédits",
     "packsHelper": "Achat unique. Les crédits achetés n'expirent jamais.",

@@ -11,7 +11,11 @@ export type ChatOnlyErrorCode =
   | "BAD_REQUEST"
   | "REPLAYED_RUN"
   | "PROVIDER_ERROR"
-  | "INTERNAL";
+  | "INTERNAL"
+  | "FORBIDDEN"
+  | "UNSUPPORTED_MEDIA_TYPE"
+  | "PAYLOAD_TOO_LARGE"
+  | "PROMPT_TOO_LARGE";
 
 export type ChatErrorCode = AiErrorCode | ChatOnlyErrorCode;
 
@@ -20,6 +24,10 @@ const CHAT_ONLY: readonly ChatOnlyErrorCode[] = [
   "REPLAYED_RUN",
   "PROVIDER_ERROR",
   "INTERNAL",
+  "FORBIDDEN",
+  "UNSUPPORTED_MEDIA_TYPE",
+  "PAYLOAD_TOO_LARGE",
+  "PROMPT_TOO_LARGE",
 ];
 
 export const CHAT_ERROR_STATUS: Record<ChatErrorCode, number> = {
@@ -41,7 +49,16 @@ export const CHAT_ERROR_STATUS: Record<ChatErrorCode, number> = {
   REPLAYED_RUN: 409,
   PROVIDER_ERROR: 502,
   INTERNAL: 500,
+  FORBIDDEN: 403,
+  UNSUPPORTED_MEDIA_TYPE: 415,
+  PAYLOAD_TOO_LARGE: 413,
+  PROMPT_TOO_LARGE: 400,
 };
+
+/** Every code the route can answer with (single list for tests and UI). */
+export const ALL_CHAT_ERROR_CODES = Object.keys(
+  CHAT_ERROR_STATUS,
+) as ChatErrorCode[];
 
 /** One token of the bucket refills in 6 s (convex/helpers/aiRateLimit.ts). */
 export const RATE_LIMIT_RETRY_AFTER_SECONDS = 6;
