@@ -43,7 +43,7 @@ import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
 
 interface EditorToolbarProps {
   /** Opens the AI chat panel (the free `basic` action, Phase 19). */
-  onOpenChat?: () => void;
+  onOpenChat?: (mode?: "chat" | "tree") => void;
 }
 
 export default function EditorToolbar({ onOpenChat }: EditorToolbarProps = {}) {
@@ -88,6 +88,11 @@ export default function EditorToolbar({ onOpenChat }: EditorToolbarProps = {}) {
     }
     if (actionKey === "basic" && onOpenChat) {
       onOpenChat();
+      return;
+    }
+    // Phase 20: the tree agent is a mode of the same panel.
+    if (actionKey === "tree" && onOpenChat) {
+      onOpenChat("tree");
       return;
     }
     toast.info(tCredits("comingSoon"));

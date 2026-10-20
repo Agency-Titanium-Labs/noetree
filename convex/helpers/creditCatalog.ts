@@ -20,6 +20,8 @@ export const ACTIONS = {
   basic: { cost: 1, tier: "free" },
   semantic: { cost: 3, tier: "free" },
   linking: { cost: 5, tier: "premium" },
+  // Phase 20: AI tree proposal (TREE-02), charged when generated.
+  tree: { cost: 5, tier: "premium" },
 } as const satisfies Record<string, { cost: number; tier: ActionTier }>;
 export type ActionKey = keyof typeof ACTIONS;
 
@@ -27,12 +29,14 @@ export const ACTION_COSTS = {
   basic: ACTIONS.basic.cost,
   semantic: ACTIONS.semantic.cost,
   linking: ACTIONS.linking.cost,
+  tree: ACTIONS.tree.cost,
 } as const;
 /** Ascending cost; UI menu order. */
 export const ACTION_KEYS: readonly ActionKey[] = [
   "basic",
   "semantic",
   "linking",
+  "tree",
 ];
 
 export const FREE_MONTHLY_QUOTA = 30;

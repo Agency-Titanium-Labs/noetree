@@ -1,6 +1,14 @@
 "use client";
 
-import { Brain, Coins, Crown, Link2, Loader2, Sparkles } from "lucide-react";
+import {
+  Brain,
+  Coins,
+  Crown,
+  Link2,
+  ListTree,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -21,6 +29,7 @@ const ICONS = {
   basic: Sparkles,
   semantic: Brain,
   linking: Link2,
+  tree: ListTree,
 } as const;
 
 interface AiActionsMenuProps {

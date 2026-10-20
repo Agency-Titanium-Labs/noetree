@@ -28,6 +28,8 @@ import {
 import { RATE_LIMIT_CAPACITY, consumeToken } from "./helpers/aiRateLimit";
 import { isValidInternalSecret } from "./helpers/internalSecret";
 import { assembleContextForUser } from "./helpers/aiContextLoad";
+import { buildTreeOutline } from "./helpers/aiTreeOutline";
+import { loadPersonalContextBlock } from "./helpers/aiPersonalContext";
 
 /**
  * AI metering state machine (AIF-01..AIF-06). Reserve, run, settle:
@@ -121,6 +123,17 @@ const beginResultValidator = v.object({
   // it, so a caller that loses the response can not recover it (18-CONTEXT
   // D-09).
   context: v.optional(contextValidator),
+  // Phase 20 (claiming call only, like `context`): the framed personal AI
+  // context (Premium users with the switch on) and, for the tree action, the
+  // whole-tree outline with its ref -> note id map. The route keeps the map
+  // server-side; the model only ever sees the refs.
+  personal: v.optional(v.object({ serialized: v.string(), chars: v.number() })),
+  tree: v.optional(
+    v.object({
+      outline: v.string(),
+      refs: v.array(v.object({ ref: v.string(), noteId: v.id("notes") })),
+    }),
+  ),
 });
 
 export const beginRun = mutation({
@@ -187,9 +200,13 @@ export const beginRun = mutation({
     if (cost === null || requiredTier === null) {
       throw new ConvexError("UNKNOWN_ACTION");
     }
-    if (requiredTier === "premium") {
-      const tier = await tierFromClerkUserId(ctx, clerkUserId);
-      if (tier !== "premium") throw new ConvexError("PREMIUM_REQUIRED");
+    const tier = await tierFromClerkUserId(ctx, clerkUserId);
+    if (requiredTier === "premium" && tier !== "premium") {
+      throw new ConvexError("PREMIUM_REQUIRED");
+    }
+    if (args.actionKey === "tree" && args.noteId === undefined) {
+      // The tree agent always works under the open note.
+      throw new ConvexError("NOTE_NOT_FOUND");
     }
 
     // 3b. Context (CTX-01..CTX-05). Built and validated BEFORE the rate
@@ -197,6 +214,7 @@ export const beginRun = mutation({
     //     PURCHASED_CONTENT_EXCLUDED and NOTE_NOT_FOUND throw here, so no
     //     token is consumed, no credit debited and no aiRuns row written.
     let context: Awaited<ReturnType<typeof assembleContextForUser>> | undefined;
+    let treeOutline: Awaited<ReturnType<typeof buildTreeOutline>> | undefined;
     if (args.noteId !== undefined) {
       const user = await ctx.db
         .query("users")
@@ -207,6 +225,24 @@ export const beginRun = mutation({
       // A missing users row is an identity problem, not a missing note.
       if (!user) throw new ConvexError("UNAUTHENTICATED");
       context = await assembleContextForUser(ctx, user._id, args.noteId);
+      if (args.actionKey === "tree") {
+        // Same refusal point as the note context: before any debit.
+        treeOutline = await buildTreeOutline(ctx, user._id, args.noteId);
+      }
+    }
+
+    // 3c. Personal AI context (TREE-01): Premium only, switch on. Read-only.
+    let personal: { serialized: string; chars: number } | null = null;
+    if (tier === "premium") {
+      const personalUser = await ctx.db
+        .query("users")
+        .withIndex("by_token", q =>
+          q.eq("tokenIdentifier", identity.tokenIdentifier),
+        )
+        .unique();
+      if (personalUser) {
+        personal = await loadPersonalContextBlock(ctx, personalUser._id);
+      }
     }
 
     // 4. In-flight cap: bounded read, at most MAX_INFLIGHT_RUNS reserved.
@@ -282,6 +318,18 @@ export const beginRun = mutation({
       replayed: false,
       claimed: true,
       ...(context ? { context } : {}),
+      ...(personal ? { personal } : {}),
+      ...(treeOutline
+        ? {
+            tree: {
+              outline: treeOutline.serialized,
+              refs: treeOutline.refs.map(r => ({
+                ref: r.ref,
+                noteId: r.noteId as Id<"notes">,
+              })),
+            },
+          }
+        : {}),
     };
   },
 });

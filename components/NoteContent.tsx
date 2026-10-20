@@ -48,6 +48,7 @@ export default function NoteContent() {
   const tListing = useTranslations("ListingForm");
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMode, setChatMode] = useState<"chat" | "tree">("chat");
   const [isListingOpen, setIsListingOpen] = useState(false);
 
   const { editor, saveStatus, getCurrentContent, previewVersion, exitPreview } =
@@ -179,7 +180,12 @@ export default function NoteContent() {
       </div>
       <div className="grow flex flex-col gap-4">
         <div className="flex flex-col gap-2 grow">
-          <EditorToolbar onOpenChat={() => setIsChatOpen(true)} />
+          <EditorToolbar
+            onOpenChat={mode => {
+              setChatMode(mode ?? "chat");
+              setIsChatOpen(true);
+            }}
+          />
           <ConditionChecker condition={!selectedNote}>
             <div className="flex-1 p-4 flex flex-col gap-4 border rounded-md">
               <Skeleton className="w-56 h-8 mt-4" />
@@ -266,6 +272,7 @@ export default function NoteContent() {
             <AiChatPanel
               key={selectedNote._id}
               noteId={selectedNote._id}
+              initialMode={chatMode}
               onClose={() => setIsChatOpen(false)}
             />
           </ResizablePanel>
