@@ -40,7 +40,7 @@ Still to do when shipping, per environment (dev/staging, production):
 
 - VAT-01: accountant sign-off (`phases/23-marketplace-vat/23-VAT-DECISION.md`). Until signed the VAT stays disabled.
 - Revoke and recreate the two AI Gateway keys if this conversation transcript is ever shared (they were pasted in chat). Spending caps are set in the Vercel dashboard.
-- Vercel Node version is already 22.x. Convex Node actions (Phase 22 embeddings) will need their own Node 22 setting in `convex.json`.
+- Vercel Node 22.x done; Convex Node actions now pinned to Node 22 via `convex.json` (done 2026-10-20).
 
 ## 5. Not required before shipping, tracked for later
 
