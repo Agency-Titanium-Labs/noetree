@@ -73,6 +73,15 @@ describe("useAutocompleteBridge", () => {
     expect(bridge(null).options.isEnabled()).toBe(false);
   });
 
+  it("never requests on a device with no fine pointer (no Tab to accept with)", () => {
+    const mm = (matches: boolean) =>
+      vi.stubGlobal("matchMedia", (q: string) => ({ matches, media: q }));
+    mm(false);
+    expect(bridge().options.isEnabled()).toBe(false);
+    mm(true);
+    expect(bridge().options.isEnabled()).toBe(true);
+  });
+
   it("posts only the note id and the text before the cursor, with the abort signal", async () => {
     fetchMock.mockResolvedValue(
       json({ status: "suggestion", suggestionId: "s1", text: " more" }),

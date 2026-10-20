@@ -471,6 +471,41 @@ describe("accept (Tab)", () => {
     expect(h.errors).toHaveLength(1);
   });
 
+  it("does not call accept when the editor became read-only (nothing is paid for)", async () => {
+    const h = setup();
+    await showGhost(h);
+    h.editor.setEditable(false);
+    key(h, "Tab");
+    await pause(0);
+    expect(h.accepts).toEqual([]);
+    expect(text(h)).toBe("We will meet tomorrow!");
+    expect(h.errors).toEqual([]);
+  });
+
+  it("an editor destroyed while accept is pending inserts nothing and does not throw", async () => {
+    const h = setup({ manualAccept: true });
+    await showGhost(h);
+    key(h, "Tab");
+    expect(h.accepts).toEqual(["s1"]);
+    h.editor.destroy();
+    h.settleAccept({ ok: true, text: " and then rest." });
+    await pause(0);
+    expect(h.errors).toEqual([]);
+  });
+
+  it("strips invisible characters from accepted text before inserting", async () => {
+    const h = setup({
+      acceptResult: {
+        ok: true,
+        text: " and\u200b then\u{e0041}\u{e0042} rest.",
+      },
+    });
+    await showGhost(h);
+    key(h, "Tab");
+    await pause(0);
+    expect(text(h)).toBe("We will meet tomorrow! and then rest.");
+  });
+
   it("does not start another request right after inserting", async () => {
     const h = setup();
     await showGhost(h);
