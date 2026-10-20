@@ -102,7 +102,11 @@ describe("createConnectOnboardingLink", () => {
         type: "express",
         metadata: { clerkUserId: "user_new_1" },
       },
-      { idempotencyKey: "connect-account-create-user_new_1" },
+      {
+        idempotencyKey: `connect-account-create-user_new_1-${Math.floor(
+          Date.now() / (10 * 60 * 1000),
+        )}`,
+      },
     );
     expect(mockConvexAction).toHaveBeenCalledTimes(1);
     expect(mockConvexAction).toHaveBeenCalledWith(expect.anything(), {
@@ -114,6 +118,43 @@ describe("createConnectOnboardingLink", () => {
     expect(mockAccountLinksCreate).toHaveBeenCalledWith(
       expect.objectContaining({ account: "acct_new_1" }),
     );
+  });
+
+  it("a failed account creation can be retried after the idempotency window (key is time-bucketed)", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-10-20T10:00:00Z"));
+      mockAuth.mockResolvedValue({
+        userId: "user_retry_1",
+        getToken: vi.fn().mockResolvedValue("mock_convex_token"),
+      });
+      mockConvexQuery.mockResolvedValue(null);
+      mockAccountsCreate.mockRejectedValue(new Error("connect not enabled"));
+
+      await expect(createConnectOnboardingLink("en")).rejects.toThrow(
+        "connectAccountCreationFailed",
+      );
+      // Same window: same key (a double submit still collapses to one account).
+      await expect(createConnectOnboardingLink("en")).rejects.toThrow(
+        "connectAccountCreationFailed",
+      );
+      vi.setSystemTime(new Date("2026-10-20T10:11:00Z"));
+      await expect(createConnectOnboardingLink("en")).rejects.toThrow(
+        "connectAccountCreationFailed",
+      );
+
+      const keys = mockAccountsCreate.mock.calls.map(
+        c => (c[1] as { idempotencyKey: string }).idempotencyKey,
+      );
+      expect(keys).toHaveLength(3);
+      expect(keys[0]).toBe(keys[1]);
+      expect(keys[2]).not.toBe(keys[0]);
+      expect(
+        keys.every(k => k.startsWith("connect-account-create-user_retry_1-")),
+      ).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lost race: when recordPendingAccount reports alreadyExists, the existing account id is reused for the link (CR-01)", async () => {

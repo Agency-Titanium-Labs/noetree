@@ -10,6 +10,15 @@ import { getAppUrl } from "@/lib/appUrl";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+// Stripe stores the result of the first request per idempotency key, errors
+// included, and replays it for 24 h. A permanent per-user key therefore froze
+// a transient failure (e.g. Connect not yet enabled on the platform account)
+// for a full day even after the cause was fixed. Bucketing the key in 10 min
+// windows still collapses a double submit / second tab into ONE account, while
+// a failed attempt can be retried soon after. Any residual duplicate across a
+// window boundary is caught by recordPendingAccount (CR-01, alreadyExists).
+const ACCOUNT_CREATE_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
+
 // Single code path behind all three D-03 CTA labels ("Become a seller",
 // "Resume onboarding", "Update details") — the label differs client-side,
 // the underlying call never does. D-02: goes straight to Stripe's hosted
@@ -72,9 +81,14 @@ export async function createConnectOnboardingLink(
           // would be an account-linking primitive.
           metadata: { clerkUserId: userId },
         },
-        // CR-01: a double submit / second tab within Stripe's idempotency
-        // window gets back the SAME account instead of minting a duplicate.
-        { idempotencyKey: `connect-account-create-${userId}` },
+        // CR-01: a double submit / second tab within the same window gets back
+        // the SAME account instead of minting a duplicate (see the window
+        // note at the top of this file for why the key is time-bucketed).
+        {
+          idempotencyKey: `connect-account-create-${userId}-${Math.floor(
+            Date.now() / ACCOUNT_CREATE_IDEMPOTENCY_WINDOW_MS,
+          )}`,
+        },
       );
     } catch (err) {
       console.error(
