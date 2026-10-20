@@ -408,6 +408,18 @@ describe("typed errors (same mapping as chat)", () => {
   });
 });
 
+describe("cleanCompletion invisible characters (21-REVIEW L5)", () => {
+  it("strips tag-block, zero-width, bidi and annotation characters", () => {
+    const tags = String.fromCodePoint(0xe0041, 0xe0042, 0xe007f);
+    expect(
+      cleanCompletion(
+        `we\u200b meet\u202e${tags}\u180e\ufff9 now\u061c.`,
+        "x ",
+      ),
+    ).toBe("we meet now.");
+  });
+});
+
 describe("cleanCompletion", () => {
   it("keeps one line and strips quotes, fences and entities", () => {
     expect(cleanCompletion('"we meet &amp; eat."\nsecond line', "x ")).toBe(

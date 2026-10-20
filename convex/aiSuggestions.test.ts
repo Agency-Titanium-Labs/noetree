@@ -7,7 +7,10 @@ import {
   MAX_UNRESOLVED_SUGGESTIONS,
   SUGGESTION_CLEANUP_GRACE_MS,
   SUGGESTION_TTL_MS,
+  SUGGEST_DAILY_CAP,
+  SUGGEST_DAILY_RETENTION_DAYS,
   SUGGEST_RATE_CAPACITY,
+  utcDay,
 } from "./helpers/aiSuggestionState";
 import {
   TEST_SECRET,
@@ -264,6 +267,89 @@ describe("issue (AUTO-02, AUTO-03)", () => {
     expect((await issue(t, noteId)).status).toBe("issued");
   });
 
+  it("caps issued suggestions per user per UTC day, quietly, and resets next day (M1)", async () => {
+    const { t, noteId } = await setup();
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2030, 0, 1, 12, 0, 0));
+    // Fast-forward the counter to one below the ceiling.
+    await t.run(async ctx =>
+      ctx.db.insert("aiSuggestionDaily", {
+        clerkUserId: USER,
+        day: utcDay(Date.now()),
+        issued: SUGGEST_DAILY_CAP - 1,
+        accepted: 0,
+      }),
+    );
+    const last = await issue(t, noteId);
+    expect(last.status).toBe("issued");
+    if (last.status === "issued") {
+      await as(t).mutation(api.aiSuggestions.dismiss, {
+        suggestionId: last.suggestionId,
+      });
+    }
+    const before = (await rows(t)).length;
+    expect(await issue(t, noteId)).toEqual({
+      status: "paused",
+      reason: "daily",
+    });
+    expect(await rows(t)).toHaveLength(before);
+
+    // Another user is unaffected (own counter).
+    const other = await setup({ key: "user_other" });
+    expect((await issue(other.t, other.noteId, "user_other")).status).toBe(
+      "issued",
+    );
+
+    // Next UTC day: resets.
+    vi.setSystemTime(Date.UTC(2030, 0, 2, 0, 0, 1));
+    expect((await issue(t, noteId)).status).toBe("issued");
+  });
+
+  it("suggestionStats reports the issued-to-accepted ratio for the operator", async () => {
+    const { t, noteId } = await setup();
+    const a = await issued(t, noteId);
+    await fill(t, a);
+    await accept(t, a);
+    await accept(t, a); // replay does not count twice
+    await issued(t, noteId);
+    const stats = await t.query(internal.aiSuggestions.suggestionStats, {});
+    expect(stats).toMatchObject({
+      users: 1,
+      issued: 2,
+      accepted: 1,
+      acceptRatio: 0.5,
+    });
+    expect(stats.top[0]).toEqual({
+      clerkUserId: USER,
+      issued: 2,
+      accepted: 1,
+    });
+    expect(
+      await t.query(internal.aiSuggestions.suggestionStats, {
+        day: utcDay(Date.now()) + 1,
+      }),
+    ).toMatchObject({ users: 0, issued: 0, acceptRatio: null });
+  });
+
+  it("sweeps daily counters older than the retention window", async () => {
+    const { t, noteId } = await setup();
+    await issued(t, noteId);
+    await t.run(async ctx =>
+      ctx.db.insert("aiSuggestionDaily", {
+        clerkUserId: USER,
+        day: utcDay(Date.now()) - SUGGEST_DAILY_RETENTION_DAYS - 2,
+        issued: 5,
+        accepted: 1,
+      }),
+    );
+    await t.mutation(internal.aiSuggestions.sweepSuggestions, {});
+    const left = await t.run(async ctx =>
+      ctx.db.query("aiSuggestionDaily").collect(),
+    );
+    expect(left).toHaveLength(1);
+    expect(left[0].day).toBe(utcDay(Date.now()));
+  });
+
   it("a request budget spent on suggestions never blocks chat (separate buckets)", async () => {
     const { t, noteId } = await setup();
     for (let i = 0; i < SUGGEST_RATE_CAPACITY; i++) {
@@ -393,6 +479,47 @@ describe("accept (AUTO-02)", () => {
     expect(await rejects(accept(t, id))).toBe("PREMIUM_REQUIRED");
     expect(await ledger(t)).toHaveLength(0);
     expect((await rows(t))[0].status).toBe("issued");
+  });
+
+  it("refuses under a per-user operator block, nothing debited (L4)", async () => {
+    const { t, noteId } = await setup();
+    const id = await issued(t, noteId);
+    await fill(t, id);
+    await t.mutation(internal.aiRuns.setUserAiBlock, {
+      clerkUserId: USER,
+      blockedUntil: Date.now() + 60_000,
+    });
+    expect(await rejects(accept(t, id))).toBe("AI_DISABLED");
+    expect(await ledger(t)).toHaveLength(0);
+    expect((await rows(t))[0].status).toBe("issued");
+  });
+
+  it("re-checks the note: purchased since issue means no charge (L4)", async () => {
+    const { t, noteId } = await setup();
+    const id = await issued(t, noteId);
+    await fill(t, id);
+    await t.run(async ctx =>
+      ctx.db.patch("notes", noteId, { isPurchasedContent: true }),
+    );
+    expect(await rejects(accept(t, id))).toBe("PURCHASED_CONTENT_EXCLUDED");
+    expect(await ledger(t)).toHaveLength(0);
+    expect((await rows(t))[0].status).toBe("issued");
+  });
+
+  it("re-checks the note: deleted since issue means no charge (L4)", async () => {
+    const { t, noteId } = await setup();
+    const id = await issued(t, noteId);
+    await fill(t, id);
+    await t.run(async ctx => ctx.db.delete("notes", noteId));
+    expect(await rejects(accept(t, id))).toBe("NOTE_NOT_FOUND");
+    expect(await ledger(t)).toHaveLength(0);
+  });
+
+  it("fill refuses text carrying invisible characters (L5)", async () => {
+    const { t, noteId } = await setup();
+    const id = await issued(t, noteId);
+    expect(await fill(t, id, "hi\u{e0041}\u200b there")).toBe(false);
+    expect(await fill(t, id, "hi there")).toBe(true);
   });
 
   it("refuses when the kill switch is on", async () => {

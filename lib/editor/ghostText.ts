@@ -1,6 +1,7 @@
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
+import { stripHiddenChars } from "@/convex/helpers/aiSuggestionState";
 
 /**
  * Ghost-text autocomplete for TipTap (21-CONTEXT D-01, D-03). Pure editor
@@ -231,6 +232,17 @@ function createGhostTextPlugin(
     if (!state?.suggestion || state.accepting) return;
     const { id } = state.suggestion;
     cancelPending();
+    // Never pay for text that cannot be inserted (21-REVIEW L1/L2): an editor
+    // that is already gone or read-only does not call accept at all.
+    if (view.isDestroyed || !view.editable) {
+      settleDismiss(id);
+      if (!view.isDestroyed) {
+        view.dispatch(
+          view.state.tr.setMeta(ghostTextKey, { type: "clear" } satisfies Meta),
+        );
+      }
+      return;
+    }
     view.dispatch(
       view.state.tr.setMeta(ghostTextKey, { type: "accepting" } satisfies Meta),
     );
@@ -244,13 +256,15 @@ function createGhostTextPlugin(
     if (view.isDestroyed) return;
     const current = ghostTextKey.getState(view.state);
     const pos = current?.suggestion?.pos;
-    if (result.ok && pos !== undefined) {
+    // Invisible characters never reach the document, whatever the server sent.
+    const insertText = result.ok ? stripHiddenChars(result.text) : "";
+    if (result.ok && pos !== undefined && insertText.length > 0) {
       const tr = view.state.tr;
       const cursorWasThere = view.state.selection.from === pos;
-      tr.insertText(result.text, pos);
+      tr.insertText(insertText, pos);
       if (cursorWasThere) {
         // Keep the caret after the accepted text, like typing it.
-        tr.setSelection(TextSelection.create(tr.doc, pos + result.text.length));
+        tr.setSelection(TextSelection.create(tr.doc, pos + insertText.length));
       }
       tr.setMeta(ghostTextKey, { type: "inserted" } satisfies Meta);
       suppressNextSchedule = true;

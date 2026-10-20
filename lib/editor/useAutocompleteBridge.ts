@@ -28,6 +28,17 @@ type CompleteResponse =
 const PAUSING_STATUSES = new Set([401, 402, 403, 429, 503]);
 
 /**
+ * Suggestions are accepted with Tab, so a device with no fine pointer at all
+ * (a phone or tablet without a trackpad, hence no hardware keyboard to count
+ * on) never asks: it would pay for model calls it cannot accept (21-REVIEW
+ * L3). Where matchMedia is unavailable the answer is yes.
+ */
+export function canAcceptWithTab(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return true;
+  return window.matchMedia("(any-pointer: fine)").matches;
+}
+
+/**
  * Connects the ghost-text extension to the app: the account preference, the
  * /api/ai/complete route and the accept/dismiss mutations. Everything the
  * extension reads at call time goes through refs, so the options object is
@@ -75,7 +86,7 @@ export function useAutocompleteBridge(noteId: string | undefined): {
   const options = useMemo<GhostTextOptions>(
     () => ({
       ...GHOST_TEXT_DEFAULTS,
-      isEnabled: () => live.current.enabled,
+      isEnabled: () => live.current.enabled && canAcceptWithTab(),
 
       async request({ textBefore, signal }): Promise<GhostRequestResult> {
         const noteId = live.current.noteId;
