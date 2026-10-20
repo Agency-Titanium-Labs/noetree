@@ -32,24 +32,24 @@
 
 ### Premium : contexte et arborescence (TREE)
 
-- [ ] **TREE-01**: Un utilisateur Premium peut enregistrer, modifier et supprimer son contexte personnel, utilisé pour personnaliser la génération.
-- [ ] **TREE-02**: L'IA reçoit le plan de toute l'arborescence (titres et courts extraits) et peut lire une note à la demande.
-- [ ] **TREE-03**: L'IA propose un arbre de nouveaux nœuds, que l'utilisateur prévisualise et coche avant application.
-- [ ] **TREE-04**: L'application crée tous les nœuds acceptés en une seule opération atomique, et uniquement sous des nœuds modifiables.
-- [ ] **TREE-05**: L'utilisateur peut annuler tout un lot de nœuds créés par l'IA.
+- [x] **TREE-01**: Un utilisateur Premium peut enregistrer, modifier et supprimer son contexte personnel, utilisé pour personnaliser la génération.
+- [x] **TREE-02**: L'IA reçoit le plan de toute l'arborescence (titres et courts extraits) et peut lire une note à la demande.
+- [x] **TREE-03**: L'IA propose un arbre de nouveaux nœuds, que l'utilisateur prévisualise et coche avant application.
+- [x] **TREE-04**: L'application crée tous les nœuds acceptés en une seule opération atomique, et uniquement sous des nœuds modifiables.
+- [x] **TREE-05**: L'utilisateur peut annuler tout un lot de nœuds créés par l'IA.
 
 ### Premium : autocomplétion (AUTO)
 
-- [ ] **AUTO-01**: Un utilisateur Premium voit une suggestion en texte fantôme dans l'éditeur, acceptée avec Tab et refusée avec Échap.
-- [ ] **AUTO-02**: Une suggestion affichée est gratuite ; 1 crédit est débité une seule fois à l'acceptation.
-- [ ] **AUTO-03**: Les demandes de suggestion sont limitées en débit, et le nombre de suggestions non résolues est plafonné.
+- [x] **AUTO-01**: Un utilisateur Premium voit une suggestion en texte fantôme dans l'éditeur, acceptée avec Tab et refusée avec Échap.
+- [x] **AUTO-02**: Une suggestion affichée est gratuite ; 1 crédit est débité une seule fois à l'acceptation.
+- [x] **AUTO-03**: Les demandes de suggestion sont limitées en débit, et le nombre de suggestions non résolues est plafonné.
 
 ### Premium : liens entre notes (LINK)
 
-- [ ] **LINK-01**: Un utilisateur Premium lance une analyse qui suggère des liens entre notes, avec la justification de chacun.
-- [ ] **LINK-02**: Il accepte ou ignore chaque suggestion ; aucun lien n'est ajouté automatiquement.
-- [ ] **LINK-03**: Les suggestions privilégient les notes d'autres branches, et les liens acceptés sont conservés.
-- [ ] **LINK-04**: Supprimer une note supprime ses embeddings, ses liens et ses suggestions.
+- [x] **LINK-01**: Un utilisateur Premium lance une analyse qui suggère des liens entre notes, avec la justification de chacun.
+- [x] **LINK-02**: Il accepte ou ignore chaque suggestion ; aucun lien n'est ajouté automatiquement.
+- [x] **LINK-03**: Les suggestions privilégient les notes d'autres branches, et les liens acceptés sont conservés.
+- [x] **LINK-04**: Supprimer une note supprime ses embeddings, ses liens et ses suggestions.
 
 ### Marketplace TVA (VAT)
 
@@ -86,9 +86,9 @@
 | AIF-01 … AIF-07   | Phase 17 | Complete |
 | CTX-01 … CTX-05   | Phase 18 | Complete |
 | CHAT-01 … CHAT-04 | Phase 19 | Complete |
-| TREE-01 … TREE-05 | Phase 20 | Pending  |
-| AUTO-01 … AUTO-03 | Phase 21 | Pending  |
-| LINK-01 … LINK-04 | Phase 22 | Pending  |
+| TREE-01 … TREE-05 | Phase 20 | Complete |
+| AUTO-01 … AUTO-03 | Phase 21 | Complete |
+| LINK-01 … LINK-04 | Phase 22 | Complete |
 | VAT-01 … VAT-06   | Phase 23 | Pending  |
 
 **Coverage:**
