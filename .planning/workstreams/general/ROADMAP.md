@@ -163,12 +163,12 @@ Full phase details archived: `.planning/workstreams/general/milestones/v1.2-ROAD
 
 ## Progress
 
-| Phase                               | Plans Complete | Status      | Completed  |
-| ----------------------------------- | -------------- | ----------- | ---------- |
-| 17. AI Foundation                   | 0/?            | Not started | -          |
-| 18. Context Assembly                | 0/?            | Not started | -          |
-| 19. Streaming Chat (Free)           | 0/?            | Not started | -          |
-| 20. Premium Context and Tree Agent  | done           | Complete    | 2026-10-20 |
-| 21. Autocomplete (Premium)          | done           | Complete    | 2026-10-20 |
-| 22. Embeddings and Link Suggestions | done           | Complete    | 2026-10-20 |
-| 23. Marketplace VAT                 | done           | Complete    | 2026-10-20 |
+| Phase                               | Plans Complete | Status   | Completed  |
+| ----------------------------------- | -------------- | -------- | ---------- |
+| 17. AI Foundation                   | done           | Complete | 2026-10-20 |
+| 18. Context Assembly                | done           | Complete | 2026-10-20 |
+| 19. Streaming Chat (Free)           | done           | Complete | 2026-10-20 |
+| 20. Premium Context and Tree Agent  | done           | Complete | 2026-10-20 |
+| 21. Autocomplete (Premium)          | done           | Complete | 2026-10-20 |
+| 22. Embeddings and Link Suggestions | done           | Complete | 2026-10-20 |
+| 23. Marketplace VAT                 | done           | Complete | 2026-10-20 |
