@@ -44,4 +44,9 @@ Still to do when shipping, per environment (dev/staging, production):
 
 - WR-01: compare Stripe's real `application_fee_amount` with the stored snapshot in the marketplace webhook (needs an extra Stripe API call).
 - No refund path exists for VAT or commission: manual runbook in `23-VAT-DECISION.md`.
-- Phase 19 must not trust a client-supplied context or `noteId`, and must sanitize model output rendering (no auto-loaded images, no raw HTML, neutralised links).
+- Phase 19 must not trust a client-supplied context or `noteId`, and must sanitize model output rendering (no auto-loaded images, no raw HTML, neutralised links). Done in Phase 19 (see `19-REVIEW.md`).
+- **Dependency upgrades (follow-up, security F-05, found by the Phase 19 review; deliberately not done in the review-fix branch).** `pnpm audit --prod` on 2026-10-20 reports advisories on the installed versions:
+  - `next` 16.2.9: several high advisories patched in `>=16.2.11` (Server Actions DoS and SSRF, middleware/proxy bypass with Turbopack and a single locale, SSRF in rewrites), critical ones patched in `>=16.3.3` (RCE on Windows-hosted servers, RCE in the Image Optimization API with AVIF), `>=16.3.6` (RCE in `next/og` ImageResponse) and `>=16.3.8` (SSRF in Image Optimization, cache poisoning of SSG/ISR). Upgrade to the latest 16.x that clears all of them, then run the full test suite and `next build`. Until then, avoid exposing the Image Optimization API and `next/og` publicly if they are not needed (check `next.config`).
+  - `@tiptap/core` 3.26.1: `>=3.30.4` (mergeAttributes `__proto__`) and `>=3.30.5` (Markdown attribute parsing ReDoS). `prosemirror-view`: high, XSS in paste handling, patched in `>=1.42.3` (pulled through `@tiptap/pm`). Upgrade the whole `@tiptap/*` set together and re-run the editor tests; this is the most relevant one for the note editor.
+  - Lower priority transitive items from the same audit: `ws` (via `convex`) `>=8.21.0`, `sharp` `>=0.35.5`, `postcss`, `nanoid`, `browserslist`, `source-map-js`, `baseline-browser-mapping`.
+  - Evidence: re-run `pnpm audit --prod`; the list above is its output at the date of the review.

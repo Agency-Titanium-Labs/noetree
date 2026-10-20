@@ -238,24 +238,39 @@ export default function NoteContent() {
 
   // The AI chat docks UNDER the note (19-CONTEXT D-01): the note stays
   // visible and editable, and the split is resizable.
-  if (isChatOpen && selectedNote) {
-    return (
-      <ResizablePanelGroup
-        orientation="vertical"
-        className="h-[calc(100dvh-7rem)] min-h-[480px]"
+  //
+  // The group is ALWAYS rendered with the same structure; only the chat
+  // panel (and its handle) is conditional. Toggling the chat therefore never
+  // changes the element type or position of the note subtree, so React keeps
+  // the editor mounted and its state (selection, undo history, unsaved text)
+  // survives (review M1).
+  const chatOpen = isChatOpen && !!selectedNote;
+  return (
+    <ResizablePanelGroup
+      orientation="vertical"
+      className="h-[calc(100dvh-7rem)] min-h-[480px]"
+    >
+      <ResizablePanel
+        id="note"
+        defaultSize={chatOpen ? "60%" : "100%"}
+        minSize="25%"
       >
-        <ResizablePanel defaultSize="60%" minSize="25%">
-          <div className="h-full overflow-auto pr-1">{content}</div>
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize="40%" minSize="25%">
-          <AiChatPanel
-            noteId={selectedNote._id}
-            onClose={() => setIsChatOpen(false)}
-          />
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    );
-  }
-  return content;
+        <div className="h-full overflow-auto pr-1">{content}</div>
+      </ResizablePanel>
+      {chatOpen && selectedNote ? (
+        <>
+          <ResizableHandle withHandle />
+          <ResizablePanel id="chat" defaultSize="40%" minSize="25%">
+            {/* keyed by note: a conversation never re-points to another
+                note when the selection changes (review M2) */}
+            <AiChatPanel
+              key={selectedNote._id}
+              noteId={selectedNote._id}
+              onClose={() => setIsChatOpen(false)}
+            />
+          </ResizablePanel>
+        </>
+      ) : null}
+    </ResizablePanelGroup>
+  );
 }

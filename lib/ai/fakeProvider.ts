@@ -15,6 +15,8 @@ export type ProviderInput = {
   system?: string;
   /** Prior turns plus the current one, oldest first. */
   messages?: ChatTurn[];
+  /** Hard ceiling on generated tokens (bounds the cost of one credit). */
+  maxOutputTokens?: number;
 };
 
 export interface LlmProvider {

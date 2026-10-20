@@ -25,8 +25,8 @@ function deps(over: Partial<ChatDeps> = {}) {
   const d: ChatDeps = {
     getAuth: async () => ({ userId: "u", token: "t" }),
     hasSettleSecret: () => true,
-    createRunClient: () => ({
-      begin: async () => BEGIN,
+    createRunClient: () => ({ begin: async () => BEGIN }),
+    createSettleClient: () => ({
       settle: async (_id, outcome) => {
         settles.push(outcome);
         return {};
@@ -57,6 +57,7 @@ describe("client transport <-> route protocol (CHAT-01)", () => {
         return handleChatRequest(
           new Request("http://localhost" + String(url), {
             method: "POST",
+            headers: init?.headers,
             body: String(init?.body),
           }),
           d,
@@ -88,6 +89,7 @@ describe("client transport <-> route protocol (CHAT-01)", () => {
       outcome: "completed",
       refunded: false,
       failed: false,
+      truncated: false,
     });
     expect(settles).toEqual(["completed"]);
 
@@ -130,7 +132,6 @@ describe("client transport <-> route protocol (CHAT-01)", () => {
           const { ConvexError } = await import("convex/values");
           throw new ConvexError("INSUFFICIENT_CREDITS");
         },
-        settle: async () => ({}),
       }),
     });
     const transport = createChatTransport({
@@ -139,6 +140,7 @@ describe("client transport <-> route protocol (CHAT-01)", () => {
         handleChatRequest(
           new Request("http://localhost/api/ai/chat", {
             method: "POST",
+            headers: init?.headers,
             body: String(init?.body),
           }),
           d,

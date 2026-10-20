@@ -13,11 +13,12 @@ import {
   runs,
   seedCredits,
 } from "../test-utils/aiHarness";
-import { seedTree, seedUser } from "../test-utils/convexSeed";
+import { seedListing, seedTree, seedUser } from "../test-utils/convexSeed";
 import {
   handleChatRequest,
   type ChatDeps,
   type RunClient,
+  type SettleClient,
 } from "../lib/ai/chatHandler";
 import {
   createFakeProvider,
@@ -60,6 +61,12 @@ function realClient(t: T): RunClient {
         actionKey: args.actionKey,
         ...(args.noteId ? { noteId: args.noteId as Id<"notes"> } : {}),
       }),
+  };
+}
+
+/** No `as(t)`: settleRun is secret-guarded and needs no user identity. */
+function realSettleClient(t: T): SettleClient {
+  return {
     settle: (runId, outcome) =>
       t.mutation(api.aiRuns.settleRun, {
         secret: TEST_SECRET,
@@ -82,6 +89,7 @@ function makeDeps(
       getAuth: async () => ({ userId: USER, token: "t" }),
       hasSettleSecret: () => true,
       createRunClient: () => realClient(t),
+      createSettleClient: () => realSettleClient(t),
       provider: {
         stream(input, signal) {
           seen?.prompts.push(input.prompt);
@@ -97,6 +105,7 @@ function req(over: Record<string, unknown> = {}, signal?: AbortSignal) {
   return new Request("http://localhost/api/ai/chat", {
     method: "POST",
     signal,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       requestId: "chat-1",
       locale: "en",
@@ -371,11 +380,85 @@ describe("chat route context handling against real beginRun (CHAT-02)", () => {
       title: "Theirs",
       content: doc("not yours"),
     });
+    // M7: a foreign note is indistinguishable from a missing one.
     expect(
       await as(t).query(api.aiChat.previewContext, { noteId: ids[0] }),
-    ).toEqual({ ok: false, code: "NOTE_NOT_OWNED" });
+    ).toEqual({ ok: false, code: "NOTE_NOT_FOUND" });
     expect(
       await t.query(api.aiChat.previewContext, { noteId: ids[0] }),
     ).toEqual({ ok: false, code: "UNAUTHENTICATED" });
+  });
+
+  it("previewContext answers the same for a foreign note and a deleted one (M7)", async () => {
+    const t = convexTest(schema, modules);
+    const other = await seedUser(t, { key: "someone_else" });
+    const me = await seedUser(t, { key: USER });
+    const foreign = await seedTree(t, other, {
+      title: "Theirs",
+      content: doc("not yours"),
+    });
+    const mine = await seedTree(t, me, { content: doc("gone") });
+    await t.run(ctx => ctx.db.delete("notes", mine.rootId));
+    const a = await as(t).query(api.aiChat.previewContext, {
+      noteId: foreign.ids[0],
+    });
+    const b = await as(t).query(api.aiChat.previewContext, {
+      noteId: mine.rootId,
+    });
+    expect(a).toEqual(b);
+    expect(a).toEqual({ ok: false, code: "NOTE_NOT_FOUND" });
+  });
+
+  it("previewContext does not return the id of a purchased sub-note (M7)", async () => {
+    const t = convexTest(schema, modules);
+    const me = await seedUser(t, { key: USER });
+    const seller = await seedUser(t, { key: "user_seller" });
+    const origin = await seedTree(t, seller, { content: doc("seller") });
+    const listingId = await seedListing(t, {
+      noteId: origin.rootId,
+      sellerId: seller,
+      sellerKey: "user_seller",
+    });
+    const tree = await seedTree(t, me, {
+      title: "Parent",
+      content: doc("mine"),
+      children: [{ title: "Bought", content: doc("purchased") }],
+    });
+    await t.run(async ctx => {
+      const purchaseId = await ctx.db.insert("purchases", {
+        buyerId: me,
+        buyerClerkUserId: USER,
+        listingId,
+        noteId: origin.rootId,
+        sellerId: seller,
+        sellerClerkUserId: "user_seller",
+        status: "paid",
+        title: "Pack",
+        priceCents: 1000,
+        currency: "eur",
+        sellerTier: "free",
+        commissionRateBps: 1500,
+        commissionCents: 150,
+        sellerNetCents: 850,
+        scope: "subtree",
+        accessMode: "copy",
+        noteCount: 1,
+        destinationAccountId: "acct_x",
+        snapshotVersion: 1,
+        snapshotAt: 1,
+        deliveredNoteId: tree.ids[1],
+        deliveryStatus: "delivered",
+      });
+      await ctx.db.patch("notes", tree.ids[1], { purchaseId });
+    });
+    const out = await as(t).query(api.aiChat.previewContext, {
+      noteId: tree.ids[0],
+    });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    const purchased = out.report.dropped.filter(d => d.reason === "purchased");
+    expect(purchased).toHaveLength(1);
+    expect(purchased[0]).not.toHaveProperty("noteId");
+    expect(JSON.stringify(out)).not.toContain(tree.ids[1]);
   });
 });

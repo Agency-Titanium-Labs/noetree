@@ -126,6 +126,15 @@ All four discussed areas took the recommended option: panel docked under the not
 
 </deferred>
 
+## Known accepted limits
+
+Accepted after review, not fixed in this phase:
+
+- **Free retries before the first token (security F-04).** A client abort before the first token is refunded (Phase 17 policy), so a client can repeatedly start and cancel streams without paying. The cost is bounded by the rate limit (10 per minute) and the in-flight cap (3), and the maximum output per run is capped (`maxOutputTokens`). Accepted.
+- **Markdown to TipTap flattening (review L4, L5).** "Insert in note" converts only headings, paragraphs, flat lists, blockquotes, code blocks and bold/italic/code. Nested lists are flattened to one level, tables and horizontal rules are not converted (they appear as plain text), and the language of a code fence is dropped. Full-fidelity conversion belongs to Phase 20 (tree agent).
+- **Preview versus actual send.** The context preview is a read-only snapshot taken when the panel opens or when the user clicks "Refresh". The route rebuilds the context at send time, so if the note changed in between (another tab, a collaborator) what is sent can differ from what was shown. The server-built context is always the source of truth; the Refresh link is the user's tool to re-check.
+- **Layout.** The note area is now always inside the resizable group (fixed viewport height, inner scroll), whether or not the chat is open, so toggling the chat never remounts the editor. Verify the look on a real browser at desktop and mobile widths.
+
 ---
 
 _Phase: 19-streaming-chat-free_

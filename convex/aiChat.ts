@@ -78,13 +78,29 @@ export const previewContext = query({
           totalChars: c.totalChars,
           included: c.included,
           truncated: c.truncated,
-          dropped: c.dropped.slice(0, DROPPED_LIMIT),
+          // A foreign or purchased note must not be identifiable: no id.
+          dropped: c.dropped
+            .slice(0, DROPPED_LIMIT)
+            .map(d =>
+              d.reason === "not_owned" || d.reason === "purchased"
+                ? {
+                    role: d.role,
+                    reason: d.reason,
+                    ...(d.count ? { count: d.count } : {}),
+                  }
+                : d,
+            ),
         },
       };
     } catch (err) {
       const code = aiErrorCode(err);
       if (code && err instanceof ConvexError) {
-        return { ok: false as const, code };
+        // Not found and not owned look identical, so the preview can not be
+        // used to probe which note ids exist (review M7).
+        return {
+          ok: false as const,
+          code: code === "NOTE_NOT_OWNED" ? "NOTE_NOT_FOUND" : code,
+        };
       }
       throw err;
     }
