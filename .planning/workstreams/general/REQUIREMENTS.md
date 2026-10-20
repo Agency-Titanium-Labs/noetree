@@ -53,12 +53,12 @@
 
 ### Marketplace TVA (VAT)
 
-- [ ] **VAT-01**: La décision TVA (base de calcul, taux, Stripe Tax) est consignée avec l'avis d'un comptable avant l'implémentation.
-- [ ] **VAT-02**: L'acheteur paie exactement le prix affiché, sans TVA ajoutée.
-- [ ] **VAT-03**: La part du vendeur est calculée en centimes entiers : prix = TVA + commission + net vendeur, vérifié par un test de propriété.
-- [ ] **VAT-04**: Le vendeur voit le détail (brut, TVA, commission, net) avant de publier une annonce et dans ses ventes.
-- [ ] **VAT-05**: Les achats déjà faits en v1.1 gardent leurs montants d'origine.
-- [ ] **VAT-06**: Un achat de test par environnement confirme que le prélèvement correspond au calcul.
+- [x] **VAT-01**: La décision TVA (base de calcul, taux, Stripe Tax) est consignée avec l'avis d'un comptable avant l'implémentation.
+- [x] **VAT-02**: L'acheteur paie exactement le prix affiché, sans TVA ajoutée.
+- [x] **VAT-03**: La part du vendeur est calculée en centimes entiers : prix = TVA + commission + net vendeur, vérifié par un test de propriété.
+- [x] **VAT-04**: Le vendeur voit le détail (brut, TVA, commission, net) avant de publier une annonce et dans ses ventes.
+- [x] **VAT-05**: Les achats déjà faits en v1.1 gardent leurs montants d'origine.
+- [x] **VAT-06**: Un achat de test par environnement confirme que le prélèvement correspond au calcul. (Local fait le 2026-10-19 ; dev/staging et production au go-live, voir DEPLOY-CHECKLIST-v1.3.)
 
 ## Future Requirements
 
@@ -81,15 +81,15 @@
 
 ## Traceability
 
-| Requirement       | Phase    | Status   |
-| ----------------- | -------- | -------- |
-| AIF-01 … AIF-07   | Phase 17 | Complete |
-| CTX-01 … CTX-05   | Phase 18 | Complete |
-| CHAT-01 … CHAT-04 | Phase 19 | Complete |
-| TREE-01 … TREE-05 | Phase 20 | Complete |
-| AUTO-01 … AUTO-03 | Phase 21 | Complete |
-| LINK-01 … LINK-04 | Phase 22 | Complete |
-| VAT-01 … VAT-06   | Phase 23 | Pending  |
+| Requirement       | Phase    | Status                                                 |
+| ----------------- | -------- | ------------------------------------------------------ |
+| AIF-01 … AIF-07   | Phase 17 | Complete                                               |
+| CTX-01 … CTX-05   | Phase 18 | Complete                                               |
+| CHAT-01 … CHAT-04 | Phase 19 | Complete                                               |
+| TREE-01 … TREE-05 | Phase 20 | Complete                                               |
+| AUTO-01 … AUTO-03 | Phase 21 | Complete                                               |
+| LINK-01 … LINK-04 | Phase 22 | Complete                                               |
+| VAT-01 … VAT-06   | Phase 23 | Complete (VAT-06: local done, staging/prod at go-live) |
 
 **Coverage:**
 

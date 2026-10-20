@@ -13,6 +13,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { v, ConvexError, type Infer } from "convex/values";
 import { settle } from "./aiRuns";
 import { isPurchasedNote } from "./helpers/purchasedFlag";
+import { isNoteOrAncestorPurchased } from "./helpers/listings";
 import { extractNoteText, cutAtWord } from "./helpers/noteText";
 import { MAX_RUN_DURATION_MS } from "./helpers/aiRunState";
 import {
@@ -91,7 +92,7 @@ async function requireOwnedNote(
 ): Promise<Doc<"notes">> {
   const note = await ctx.db.get("notes", noteId);
   if (!note || note.owner !== user._id) throw new ConvexError("NOTE_NOT_FOUND");
-  if (isPurchasedNote(note)) {
+  if (await isNoteOrAncestorPurchased(ctx, note._id)) {
     throw new ConvexError("PURCHASED_CONTENT_EXCLUDED");
   }
   return note;
@@ -255,7 +256,7 @@ export const prepareEmbeddings = internalQuery({
       if (
         !note ||
         note.owner !== args.owner ||
-        isPurchasedNote(note) ||
+        (await isNoteOrAncestorPurchased(ctx, note._id)) ||
         !hasText(note.content)
       ) {
         out.push({ noteId, eligible: false });
@@ -298,7 +299,12 @@ export const upsertEmbeddings = internalMutation({
       if (row.embedding.length !== EMBEDDING_DIMENSIONS) continue;
       const note = await ctx.db.get("notes", row.noteId);
       // A note deleted, handed over or purchased meanwhile gets no vector.
-      if (!note || note.owner !== args.owner || isPurchasedNote(note)) continue;
+      if (
+        !note ||
+        note.owner !== args.owner ||
+        (await isNoteOrAncestorPurchased(ctx, note._id))
+      )
+        continue;
       const existing = await ctx.db
         .query("noteEmbeddings")
         .withIndex("by_noteId", q => q.eq("noteId", row.noteId))
@@ -395,7 +401,12 @@ export const loadExcerpts = internalQuery({
     const out: Array<{ noteId: Id<"notes">; title: string; text: string }> = [];
     for (const noteId of args.noteIds) {
       const note = await ctx.db.get("notes", noteId);
-      if (!note || note.owner !== args.owner || isPurchasedNote(note)) continue;
+      if (
+        !note ||
+        note.owner !== args.owner ||
+        (await isNoteOrAncestorPurchased(ctx, note._id))
+      )
+        continue;
       const max =
         noteId === args.sourceId ? SOURCE_EXCERPT_CHARS : TARGET_EXCERPT_CHARS;
       out.push({
@@ -896,7 +907,7 @@ export const finishAnalysis = internalMutation({
       if (
         !target ||
         target.owner !== analysis.owner ||
-        isPurchasedNote(target)
+        (await isNoteOrAncestorPurchased(ctx, target._id))
       ) {
         continue;
       }
@@ -977,7 +988,12 @@ export const getPanel = query({
       .unique();
     if (!user) return null;
     const note = await ctx.db.get("notes", args.noteId);
-    if (!note || note.owner !== user._id || isPurchasedNote(note)) return null;
+    if (
+      !note ||
+      note.owner !== user._id ||
+      (await isNoteOrAncestorPurchased(ctx, note._id))
+    )
+      return null;
 
     const latest = await ctx.db
       .query("linkAnalyses")

@@ -879,6 +879,22 @@ describe("decisions (LINK-02, D-06): accept, ignore, restore are idempotent and 
     ).toBe("UNAUTHENTICATED");
   });
 
+  it("refuses a note that sits under a purchased ancestor even without its own flag", async () => {
+    const t = newT();
+    const { userId } = await setupPremium(t);
+    const bought = await insertNote(t, userId, {
+      title: "P",
+      text: "astronomy",
+      purchased: true,
+    });
+    const child = await insertNote(t, userId, {
+      title: "Child",
+      text: "astronomy notes",
+      parent: bought,
+    });
+    expect(await rejects(start(t, child))).toBe("PURCHASED_CONTENT_EXCLUDED");
+  });
+
   it("accept refuses when a note became purchased content meanwhile", async () => {
     const t = newT();
     const { rel, suggestionId } = await withSuggestion(t);
