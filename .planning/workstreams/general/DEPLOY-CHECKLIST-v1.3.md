@@ -56,3 +56,9 @@ Still to do when shipping, per environment (dev/staging, production):
 ## 6. Close-out verification (2026-10-20)
 
 Gate on `milestone/v1.3`: 1575 tests green, `tsc` root and convex clean, eslint clean. Real browser test of tree undo on local dev: a batch with an edited note is refused with an explicit message listing the blocking note, nothing deleted (TREE-05 blocker case). Happy-path undo of an untouched batch is covered by `convex/aiTree.test.ts`.
+
+## 7. Updates of 2026-10-20 (supersede sections 4 and 5 where they conflict)
+
+- **VAT-01: accountant sign-off DONE** (confirmed by the user). VAT is still OFF by default: at go-live, set `MARKETPLACE_VAT_RATE_BPS` (e.g. 2000) per deployment and repeat the test purchase with the expected split 166 / 166 / 668 on 10.00 EUR (section 2, step 5).
+- **Backfill `notes:backfillPurchasedFlag` stays a go-live action** (dev/staging and production), as in section 1.
+- **Dependency upgrades DONE** on `milestone/v1.3`: `next` 16.2.9 to 16.4.2, all `@tiptap/*` 3.26.1 to 3.32.0. Overrides in `pnpm-workspace.yaml` clear the transitive advisories (`prosemirror-view` >=1.42.3, `ws`, `browserslist`, `baseline-browser-mapping`, `source-map-js`) and pin a single `prosemirror-model`/`prosemirror-transform` (two copies broke types and one ghost-text Tab test). `pnpm audit --prod`: no known vulnerabilities. Gate: 1575 tests, tsc root and convex, eslint, `next build` all green; editor smoke-tested in Chrome with no console error.
