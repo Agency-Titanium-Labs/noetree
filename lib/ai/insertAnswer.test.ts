@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
-import { insertAnswer } from "./insertAnswer";
+import { insertAnswer, trackUserCursor } from "./insertAnswer";
 
 let editor: Editor | null = null;
 afterEach(() => {
@@ -59,6 +59,30 @@ describe("insertAnswer (Insert in note)", () => {
     expect(e.getText()).not.toContain("Added");
   });
 
+  it("with the selection inside a code block, inserts after the block (M4)", () => {
+    const e = make(
+      "<p>Intro</p><pre><code>line1\nline2</code></pre><p>Outro</p>",
+    );
+    // a position inside the code text
+    let inside = -1;
+    e.state.doc.descendants((node, pos) => {
+      if (node.type.name === "codeBlock") inside = pos + 3;
+    });
+    e.commands.setTextSelection(inside);
+    expect(insertAnswer(e, "ANSWER", true)).toBe(true);
+    const json = e.getJSON().content!;
+    expect(json.map(n => n.type)).toEqual([
+      "paragraph",
+      "codeBlock",
+      "paragraph",
+      "paragraph",
+    ]);
+    // the code itself is untouched and not split
+    expect(json[1].content![0].text).toBe("line1\nline2");
+    expect(json[2].content![0].text).toBe("ANSWER");
+    expect(json[3].content![0].text).toBe("Outro");
+  });
+
   it("refuses a read-only editor and empty answers", () => {
     const ro = make("<p>x</p>", false);
     expect(insertAnswer(ro, "Nope", false)).toBe(false);
@@ -66,5 +90,50 @@ describe("insertAnswer (Insert in note)", () => {
     editor?.destroy();
     const e = make("<p>x</p>");
     expect(insertAnswer(e, "   ", false)).toBe(false);
+  });
+});
+
+describe("trackUserCursor (M4)", () => {
+  /** jsdom has no real focus; drive isFocused directly. */
+  function focused(e: Editor, value: boolean) {
+    Object.defineProperty(e, "isFocused", {
+      get: () => value,
+      configurable: true,
+    });
+  }
+
+  it("programmatic focus at position 0 is not a user cursor", () => {
+    const e = make("<p>Hello world</p>");
+    const cursor = trackUserCursor(e);
+    focused(e, true);
+    e.commands.setTextSelection(1); // focus('start') style: collapsed at start
+    expect(cursor.has()).toBe(false);
+    cursor.dispose();
+  });
+
+  it("no selection change at all means no cursor", () => {
+    const e = make("<p>Hello world</p>");
+    const cursor = trackUserCursor(e);
+    focused(e, true);
+    expect(cursor.has()).toBe(false);
+    cursor.dispose();
+  });
+
+  it("a selection placed while focused is a user cursor", () => {
+    const e = make("<p>Hello world</p>");
+    const cursor = trackUserCursor(e);
+    focused(e, true);
+    e.commands.setTextSelection(6);
+    expect(cursor.has()).toBe(true);
+    cursor.dispose();
+  });
+
+  it("selection changes while the editor is not focused do not count", () => {
+    const e = make("<p>Hello world</p>");
+    const cursor = trackUserCursor(e);
+    focused(e, false);
+    e.commands.setTextSelection(6);
+    expect(cursor.has()).toBe(false);
+    cursor.dispose();
   });
 });
