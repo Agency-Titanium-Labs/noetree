@@ -32,3 +32,13 @@ Inline plan (research flag handled in 19-RESEARCH.md). Single wave, ordered task
 - Every success criterion maps to >= 1 test above. Money paths reuse `executeRun` (no new debit/refund code).
 - Threats: client context (ignored), forged requestId semantics (idempotency only, user-scoped by Convex), XSS/exfil via output (SafeMarkdown), secret leakage (env read server-side only), double stream (claimed flag), reaper race (stream timer 100s < maxDuration 120s < TTL 300s).
 - Risk: `beginRun` returns bare `RATE_LIMITED` -> static wait hint (documented).
+
+## Review fixes (post-execution)
+
+Decisions recorded while fixing `19-REVIEW.md`:
+
+- **Settlement credential (security F-01).** `settleRun` is secret-guarded and needs no user identity, so the route settles through a SEPARATE `ConvexHttpClient` that never has `setAuth` called (`createSettleClient()` in `lib/ai/chatRouteDeps.ts`). The user's Clerk `convex` JWT is used for `beginRun` only. Assumption to verify in the Clerk dashboard: the `convex` JWT template lifetime is short (Clerk default 60 s) and is read once at the start of the request; a stream can last up to 100 s, so the token may well expire mid-stream. With the separate client that no longer matters: the secret is the credential. Test: `lib/ai/chatRouteDeps.test.ts` (expired user token, settle still authenticated by secret only) and `convex/aiChatRoute.test.ts` (real `settleRun` without `as(t)`).
+- **Timeout policy (review H4).** A server-side timeout is not a user abort. Timeout AFTER output: the charge stands (`aborted_after_output`), the final `data-settled` part carries `truncated: true` and the panel shows a distinct "answer cut off" notice. Timeout BEFORE any output: refunded (`aborted_before_output`), `truncated: false`.
+- **Cost of one credit (review H2, security F-02).** Body capped in bytes before it is read (`content-length` checked, then the stream is counted; 512 KiB), merged same-role turns capped at the per-message limit, total prompt capped at 60 000 characters (typed 400 `PROMPT_TOO_LARGE`), and `maxOutputTokens` (default 2048, `AI_CHAT_MAX_OUTPUT_TOKENS` clamps 64 to 8192) passed to the model. Configured in `lib/ai/models.ts`.
+- **Request provenance (security F-03).** `Content-Type: application/json` (415) and no cross-site request (`Sec-Fetch-Site` not same-origin/same-site/none, or `Origin` host mismatch: 403) are checked before any auth work.
+- **Settle bound (review M6).** Settlement waits at most 10 s (`CHAT_SETTLE_TIMEOUT_MS`); on timeout the stream closes and the reaper is the backstop.
