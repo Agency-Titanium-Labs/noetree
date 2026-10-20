@@ -20,9 +20,14 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 
 describe("models.ts (D-11)", () => {
-  it("defaults to a Claude Haiku class Gateway id", () => {
+  it("defaults to a Gateway id that works on the free tier (user decision 2026-10-20)", () => {
     expect(chatModelId({})).toBe(DEFAULT_CHAT_MODEL);
-    expect(DEFAULT_CHAT_MODEL).toMatch(/^anthropic\/claude-haiku/);
+    expect(DEFAULT_CHAT_MODEL).toBe("google/gemini-2.5-flash-lite");
+  });
+  it("lets an operator switch back to Claude Haiku without a code change", () => {
+    expect(chatModelId({ AI_CHAT_MODEL: "anthropic/claude-haiku-5.5" })).toBe(
+      "anthropic/claude-haiku-5.5",
+    );
   });
   it("accepts a well-formed env override and rejects junk", () => {
     expect(chatModelId({ AI_CHAT_MODEL: "openai/gpt-5.4-mini" })).toBe(

@@ -2,11 +2,16 @@
  * Single place for AI model ids (19-CONTEXT D-11). Plain "provider/model"
  * strings resolved by the Vercel AI Gateway. Server-only env overrides let an
  * operator switch model without a deploy of code (verified ids live in
- * 19-RESEARCH.md; `anthropic/claude-haiku-5.5` is in the installed Gateway
- * model list).
+ * 19-RESEARCH.md).
+ *
+ * Default (user decision 2026-10-20): Gemini 2.5 Flash Lite. It answers on the
+ * Gateway free tier (verified with a real call), unlike the Anthropic models
+ * (`anthropic/claude-haiku-5.5` returns 403 "Free tier users do not have
+ * access to this model" until AI Gateway credits are bought). Switch back with
+ * AI_CHAT_MODEL=anthropic/claude-haiku-5.5, no code change.
  */
 
-export const DEFAULT_CHAT_MODEL = "anthropic/claude-haiku-5.5";
+export const DEFAULT_CHAT_MODEL = "google/gemini-2.5-flash-lite";
 
 const MODEL_ID = /^[a-z0-9][a-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 

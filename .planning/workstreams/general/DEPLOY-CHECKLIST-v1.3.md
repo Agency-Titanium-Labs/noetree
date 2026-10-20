@@ -36,7 +36,7 @@ Still to do when shipping, per environment (dev/staging, production):
 
 ## 4. Human decisions still open
 
-- **AI Gateway plan (blocks the default chat model).** The Vercel team is on the Gateway free tier: Anthropic models (default `anthropic/claude-haiku-5.5`) return 403 "Free tier users do not have access to this model". Either top up AI Gateway credits in the Vercel dashboard (paid), or change the default chat model in `lib/ai/models.ts` (free-tier models that answered on 2026-10-20: `google/gemini-2.5-flash-lite`, `openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `openai/gpt-5-nano`, `meta/llama-3.1-8b`, `mistral/ministral-3b`). Env override: `AI_CHAT_MODEL`.
+- **AI Gateway plan (RESOLVED 2026-10-20: default chat model is now `google/gemini-2.5-flash-lite`, works on the free tier; set `AI_CHAT_MODEL=anthropic/claude-haiku-5.5` after buying AI Gateway credits if you want Claude).** The Vercel team is on the Gateway free tier: Anthropic models (default `anthropic/claude-haiku-5.5`) return 403 "Free tier users do not have access to this model". Either top up AI Gateway credits in the Vercel dashboard (paid), or change the default chat model in `lib/ai/models.ts` (free-tier models that answered on 2026-10-20: `google/gemini-2.5-flash-lite`, `openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `openai/gpt-5-nano`, `meta/llama-3.1-8b`, `mistral/ministral-3b`). Env override: `AI_CHAT_MODEL`.
 
 - VAT-01: accountant sign-off (`phases/23-marketplace-vat/23-VAT-DECISION.md`). Until signed the VAT stays disabled.
 - Revoke and recreate the two AI Gateway keys if this conversation transcript is ever shared (they were pasted in chat). Spending caps are set in the Vercel dashboard.
