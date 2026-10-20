@@ -459,6 +459,29 @@ describe("config (D-03, D-07)", () => {
       completeMaxOutputTokens({ AI_COMPLETE_MAX_OUTPUT_TOKENS: "abc" }),
     ).toBe(60);
   });
+  it("every typed AI error has an en and fr message, and the Autocomplete namespace has parity", async () => {
+    const en = (await import("../../messages/en.json")).default as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const fr = (await import("../../messages/fr.json")).default as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const { AI_ERROR_CODES } = await import("../../convex/helpers/aiErrors");
+    for (const code of AI_ERROR_CODES) {
+      expect(
+        (en.AiCredits.errors as Record<string, string>)[code],
+      ).toBeTruthy();
+      expect(
+        (fr.AiCredits.errors as Record<string, string>)[code],
+      ).toBeTruthy();
+    }
+    expect(Object.keys(en.Autocomplete).sort()).toEqual(
+      Object.keys(fr.Autocomplete).sort(),
+    );
+    expect(Object.keys(en.Autocomplete).length).toBeGreaterThan(5);
+  });
   it("the route runs on Node with a short maxDuration", async () => {
     const route = await import("../../app/api/ai/complete/route");
     expect(route.runtime).toBe("nodejs");

@@ -9,6 +9,7 @@ import AiActionsMenu from "./AiActionsMenu";
 import { toast } from "sonner";
 import { ACTIONS, type ActionKey } from "@/convex/helpers/creditCatalog";
 import AiUpsellDialog from "./AiUpsellDialog";
+import AutocompleteToggle from "./AutocompleteToggle";
 import {
   Tooltip,
   TooltipContent,
@@ -224,6 +225,9 @@ export default function EditorToolbar({ onOpenChat }: EditorToolbarProps = {}) {
             {tCredits("badgeTooltip", { count: total ?? 0 })}
           </TooltipContent>
         </Tooltip>
+
+        {/* Phase 21: Premium ghost-text autocomplete toggle */}
+        <AutocompleteToggle />
 
         {/* Link Dialog */}
         <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>

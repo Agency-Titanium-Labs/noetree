@@ -44,6 +44,13 @@ vi.mock("@tiptap/extension-placeholder", () => ({
 }));
 vi.mock("@tiptap/extension-link", () => ({ default: {} }));
 vi.mock("@tiptap/extension-image", () => ({ default: {} }));
+// Phase 21: the ghost-text extension and its Convex bridge have their own tests.
+vi.mock("@/lib/editor/ghostText", () => ({
+  GhostText: { configure: () => ({}) },
+}));
+vi.mock("@/lib/editor/useAutocompleteBridge", () => ({
+  useAutocompleteBridge: () => ({ options: {}, enabled: false }),
+}));
 vi.mock("use-debounce", () => ({
   useDebouncedCallback: () => {
     const fn = Object.assign((...args: unknown[]) => h.debounced(...args), {

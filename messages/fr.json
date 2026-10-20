@@ -248,7 +248,9 @@
       "FORBIDDEN": "Cette requête a été bloquée. Rechargez la page et réessayez. Vous n'avez pas été débité.",
       "UNSUPPORTED_MEDIA_TYPE": "Nous n'avons pas pu lire ce message. Rechargez la page et réessayez. Vous n'avez pas été débité.",
       "PAYLOAD_TOO_LARGE": "Cette conversation est trop longue pour être envoyée. Commencez-en une nouvelle ou raccourcissez votre message. Vous n'avez pas été débité.",
-      "PROMPT_TOO_LARGE": "Cette conversation est trop longue pour être envoyée. Commencez-en une nouvelle ou raccourcissez votre message. Vous n'avez pas été débité."
+      "PROMPT_TOO_LARGE": "Cette conversation est trop longue pour être envoyée. Commencez-en une nouvelle ou raccourcissez votre message. Vous n'avez pas été débité.",
+      "SUGGESTION_NOT_FOUND": "Cette suggestion n'est plus disponible. Vous n'avez pas été débité.",
+      "SUGGESTION_EXPIRED": "Cette suggestion a expiré avant d'être acceptée. Vous n'avez pas été débité."
     },
     "packsHeading": "Acheter des crédits",
     "packsHelper": "Achat unique. Les crédits achetés n'expirent jamais.",
@@ -313,6 +315,19 @@
     "answerReady": "La réponse est prête.",
     "insertFailed": "Impossible d'insérer dans la note. Elle est peut-être en lecture seule.",
     "truncated": "La réponse a été coupée car elle a pris trop de temps. Votre crédit est conservé pour la partie reçue."
+  },
+  "Autocomplete": {
+    "title": "Saisie semi-automatique",
+    "toggleAria": "Réglages de la saisie semi-automatique",
+    "tooltipOn": "La saisie semi-automatique est activée",
+    "tooltipOff": "La saisie semi-automatique est désactivée",
+    "how": "Quand vous faites une pause en fin de paragraphe, une suggestion grise apparaît. Appuyez sur Tab pour l'accepter, ou sur Échap (ou continuez simplement à écrire) pour l'ignorer. Voir une suggestion est gratuit.",
+    "cost": "Accepter une suggestion coûte {cost, plural, one {# crédit} other {# crédits}}.",
+    "privacy": "Lorsqu'elle est activée, le titre de la note et jusqu'à environ 2 000 caractères avant votre curseur sont envoyés à notre fournisseur d'IA pour rédiger chaque suggestion. Rien n'est envoyé tant qu'elle est désactivée. Votre choix est enregistré sur votre compte.",
+    "paused": "En pause un instant. Elle reprend toute seule.",
+    "lockedAria": "Saisie semi-automatique (Premium)",
+    "lockedTooltip": "La saisie semi-automatique est une fonctionnalité Premium",
+    "suggestionAnnounce": "Suggestion : {text}. Appuyez sur Tab pour l'accepter ou sur Échap pour l'ignorer."
   },
   "Editor": {
     "placeholder": "Écrivez quelque chose...",

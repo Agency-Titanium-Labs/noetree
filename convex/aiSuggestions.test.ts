@@ -485,9 +485,10 @@ describe("dismiss", () => {
 
     await seedUser(t, { key: "mallory" });
     await as(t, "mallory").mutation(api.aiSuggestions.dismiss, {
-      suggestionId: (await issued(t, noteId)) as Id<"aiSuggestions">,
+      suggestionId: await issued(t, noteId),
     });
-    expect((await rows(t)).at(-1)!.status).toBe("issued");
+    const all = await rows(t);
+    expect(all[all.length - 1].status).toBe("issued");
   });
 });
 
