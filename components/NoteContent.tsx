@@ -18,6 +18,7 @@ import CommentsButton from "./CommentsButton";
 import CommentsPanel from "./CommentsPanel";
 import HistoryButton from "./HistoryButton";
 import HistoryPanel from "./HistoryPanel";
+import LinkedNotesBlock from "./LinkedNotesBlock";
 import VersionPreviewBanner from "./VersionPreviewBanner";
 import dynamic from "next/dynamic";
 import {
@@ -29,6 +30,9 @@ import {
 // Loaded on first open: keeps the AI SDK and the Markdown renderer out of the
 // initial editor bundle.
 const AiChatPanel = dynamic(() => import("./editor/AiChatPanel"), {
+  ssr: false,
+});
+const RelatedNotesPanel = dynamic(() => import("./editor/RelatedNotesPanel"), {
   ssr: false,
 });
 
@@ -48,6 +52,9 @@ export default function NoteContent() {
   const tListing = useTranslations("ListingForm");
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  // Phase 22: Related notes panel, docked in the same slot as the chat (one
+  // at a time). It auto-starts only when opened from the AI menu.
+  const [isLinksOpen, setIsLinksOpen] = useState(false);
   const [isListingOpen, setIsListingOpen] = useState(false);
 
   const { editor, saveStatus, getCurrentContent, previewVersion, exitPreview } =
@@ -103,6 +110,15 @@ export default function NoteContent() {
       if (!open && searchParams.get("comments")) router.replace(pathname);
     },
     [searchParams, router, pathname],
+  );
+
+  const openLinkedNote = useCallback(
+    (id: string) => {
+      if (!tree) return;
+      const target = findInTree(id, tree);
+      if (target) onSelectNote(target, getCurrentContent);
+    },
+    [tree, onSelectNote, getCurrentContent],
   );
 
   const content = (
@@ -179,7 +195,16 @@ export default function NoteContent() {
       </div>
       <div className="grow flex flex-col gap-4">
         <div className="flex flex-col gap-2 grow">
-          <EditorToolbar onOpenChat={() => setIsChatOpen(true)} />
+          <EditorToolbar
+            onOpenChat={() => {
+              setIsLinksOpen(false);
+              setIsChatOpen(true);
+            }}
+            onOpenLinks={() => {
+              setIsChatOpen(false);
+              setIsLinksOpen(true);
+            }}
+          />
           <ConditionChecker condition={!selectedNote}>
             <div className="flex-1 p-4 flex flex-col gap-4 border rounded-md">
               <Skeleton className="w-56 h-8 mt-4" />
@@ -199,6 +224,12 @@ export default function NoteContent() {
               >
                 <EditorContent editor={editor} />
               </div>
+              {selectedNote?.role === "owner" && (
+                <LinkedNotesBlock
+                  noteId={selectedNote._id}
+                  onOpenNote={openLinkedNote}
+                />
+              )}
             </>
           </ConditionChecker>
         </div>
@@ -245,6 +276,8 @@ export default function NoteContent() {
   // the editor mounted and its state (selection, undo history, unsaved text)
   // survives (review M1).
   const chatOpen = isChatOpen && !!selectedNote;
+  const linksOpen = isLinksOpen && !!selectedNote && !chatOpen;
+  const dockOpen = chatOpen || linksOpen;
   return (
     <ResizablePanelGroup
       orientation="vertical"
@@ -252,11 +285,26 @@ export default function NoteContent() {
     >
       <ResizablePanel
         id="note"
-        defaultSize={chatOpen ? "60%" : "100%"}
+        defaultSize={dockOpen ? "60%" : "100%"}
         minSize="25%"
       >
         <div className="h-full overflow-auto pr-1">{content}</div>
       </ResizablePanel>
+      {linksOpen && selectedNote ? (
+        <>
+          <ResizableHandle withHandle />
+          <ResizablePanel id="links" defaultSize="40%" minSize="25%">
+            {/* keyed by note, like the chat: results never re-point */}
+            <RelatedNotesPanel
+              key={selectedNote._id}
+              noteId={selectedNote._id}
+              autoStart
+              onOpenNote={openLinkedNote}
+              onClose={() => setIsLinksOpen(false)}
+            />
+          </ResizablePanel>
+        </>
+      ) : null}
       {chatOpen && selectedNote ? (
         <>
           <ResizableHandle withHandle />

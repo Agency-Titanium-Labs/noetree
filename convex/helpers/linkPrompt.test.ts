@@ -45,7 +45,6 @@ describe("buildJustificationPrompt", () => {
       // No active Markdown image/link opener, no bidi / tag characters.
       expect(user).not.toMatch(/!\[/);
       expect(user).not.toMatch(/\]\(/);
-      // eslint-disable-next-line no-control-regex
       expect(user).not.toMatch(/[​-‏‪-‮⁠-⁯]/u);
       expect(user).not.toMatch(/[\u{E0000}-\u{E0FFF}]/u);
     });

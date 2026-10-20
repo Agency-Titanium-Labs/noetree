@@ -44,9 +44,14 @@ import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
 interface EditorToolbarProps {
   /** Opens the AI chat panel (the free `basic` action, Phase 19). */
   onOpenChat?: () => void;
+  /** Opens the Related notes panel (the Premium `linking` action, Phase 22). */
+  onOpenLinks?: () => void;
 }
 
-export default function EditorToolbar({ onOpenChat }: EditorToolbarProps = {}) {
+export default function EditorToolbar({
+  onOpenChat,
+  onOpenLinks,
+}: EditorToolbarProps = {}) {
   const t = useTranslations("Editor");
   const tCredits = useTranslations("AiCredits");
   const { editor } = useEditorContext();
@@ -88,6 +93,10 @@ export default function EditorToolbar({ onOpenChat }: EditorToolbarProps = {}) {
     }
     if (actionKey === "basic" && onOpenChat) {
       onOpenChat();
+      return;
+    }
+    if (actionKey === "linking" && onOpenLinks) {
+      onOpenLinks();
       return;
     }
     toast.info(tCredits("comingSoon"));

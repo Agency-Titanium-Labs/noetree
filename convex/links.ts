@@ -29,7 +29,6 @@ import {
   canonicalPair,
   embeddingHash,
   embeddingInput,
-  embeddingModelId,
   minScore,
   pairKey,
   recencyKey,

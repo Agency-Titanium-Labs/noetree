@@ -683,5 +683,47 @@
     "textReply": "<b>{actor}</b> replied to your comment on \"{title}\"",
     "unread": "Unread",
     "unknownActor": "Someone"
+  },
+  "RelatedNotes": {
+    "title": "Related notes",
+    "close": "Close related notes",
+    "costHint": "{count, plural, one {An analysis costs # credit.} other {An analysis costs # credits.}} Accepting or ignoring a suggestion is free.",
+    "run": "Find related notes",
+    "runAgain": "Run again",
+    "running": "Looking for related notes...",
+    "noneFound": "No related notes found. Nothing was linked. Your credits were used for this analysis.",
+    "failed": "The analysis couldn't be completed, so your credits were refunded. Try again in a moment.",
+    "truncated": "You have more than {max} notes, so only the {max} most recently modified were compared.",
+    "skipped": "{count, plural, one {# note} other {# notes}} could not be analyzed this time and were left out.",
+    "suggestionsAria": "Suggested links",
+    "ignoredAria": "Ignored suggestions",
+    "score": "Match {percent}%",
+    "accept": "Link",
+    "acceptAria": "Link to {title}",
+    "ignore": "Ignore",
+    "ignoreAria": "Ignore {title}",
+    "accepted": "Linked",
+    "showIgnored": "Show ignored ({count})",
+    "hideIgnored": "Hide ignored",
+    "showAgain": "Show again",
+    "showAgainAria": "Show {title} again",
+    "open": "Open {title}",
+    "untitled": "Untitled",
+    "actionError": "Couldn't save your choice. Try again.",
+    "premiumTitle": "Related notes is a Premium feature",
+    "premiumBody": "Upgrade to Premium to get suggested links between your notes. You haven't been charged anything.",
+    "upgrade": "Upgrade to Premium",
+    "errors": {
+      "LINK_NOTE_EMPTY": "This note has no text yet, so there is nothing to compare. You weren't charged."
+    }
+  },
+  "LinkedNotes": {
+    "title": "Linked notes",
+    "listAria": "Linked notes",
+    "open": "Open {title}",
+    "remove": "Remove link",
+    "removeAria": "Remove link to {title}",
+    "removeError": "Couldn't remove the link. Try again.",
+    "untitled": "Untitled"
   }
 }

@@ -620,7 +620,7 @@ describe("lazy embedding (D-03)", () => {
     );
     await analyze(t, src, "r3");
     expect(mock.embeddedTexts()).toBe(4);
-    expect(mock.embedCalls.at(-1)![0]).toContain("changed");
+    expect(mock.embedCalls[mock.embedCalls.length - 1][0]).toContain("changed");
 
     // Same text, other model: everything is stale (hash covers the model).
     process.env.AI_EMBEDDING_MODEL = "google/gemini-embedding-001";

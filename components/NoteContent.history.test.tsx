@@ -51,6 +51,7 @@ vi.mock("./ShareDialog", () => ({ default: () => null }));
 vi.mock("./ListingFormDialog", () => ({ default: () => null }));
 vi.mock("./CommentsButton", () => ({ default: () => null }));
 vi.mock("./CommentsPanel", () => ({ default: () => null }));
+vi.mock("./LinkedNotesBlock", () => ({ default: () => null }));
 vi.mock("./HistoryButton", () => ({
   default: ({ onClick }: { onClick: () => void }) => (
     <button data-testid="history-button" onClick={onClick} />
