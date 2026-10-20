@@ -18,6 +18,9 @@ export function createGatewayProvider(model: LanguageModel): LlmProvider {
         model,
         system: input.system,
         messages: input.messages ?? [{ role: "user", content: input.prompt }],
+        ...(input.maxOutputTokens
+          ? { maxOutputTokens: input.maxOutputTokens }
+          : {}),
         abortSignal: signal,
         maxRetries: 1,
       });

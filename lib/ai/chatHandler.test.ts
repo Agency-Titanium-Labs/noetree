@@ -6,6 +6,7 @@ import {
   type BeginResult,
   type ChatDeps,
   type RunClient,
+  type SettleClient,
 } from "./chatHandler";
 import {
   createFakeProvider,
@@ -83,6 +84,8 @@ function harness(opts: {
       if (r instanceof Error) throw r;
       return r;
     },
+  };
+  const settleClient: SettleClient = {
     async settle(runId, outcome) {
       settles.push({ runId, outcome });
       return { status: "x", changed: true };
@@ -92,6 +95,7 @@ function harness(opts: {
     getAuth: async () => opts.auth ?? { userId: "user_1", token: "tok" },
     hasSettleSecret: () => opts.secret ?? true,
     createRunClient: () => client,
+    createSettleClient: () => settleClient,
     provider,
     after: p => afters.push(p),
     streamTimeoutMs: opts.streamTimeoutMs,
@@ -223,8 +227,7 @@ describe("POST /api/ai/chat core (CHAT-01)", () => {
   it("a settle failure never breaks the response (reaper is the backstop)", async () => {
     const h = harness({});
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    h.deps.createRunClient = () => ({
-      begin: async () => OK_BEGIN,
+    h.deps.createSettleClient = () => ({
       settle: async () => {
         throw new Error("convex down");
       },
@@ -339,14 +342,18 @@ describe("typed gate errors (CHAT-03)", () => {
     },
   );
 
-  it("recognises the code inside a wrapped Error message", async () => {
+  it("classifies by ConvexError data, never by message text (L2)", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const h = harness({
       begin: new Error(
         "[Request ID: abc] Server Error Uncaught ConvexError: INSUFFICIENT_CREDITS",
       ),
     });
     const res = await handleChatRequest(request(body()), h.deps);
-    expect(res.status).toBe(402);
+    expect(res.status).toBe(500);
+    // only the error name is logged, never its message
+    expect(JSON.stringify(err.mock.calls)).not.toContain("INSUFFICIENT");
+    err.mockRestore();
   });
 
   it("an unknown failure is a generic 500 that leaks nothing", async () => {

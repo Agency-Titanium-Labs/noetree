@@ -24,3 +24,24 @@ export function chatModelId(
 ): string {
   return resolveModelId(env.AI_CHAT_MODEL, DEFAULT_CHAT_MODEL);
 }
+
+/**
+ * Output ceiling for one chat answer (review H2): one credit must not buy an
+ * unbounded generation. About 2 000 tokens is a long Markdown answer; an
+ * operator can change it with AI_CHAT_MAX_OUTPUT_TOKENS (clamped).
+ */
+export const DEFAULT_CHAT_MAX_OUTPUT_TOKENS = 2048;
+const MIN_CHAT_MAX_OUTPUT_TOKENS = 64;
+const MAX_CHAT_MAX_OUTPUT_TOKENS = 8192;
+
+export function chatMaxOutputTokens(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const raw = env.AI_CHAT_MAX_OUTPUT_TOKENS?.trim();
+  const n = raw && /^\d+$/.test(raw) ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_CHAT_MAX_OUTPUT_TOKENS;
+  return Math.min(
+    MAX_CHAT_MAX_OUTPUT_TOKENS,
+    Math.max(MIN_CHAT_MAX_OUTPUT_TOKENS, n),
+  );
+}

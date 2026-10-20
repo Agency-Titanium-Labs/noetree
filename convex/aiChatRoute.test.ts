@@ -18,6 +18,7 @@ import {
   handleChatRequest,
   type ChatDeps,
   type RunClient,
+  type SettleClient,
 } from "../lib/ai/chatHandler";
 import {
   createFakeProvider,
@@ -60,6 +61,12 @@ function realClient(t: T): RunClient {
         actionKey: args.actionKey,
         ...(args.noteId ? { noteId: args.noteId as Id<"notes"> } : {}),
       }),
+  };
+}
+
+/** No `as(t)`: settleRun is secret-guarded and needs no user identity. */
+function realSettleClient(t: T): SettleClient {
+  return {
     settle: (runId, outcome) =>
       t.mutation(api.aiRuns.settleRun, {
         secret: TEST_SECRET,
@@ -82,6 +89,7 @@ function makeDeps(
       getAuth: async () => ({ userId: USER, token: "t" }),
       hasSettleSecret: () => true,
       createRunClient: () => realClient(t),
+      createSettleClient: () => realSettleClient(t),
       provider: {
         stream(input, signal) {
           seen?.prompts.push(input.prompt);
@@ -97,6 +105,7 @@ function req(over: Record<string, unknown> = {}, signal?: AbortSignal) {
   return new Request("http://localhost/api/ai/chat", {
     method: "POST",
     signal,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       requestId: "chat-1",
       locale: "en",

@@ -18,6 +18,13 @@ export type ChatRequestOptions = {
   fetch?: typeof globalThis.fetch;
 };
 
+/** Type guard instead of a cast: only real text parts carry `text`. */
+function isTextPart(
+  p: ChatMessage["parts"][number],
+): p is Extract<ChatMessage["parts"][number], { type: "text" }> {
+  return p.type === "text";
+}
+
 export function createChatTransport(opts: ChatRequestOptions) {
   return new DefaultChatTransport<ChatMessage>({
     api: opts.api ?? "/api/ai/chat",
@@ -33,8 +40,8 @@ export function createChatTransport(opts: ChatRequestOptions) {
           messages: messages.map(m => ({
             role: m.role,
             parts: m.parts
-              .filter(p => p.type === "text")
-              .map(p => ({ type: "text", text: (p as { text: string }).text })),
+              .filter(isTextPart)
+              .map(p => ({ type: "text", text: p.text })),
           })),
         },
       };

@@ -12,6 +12,14 @@ import type { ChatTurn } from "./fakeProvider";
 export const CHAT_HISTORY_EXCHANGES = 6;
 export const CHAT_MAX_MESSAGE_CHARS = 8_000;
 export const CHAT_MAX_BODY_MESSAGES = 200;
+/**
+ * Ceiling on the user-supplied conversation sent to the model, characters
+ * (review H2): bounds the input cost of one credit. The server-built note
+ * context has its own budget (Phase 18) and is not counted here.
+ */
+export const CHAT_MAX_PROMPT_CHARS = 60_000;
+/** Request body ceiling, bytes, enforced before the body is read as text. */
+export const CHAT_MAX_BODY_BYTES = 512 * 1024;
 
 export const CHAT_LOCALES = ["en", "fr"] as const;
 export type ChatLocale = (typeof CHAT_LOCALES)[number];
@@ -30,7 +38,12 @@ export const chatBodySchema = z.object({
   requestId: z.string().min(1).max(128),
   locale: z.enum(CHAT_LOCALES),
   /** Only an id: the server rebuilds the context itself. */
-  noteId: z.string().min(1).max(64).optional(),
+  noteId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]+$/)
+    .optional(),
   messages: z
     .array(
       z.object({
@@ -70,7 +83,11 @@ export function buildChatTurns(
     if (!content) continue;
     const prev = turns[turns.length - 1];
     if (prev && prev.role === m.role) {
-      prev.content = `${prev.content}\n\n${content}`;
+      // Merging must not defeat the per-message cap: keep the most recent
+      // CHAT_MAX_MESSAGE_CHARS of the merged turn.
+      prev.content = `${prev.content}\n\n${content}`.slice(
+        -CHAT_MAX_MESSAGE_CHARS,
+      );
     } else {
       turns.push({ role: m.role, content });
     }
@@ -90,6 +107,11 @@ export function buildChatTurns(
   const kept = turns.slice(keepFrom);
   // A conversation must open with a user turn.
   return kept[0].role === "user" ? kept : kept.slice(1);
+}
+
+/** Total characters of the turns that will be sent (history + question). */
+export function promptChars(turns: ChatTurn[]): number {
+  return turns.reduce((n, t) => n + t.content.length, 0);
 }
 
 export function buildSystemPrompt(locale: ChatLocale): string {

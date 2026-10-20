@@ -128,6 +128,7 @@ describe("route module config", () => {
     const res = await route.POST(
       new Request("http://localhost/api/ai/chat", {
         method: "POST",
+        headers: { "content-type": "application/json" },
         body: "{}",
       }),
     );
