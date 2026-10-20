@@ -141,6 +141,58 @@ describe("RelatedNotesPanel (D-08)", () => {
     expect(mutationFor("links:requestAnalysis")).not.toHaveBeenCalled();
   });
 
+  it("autoStart is consumed once: onAutoStartConsumed fires once, and a note change without autoStart starts nothing", async () => {
+    const consumed = vi.fn();
+    const OTHER = "note2" as Id<"notes">;
+    const { rerender } = mount({
+      autoStart: true,
+      onAutoStartConsumed: consumed,
+    });
+    await waitFor(() =>
+      expect(mutationFor("links:requestAnalysis")).toHaveBeenCalledTimes(1),
+    );
+    expect(consumed).toHaveBeenCalledTimes(1);
+
+    // Host consumed the request (autoStart false), then another note is shown.
+    rerender(
+      <RelatedNotesPanel
+        key={OTHER}
+        noteId={OTHER}
+        onClose={() => {}}
+        autoStart={false}
+        onAutoStartConsumed={consumed}
+      />,
+    );
+    await Promise.resolve();
+    expect(mutationFor("links:requestAnalysis")).toHaveBeenCalledTimes(1);
+    expect(consumed).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("button", { name: /RelatedNotes\.run/ }),
+    ).toBeEnabled();
+  });
+
+  it("a fresh autoStart request on another note starts exactly once more", async () => {
+    const OTHER = "note2" as Id<"notes">;
+    const { rerender } = mount({ autoStart: true });
+    await waitFor(() =>
+      expect(mutationFor("links:requestAnalysis")).toHaveBeenCalledTimes(1),
+    );
+    rerender(
+      <RelatedNotesPanel
+        key={OTHER}
+        noteId={OTHER}
+        onClose={() => {}}
+        autoStart
+      />,
+    );
+    await waitFor(() =>
+      expect(mutationFor("links:requestAnalysis")).toHaveBeenCalledTimes(2),
+    );
+    expect(mutationFor("links:requestAnalysis")).toHaveBeenLastCalledWith(
+      expect.objectContaining({ noteId: OTHER }),
+    );
+  });
+
   it("shows the running state and disables the button", () => {
     panelData = { analysis: done({ status: "running" }), suggestions: [] };
     mount();

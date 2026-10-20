@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
@@ -10,9 +10,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
  * tree" menu entry must reach an already open chat as a new mode request.
  */
 
+const sel = vi.hoisted(() => ({ id: "n1" }));
 vi.mock("@/providers/TreeProvider", () => ({
   useTreeContext: () => ({
-    selectedNote: { _id: "n1", title: "T", role: "owner" },
+    selectedNote: { _id: sel.id, title: "T", role: "owner" },
     tree: null,
     onSelectNote: vi.fn(),
   }),
@@ -67,12 +68,36 @@ vi.mock("./VersionPreviewBanner", () => ({ default: () => null }));
 
 // NoteContent calls dynamic() twice, in this order: chat, then links.
 const counter = vi.hoisted(() => ({ calls: 0 }));
+const paid = vi.hoisted(() => ({ starts: [] as string[] }));
 vi.mock("next/dynamic", () => ({
   default: () => {
     const isChat = counter.calls++ % 2 === 0;
     if (!isChat) {
-      return function FakeLinks() {
-        return <section data-testid="links-panel" />;
+      // Mimics the real panel's one-shot: a paid "start" is only counted
+      // when autoStart is true, then the request is consumed.
+      return function FakeLinks({
+        noteId,
+        autoStart,
+        onAutoStartConsumed,
+      }: {
+        noteId: string;
+        autoStart?: boolean;
+        onAutoStartConsumed?: () => void;
+      }) {
+        const used = useRef(false);
+        useEffect(() => {
+          if (!autoStart) {
+            used.current = false;
+            return;
+          }
+          if (used.current) return;
+          used.current = true;
+          paid.starts.push(noteId);
+          onAutoStartConsumed?.();
+        }, [autoStart, noteId, onAutoStartConsumed]);
+        return (
+          <section data-testid="links-panel" data-auto={String(!!autoStart)} />
+        );
       };
     }
     return function FakeChat({
@@ -107,6 +132,8 @@ vi.mock("next/dynamic", () => ({
 import NoteContent from "./NoteContent";
 
 beforeEach(() => {
+  sel.id = "n1";
+  paid.starts.length = 0;
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -162,5 +189,29 @@ describe("NoteContent dock (M3)", () => {
     fireEvent.click(screen.getByTestId("open-chat"));
     fireEvent.click(screen.getByTestId("close-chat"));
     expect(screen.queryByTestId("ai-chat")).toBeNull();
+  });
+
+  it("Related notes starts once from the menu, never when the selection changes", () => {
+    const { rerender } = render(<NoteContent />);
+    fireEvent.click(screen.getByTestId("open-links"));
+    expect(paid.starts).toEqual(["n1"]);
+
+    sel.id = "n2";
+    rerender(<NoteContent />);
+    expect(screen.getByTestId("links-panel").dataset.auto).toBe("false");
+    sel.id = "n1";
+    rerender(<NoteContent />);
+    expect(screen.getByTestId("links-panel").dataset.auto).toBe("false");
+    expect(paid.starts).toEqual(["n1"]);
+  });
+
+  it("re-opening from the menu on another note starts once for that note", () => {
+    const { rerender } = render(<NoteContent />);
+    fireEvent.click(screen.getByTestId("open-links"));
+    sel.id = "n2";
+    rerender(<NoteContent />);
+    expect(paid.starts).toEqual(["n1"]);
+    fireEvent.click(screen.getByTestId("open-links"));
+    expect(paid.starts).toEqual(["n1", "n2"]);
   });
 });
