@@ -15,6 +15,7 @@ const messages: Record<string, string> = {
   "actions.basic": "Generate suggestion",
   "actions.semantic": "Analyze semantics",
   "actions.linking": "Generate note links",
+  "actions.tree": "Propose a tree",
   costAria: "{count} credits",
   premiumBadge: "Premium",
   premiumBadgeAria: "Premium feature",
@@ -65,13 +66,14 @@ function setup(props: {
 const items = () => screen.getAllByRole("menuitem");
 
 describe("AiActionsMenu", () => {
-  it("lists three actions in order with cost chips", () => {
+  it("lists the actions in order with cost chips", () => {
     setup({ balance: 10 });
     const list = items();
-    expect(list).toHaveLength(3);
+    expect(list).toHaveLength(4);
     expect(list[0]).toHaveTextContent("Generate suggestion");
     expect(list[1]).toHaveTextContent("Analyze semantics");
     expect(list[2]).toHaveTextContent("Generate note links");
+    expect(list[3]).toHaveTextContent("Propose a tree");
     expect(within(list[0]).getByLabelText("1 credits")).toHaveTextContent("1");
     expect(within(list[1]).getByLabelText("3 credits")).toHaveTextContent("3");
     expect(within(list[2]).getByLabelText("5 credits")).toHaveTextContent("5");
