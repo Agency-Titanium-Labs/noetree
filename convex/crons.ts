@@ -12,4 +12,12 @@ crons.interval(
   {},
 );
 
+// Phase 21: delete expired autocomplete suggestions (and their text).
+crons.interval(
+  "sweep expired autocomplete suggestions",
+  { minutes: 10 },
+  internal.aiSuggestions.sweepSuggestions,
+  {},
+);
+
 export default crons;
