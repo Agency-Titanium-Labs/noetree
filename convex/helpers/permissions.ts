@@ -9,12 +9,21 @@ export async function isOwnerOrAncestorOwner(
   ctx: QueryCtx | MutationCtx,
   noteId: Id<"notes">,
   userId: Id<"users">,
+  visited = new Set<Id<"notes">>(),
 ): Promise<boolean> {
+  // Defensive cycle guard (a corrupted parent loop must not recurse forever).
+  if (visited.has(noteId)) {
+    console.warn(
+      `[Cycle detected] isOwnerOrAncestorOwner encountered loop on note ${noteId}`,
+    );
+    return false;
+  }
+  visited.add(noteId);
   const note = await ctx.db.get("notes", noteId);
   if (!note) return false;
   if (note.owner === userId) return true;
   if (note.parentNote) {
-    return await isOwnerOrAncestorOwner(ctx, note.parentNote, userId);
+    return await isOwnerOrAncestorOwner(ctx, note.parentNote, userId, visited);
   }
   return false;
 }
@@ -32,8 +41,16 @@ async function resolveShareRole(
 
   let atSelf = startAtSelf;
   let currId: Id<"notes"> | undefined = startNoteId;
+  const visited = new Set<Id<"notes">>();
   while (currId) {
     const noteId: Id<"notes"> = currId;
+    if (visited.has(noteId)) {
+      console.warn(
+        `[Cycle detected] resolveShareRole encountered loop on note ${noteId}`,
+      );
+      return null;
+    }
+    visited.add(noteId);
     const currNote = await ctx.db.get("notes", noteId);
     if (!currNote) return null;
 

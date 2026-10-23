@@ -37,9 +37,19 @@ export default defineSchema({
     isPublic: v.optional(v.boolean()),
     // D-08: set on a purchase copy root so it can be found by its purchase.
     purchaseId: v.optional(v.id("purchases")),
+    // Phase 18 (D-06): sticky marker on EVERY note that holds purchased
+    // marketplace content (all notes written by purchase delivery, and their
+    // duplicates). Never cleared by edits or moves. Optional: older rows are
+    // flagged by notes.backfillPurchasedFlag.
+    isPurchasedContent: v.optional(v.boolean()),
     // Phase 15: user who last saved the current content (author of the next
     // snapshot of this content). Optional so no migration is needed.
     lastEditedBy: v.optional(v.id("users")),
+    // Phase 20: batch marker on notes created by an applied AI tree proposal
+    // (aiTree.applyAiTree). Lets the batch be found and undone within 24 h.
+    // Optional so no migration is needed.
+    aiBatchId: v.optional(v.string()),
+    aiBatchAt: v.optional(v.number()),
   })
     .index("by_owner", ["owner", "parentNote"])
     .index("by_parent", ["parentNote"])
@@ -114,9 +124,155 @@ export default defineSchema({
     actionKey: v.optional(v.string()),
     packKey: v.optional(v.string()),
     refundsTransactionId: v.optional(v.id("creditTransactions")),
+    // Phase 17: the AI run this deduction/refund belongs to (audit only).
+    aiRunId: v.optional(v.id("aiRuns")),
   })
     .index("by_clerkUserId", ["clerkUserId"])
-    .index("by_clerkUserId_and_type", ["clerkUserId", "type"]),
+    .index("by_clerkUserId_and_type", ["clerkUserId", "type"])
+    // Phase 17: second line of defence, a deduction can be refunded once.
+    .index("by_refundsTransactionId", ["refundsTransactionId"]),
+
+  // AI run metering (Phase 17). Invariants:
+  // - One row per (clerkUserId, requestId): a replay never debits twice.
+  // - Inserted only by aiRuns.beginRun, in the same transaction as the debit.
+  // - status leaves "reserved" exactly once (compare-and-set in settle/expire).
+  // - fromMonthly/fromPurchased/transactionId are the original Draw so a
+  //   refund restores exactly what each bucket paid.
+  // - Never exposes prompts or completions: only ids, costs and token usage.
+  aiRuns: defineTable({
+    clerkUserId: v.string(),
+    requestId: v.string(),
+    actionKey: v.string(),
+    cost: v.number(),
+    status: v.union(
+      v.literal("reserved"),
+      v.literal("completed"),
+      v.literal("refunded"),
+    ),
+    transactionId: v.id("creditTransactions"),
+    fromMonthly: v.number(),
+    fromPurchased: v.number(),
+    createdAt: v.number(),
+    // Set by beginRun when the run is created: the creating call is the only
+    // one allowed to stream (single owner). Replays never get a claim.
+    streamClaimedAt: v.optional(v.number()),
+    // Set by the reaper when expiring this run threw; the sweep skips it for
+    // REAP_RETRY_MS so one poisoned run cannot starve the rest of the batch.
+    reapFailedAt: v.optional(v.number()),
+    // Phase 20: readNote calls used by a tree run (cap TREE_MAX_READS).
+    readCount: v.optional(v.number()),
+    settledAt: v.optional(v.number()),
+    outcome: v.optional(v.string()),
+    refundTransactionId: v.optional(v.id("creditTransactions")),
+    usage: v.optional(
+      v.object({
+        inputTokens: v.optional(v.number()),
+        outputTokens: v.optional(v.number()),
+      }),
+    ),
+  })
+    .index("by_clerkUserId_and_requestId", ["clerkUserId", "requestId"])
+    .index("by_clerkUserId_and_status", ["clerkUserId", "status"])
+    .index("by_status_and_createdAt", ["status", "createdAt"]),
+
+  // Phase 20: personal AI context (TREE-01). One row per user, plain text,
+  // max 1 500 characters. Sent to the AI provider only for Premium users while
+  // `enabled`, framed as data (Phase 18 D-07).
+  aiUserContext: defineTable({
+    userId: v.id("users"),
+    text: v.string(),
+    enabled: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
+
+  // Phase 20: one row per applied AI tree batch (TREE-04/05). Idempotency key
+  // is (userId, batchId); noteIds lets undo find the batch without scanning.
+  aiTreeBatches: defineTable({
+    userId: v.id("users"),
+    batchId: v.string(),
+    rootNoteId: v.id("notes"),
+    noteIds: v.array(v.id("notes")),
+    createdAt: v.number(),
+    undoneAt: v.optional(v.number()),
+  })
+    .index("by_userId_and_batchId", ["userId", "batchId"])
+    .index("by_userId_and_createdAt", ["userId", "createdAt"]),
+
+  // Operator kill switch (Phase 17). Singleton row keyed "global"; absent
+  // means AI is enabled. Flipped from the Convex dashboard through the
+  // internal mutation aiRuns.setAiEnabled, no redeploy needed.
+  aiConfig: defineTable({
+    key: v.string(),
+    enabled: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
+  // Per-user token bucket + operator block (Phase 17).
+  aiRateLimits: defineTable({
+    clerkUserId: v.string(),
+    tokens: v.number(),
+    updatedAt: v.number(),
+    blockedUntil: v.optional(v.number()),
+  }).index("by_clerkUserId", ["clerkUserId"]),
+
+  // Autocomplete suggestions (Phase 21). Shown for free; the only charge is
+  // aiSuggestions.accept. Invariants:
+  // - Inserted only by aiSuggestions.issue, which enforces the rate limit and
+  //   the unresolved cap in the same transaction.
+  // - status leaves "issued" exactly once (accepted | dismissed); a replayed
+  //   accept returns the stored text and never debits again.
+  // - `text` is written once, by the secret-guarded fill, never by a client.
+  // - Rows are deleted by the cleanup cron SUGGESTION_CLEANUP_GRACE_MS after
+  //   expiresAt. Holds the model's short output only, never note text.
+  aiSuggestions: defineTable({
+    clerkUserId: v.string(),
+    noteId: v.id("notes"),
+    status: v.union(
+      v.literal("issued"),
+      v.literal("accepted"),
+      v.literal("dismissed"),
+    ),
+    text: v.optional(v.string()),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+    // The 1-credit deduction of an accepted suggestion (audit only).
+    transactionId: v.optional(v.id("creditTransactions")),
+  })
+    .index("by_clerkUserId_and_status_and_expiresAt", [
+      "clerkUserId",
+      "status",
+      "expiresAt",
+    ])
+    .index("by_expiresAt", ["expiresAt"]),
+
+  // Token bucket of suggestion requests, separate from aiRateLimits (chat).
+  aiSuggestionLimits: defineTable({
+    clerkUserId: v.string(),
+    tokens: v.number(),
+    updatedAt: v.number(),
+  }).index("by_clerkUserId", ["clerkUserId"]),
+
+  // Per-user, per-UTC-day counters of issued and accepted suggestions
+  // (21-REVIEW M1): `issued` enforces SUGGEST_DAILY_CAP inside
+  // aiSuggestions.issue, `accepted` lets the operator watch the
+  // issued-to-accepted ratio (aiSuggestions.suggestionStats). Swept after
+  // SUGGEST_DAILY_RETENTION_DAYS. Holds counts only.
+  aiSuggestionDaily: defineTable({
+    clerkUserId: v.string(),
+    day: v.number(),
+    issued: v.number(),
+    accepted: v.number(),
+  })
+    .index("by_clerkUserId_and_day", ["clerkUserId", "day"])
+    .index("by_day", ["day"]),
+
+  // Account-level autocomplete preference (D-02), OFF when absent.
+  autocompletePrefs: defineTable({
+    clerkUserId: v.string(),
+    enabled: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_clerkUserId", ["clerkUserId"]),
 
   processedStripeEvents: defineTable({
     stripeEventId: v.string(),
@@ -321,6 +477,10 @@ export default defineSchema({
     commissionRateBps: v.number(),
     commissionCents: v.number(),
     sellerNetCents: v.number(),
+    // Phase 23: VAT absorbed by the seller. Optional so v1.1/v1.2 rows stay
+    // valid; undefined reads as 0 (no backfill of history).
+    vatRateBps: v.optional(v.number()),
+    vatCents: v.optional(v.number()),
     scope: v.union(v.literal("note"), v.literal("subtree")),
     accessMode: v.union(v.literal("copy"), v.literal("readonly")),
     noteCount: v.number(),
@@ -369,5 +529,102 @@ export default defineSchema({
     grossCents: v.number(),
     commissionCents: v.number(),
     netCents: v.number(),
+    // Phase 23: undefined reads as 0.
+    vatCents: v.optional(v.number()),
   }).index("by_sellerId", ["sellerId"]),
+
+  // Phase 22 (embeddings and link suggestions). Invariants:
+  // - noteEmbeddings: one row per note, written only inside a paid link
+  //   analysis (never on save). `contentHash` covers model + title + text, so
+  //   an unchanged note is never re-embedded. The vector index is filtered by
+  //   `owner`: a search can never see another user's vectors. Dimension 768
+  //   (google/text-embedding-005); changing it needs a new index.
+  // - noteLinks: one row per UNORDERED pair, stored once with noteA < noteB
+  //   (id string order); shown from both notes. Written only by acceptance.
+  // - linkAnalyses: one row per paid run (1:1 with its aiRuns row).
+  // - linkSuggestions / linkIgnoredPairs: proposals and remembered "ignore"
+  //   decisions. Every row is owner-scoped and removed by the deleteNote
+  //   cascade (helpers/linkCleanup.ts).
+  noteEmbeddings: defineTable({
+    owner: v.id("users"),
+    noteId: v.id("notes"),
+    contentHash: v.string(),
+    model: v.string(),
+    embedding: v.array(v.float64()),
+    updatedAt: v.number(),
+  })
+    .index("by_noteId", ["noteId"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: 768,
+      filterFields: ["owner"],
+    }),
+
+  noteLinks: defineTable({
+    owner: v.id("users"),
+    noteA: v.id("notes"),
+    noteB: v.id("notes"),
+    // Plain-text justification kept from the accepted suggestion (optional).
+    reason: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_noteA", ["noteA"])
+    .index("by_noteB", ["noteB"])
+    .index("by_noteA_and_noteB", ["noteA", "noteB"]),
+
+  linkAnalyses: defineTable({
+    owner: v.id("users"),
+    runId: v.id("aiRuns"),
+    noteId: v.id("notes"),
+    locale: v.union(v.literal("en"), v.literal("fr")),
+    status: v.union(
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    createdAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    // More eligible notes than the per-analysis cap (D-02).
+    truncated: v.optional(v.boolean()),
+    eligibleCount: v.optional(v.number()),
+    comparedCount: v.optional(v.number()),
+    embeddedCount: v.optional(v.number()),
+    // Notes whose embedding batch failed and were left out of the comparison.
+    skippedCount: v.optional(v.number()),
+    suggestionCount: v.optional(v.number()),
+    errorCode: v.optional(v.string()),
+  })
+    .index("by_runId", ["runId"])
+    .index("by_noteId_and_createdAt", ["noteId", "createdAt"]),
+
+  linkSuggestions: defineTable({
+    owner: v.id("users"),
+    analysisId: v.id("linkAnalyses"),
+    // The note the analysis was run for, and the proposed counterpart.
+    noteId: v.id("notes"),
+    targetNoteId: v.id("notes"),
+    // Plain text, one sentence, sanitized before storage.
+    justification: v.string(),
+    score: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("ignored"),
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_noteId", ["noteId"])
+    .index("by_noteId_and_status", ["noteId", "status"])
+    .index("by_targetNoteId", ["targetNoteId"])
+    .index("by_analysisId", ["analysisId"]),
+
+  linkIgnoredPairs: defineTable({
+    owner: v.id("users"),
+    noteA: v.id("notes"),
+    noteB: v.id("notes"),
+    createdAt: v.number(),
+  })
+    .index("by_noteA", ["noteA"])
+    .index("by_noteB", ["noteB"])
+    .index("by_noteA_and_noteB", ["noteA", "noteB"]),
 });

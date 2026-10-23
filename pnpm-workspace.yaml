@@ -5,3 +5,11 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+overrides:
+  prosemirror-view: ">=1.42.3"
+  ws: ">=8.21.0"
+  browserslist: ">=4.28.7"
+  baseline-browser-mapping: ">=2.11.0"
+  source-map-js: ">=1.2.2"
+  prosemirror-model: "1.25.12"
+  prosemirror-transform: "1.12.2"

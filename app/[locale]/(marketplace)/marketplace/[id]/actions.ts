@@ -17,6 +17,7 @@ export type CheckoutResult = { ok: false; code: string };
 const PREPARE_CODES = new Set([
   "UNAUTHENTICATED",
   "PURCHASE_LISTING_UNAVAILABLE",
+  "PURCHASE_PRICE_BELOW_MINIMUM",
   "PURCHASE_OWN_LISTING",
   "PURCHASE_ALREADY_OWNED",
   "CONNECT_ONBOARDING_REQUIRED",
@@ -33,6 +34,7 @@ type Snapshot = {
   priceCents: number;
   currency: string;
   commissionCents: number;
+  applicationFeeCents: number;
   destinationAccountId: string;
   listingId: string;
 };
@@ -67,7 +69,7 @@ async function createDestinationSession(
         },
       ],
       payment_intent_data: {
-        application_fee_amount: snapshot.commissionCents,
+        application_fee_amount: snapshot.applicationFeeCents,
         transfer_data: { destination: snapshot.destinationAccountId },
         metadata,
       },

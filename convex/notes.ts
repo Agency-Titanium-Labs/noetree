@@ -1,18 +1,38 @@
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalMutation,
+  QueryCtx,
+  MutationCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v, ConvexError } from "convex/values";
 import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
-import { unpublishListingForNote } from "./helpers/listings";
-import { deleteShareLinkForNote } from "./helpers/sharing";
-import { deleteCommentsForNote } from "./helpers/commentAccess";
+import { isNoteOrAncestorPurchased } from "./helpers/listings";
+import {
+  ancestorHasPurchaseGrant,
+  cleanupDeletedNote,
+  noteHasPurchaseShare,
+} from "./helpers/noteDeletion";
 import { planCopy, writeCopy } from "./helpers/delivery";
-import { deleteVersionsForNote, writeNoteContent } from "./helpers/noteVersions";
+import { writeNoteContent } from "./helpers/noteVersions";
 import {
   getInheritedPermission,
   getUserPermission,
 } from "./helpers/permissions";
 
 type Notes = Doc<"notes">;
+
+/** AI-batch bookkeeping (Phase 20) is server-only; never sent to clients. */
+function stripAiBatch<T extends Notes>(
+  note: T,
+): Omit<T, "aiBatchId" | "aiBatchAt"> {
+  const { aiBatchId: _id, aiBatchAt: _at, ...rest } = note;
+  void _id;
+  void _at;
+  return rest;
+}
 
 interface NotesToSend extends Omit<Notes, "childNotes"> {
   childNotes: NotesToSend[] | Id<"notes">[] | undefined;
@@ -119,7 +139,7 @@ export const getTreeById = query({
 
     // step 2 Check if user exists
     if (!user) {
-      throw new Error("User not found");
+      return null;
     }
 
     //step 3 Get the note
@@ -143,7 +163,7 @@ export const getTreeById = query({
 
     //step 5 - map current notes to be as NotesToSend
     const noteToSend: NotesToSend = {
-      ...note,
+      ...stripAiBatch(note),
       childNotes: topSeesChildren ? note.childNotes || [] : [],
       shareId,
       isShared,
@@ -157,6 +177,7 @@ export const getTreeById = query({
     if (args.deep) {
       // Start with the top-level notes
       let currentLevelNotes = [noteToSend];
+      const visitedNoteIds = new Set<Id<"notes">>([noteToSend._id]);
 
       // For each level of depth
       for (let i = 0; i < args.deep; i++) {
@@ -171,12 +192,20 @@ export const getTreeById = query({
             .withIndex("by_parent", q => q.eq("parentNote", currentNote._id))
             .collect();
 
-          if (childrenNotes.length > 0) {
-            const orderedIds = currentNote.childNotes as Id<"notes">[];
+          // Defensively skip any child that has already been visited to prevent cycles
+          const unvisitedChildren = childrenNotes.filter(
+            c => !visitedNoteIds.has(c._id),
+          );
+          for (const c of unvisitedChildren) {
+            visitedNoteIds.add(c._id);
+          }
+
+          if (unvisitedChildren.length > 0) {
+            const orderedIds = (currentNote.childNotes || []) as Id<"notes">[];
 
             // Convert children to NotesToSend format
             const resolvedChildren = await Promise.all(
-              childrenNotes.map(async childNote => {
+              unvisitedChildren.map(async childNote => {
                 let childIsShared = currentNote.isShared;
                 let childShareId = currentNote.shareId;
                 let childIsPurchased = currentNote.isPurchased;
@@ -264,7 +293,7 @@ export const getTreesByMe = query({
 
     //step 2 - check if user exists
     if (!user) {
-      throw new Error("User not found");
+      return [];
     }
 
     //step 3 - get all top parent notes owned by me
@@ -362,7 +391,7 @@ export const getTreesByMe = query({
         .collect();
       for (const child of children) {
         sharedNotesDescendants.push({
-          ...child,
+          ...stripAiBatch(child),
           shareId: parentShareId,
           isShared: true,
           isPurchased,
@@ -439,7 +468,7 @@ export const getTreesByMe = query({
         );
         if (!seesChildren) hiddenChildren.add(note._id);
         return {
-          ...note,
+          ...stripAiBatch(note),
           childNotes: seesChildren ? note.childNotes || [] : [],
           nestedNotesCount: seesChildren ? countDescendants(note._id) : 0,
           shareId,
@@ -696,33 +725,17 @@ export const deleteNote = mutation({
     }
 
     // D-05: read-only sales must not lose their source. Pre-scan, no writes.
-    // Ancestors: a purchase share with scope other than "note" covers this
-    // subtree. Undefined sorts lowest in index order, so descending yields every
-    // purchase-share row before any manual row (see shareIndexes.test.ts).
-    let ancestorId = rootNote.parentNote;
-    for (let hops = 0; ancestorId && hops < 64; hops++) {
-      for await (const share of ctx.db
-        .query("shares")
-        .withIndex("by_note_and_purchaseId", q => q.eq("noteId", ancestorId!))
-        .order("desc")) {
-        if (share.purchaseId === undefined) break;
-        if (share.scope !== "note") {
-          throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
-        }
-      }
-      const ancestor: Doc<"notes"> | null = await ctx.db.get(ancestorId);
-      ancestorId = ancestor?.parentNote;
+    if (await ancestorHasPurchaseGrant(ctx, rootNote.parentNote)) {
+      throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
     }
     // Subtree: any note carrying a purchase share blocks deletion.
     const queue: Id<"notes">[] = [args.id];
+    const scanned = new Set<Id<"notes">>();
     while (queue.length > 0) {
       const current = queue.shift()!;
-      const top = await ctx.db
-        .query("shares")
-        .withIndex("by_note_and_purchaseId", q => q.eq("noteId", current))
-        .order("desc")
-        .first();
-      if (top && top.purchaseId !== undefined) {
+      if (scanned.has(current)) continue;
+      scanned.add(current);
+      if (await noteHasPurchaseShare(ctx, current)) {
         throw new ConvexError("NOTE_HAS_PURCHASE_GRANTS");
       }
       for await (const child of ctx.db
@@ -732,31 +745,28 @@ export const deleteNote = mutation({
       }
     }
 
-    const deleteRecursive = async (noteId: Id<"notes">) => {
+    const deleteRecursive = async (
+      noteId: Id<"notes">,
+      visited = new Set<Id<"notes">>(),
+    ) => {
+      if (visited.has(noteId)) {
+        console.warn(
+          `[Cycle detected] deleteRecursive encountered cycle on ${noteId}`,
+        );
+        return;
+      }
+      visited.add(noteId);
       const children = await ctx.db
         .query("notes")
         .withIndex("by_parent", q => q.eq("parentNote", noteId))
         .collect();
 
       for (const child of children) {
-        await deleteRecursive(child._id);
+        await deleteRecursive(child._id, visited);
       }
       await ctx.db.delete(noteId);
 
-      // Delete any shares associated with the deleted note
-      const shares = await ctx.db
-        .query("shares")
-        .withIndex("by_note", q => q.eq("noteId", noteId))
-        .collect();
-      for (const share of shares) {
-        await ctx.db.delete(share._id);
-      }
-
-      // D-18: auto-unpublish (never delete) the listing for every deleted note — same transaction; purchases keep pointing at the row (D-16)
-      await unpublishListingForNote(ctx, noteId);
-      await deleteShareLinkForNote(ctx, noteId);
-      await deleteCommentsForNote(ctx, noteId);
-      await deleteVersionsForNote(ctx, noteId);
+      await cleanupDeletedNote(ctx, noteId);
     };
 
     if (rootNote.parentNote) {
@@ -820,10 +830,16 @@ export const duplicateNote = mutation({
     if (!planned.ok) {
       throw new Error("Note not found");
     }
+    // D-06: a duplicate of purchased content stays purchased content. The
+    // source flag / purchaseId propagates inside writeCopy; an unflagged
+    // legacy note sitting under a purchased note is caught by the ancestor
+    // walk here.
+    const underPurchased = await isNoteOrAncestorPurchased(ctx, args.id);
     const newNoteId = await writeCopy(ctx, planned.plan, {
       owner: user._id,
       parentNote: sourceNote.parentNote,
       rootTitle: uniqueTitle,
+      purchased: underPurchased,
     });
 
     if (sourceNote.parentNote) {
@@ -853,6 +869,26 @@ export const updateParentNote = mutation({
       throw new Error("User not found");
     }
     await requireEditAccess(ctx, args.id, user._id);
+
+    if (args.parentNote) {
+      if (args.id === args.parentNote) {
+        throw new ConvexError("Cannot set a note as its own parent");
+      }
+      // Check if args.parentNote is a descendant of args.id
+      let curr: Id<"notes"> | undefined = args.parentNote;
+      const visited = new Set<Id<"notes">>();
+      while (curr) {
+        if (curr === args.id) {
+          throw new ConvexError("Cannot set a descendant as parent");
+        }
+        if (visited.has(curr)) break;
+        visited.add(curr);
+        const p: Doc<"notes"> | null = await ctx.db.get(curr);
+        if (!p) break;
+        curr = p.parentNote;
+      }
+    }
+
     const note = await ctx.db.patch(args.id, {
       parentNote: args.parentNote,
       updated_at: new Date().toISOString(),
@@ -892,50 +928,181 @@ export const moveNote = mutation({
     if (!user) {
       throw new Error("User not found");
     }
+
+    // 1. Cannot move into itself
+    if (args.id === args.to) {
+      throw new ConvexError("Cannot move a note into itself");
+    }
+
+    // 2. Fetch the note to be moved
+    const note = await ctx.db.get(args.id);
+    if (!note) {
+      throw new ConvexError("Note not found");
+    }
+
+    // 3. Root notes cannot be moved
+    if (!note.parentNote) {
+      throw new ConvexError("Root note cannot be moved");
+    }
+
+    // 4. Permissions check
     await requireEditAccess(ctx, args.id, user._id);
     await requireEditAccess(ctx, args.from, user._id);
     await requireEditAccess(ctx, args.to, user._id);
 
-    // remove from childNotes of from
+    // 5. Anti-cycle / Descendant check:
+    // Ensure that `to` is not a descendant of `id`.
+    let currParent: Id<"notes"> | undefined = args.to;
+    const visited = new Set<Id<"notes">>();
+    while (currParent) {
+      if (currParent === args.id) {
+        throw new ConvexError("Cannot move a note into its own descendant");
+      }
+      if (visited.has(currParent)) {
+        throw new ConvexError("Cycle detected in parent hierarchy");
+      }
+      visited.add(currParent);
+      const parentDoc: Doc<"notes"> | null = await ctx.db.get(currParent);
+      if (!parentDoc) break;
+      currParent = parentDoc.parentNote;
+    }
+
+    // 6. Fetch from and to notes
     const noteFrom = await ctx.db.get(args.from);
     const noteTo = await ctx.db.get(args.to);
 
     if (!noteFrom || !noteTo) {
-      throw new Error("Note not found");
+      throw new ConvexError("Parent note not found");
     }
 
-    if (!noteFrom.childNotes) {
-      throw new Error("Note does not have childNotes");
+    // 7. If from === to (reordering inside same parent)
+    if (args.from === args.to) {
+      const currentChildren = (noteTo.childNotes || []).filter(
+        childId => childId !== args.id,
+      );
+      if (args.index !== undefined && args.index >= 0) {
+        currentChildren.splice(args.index, 0, args.id);
+      } else {
+        currentChildren.push(args.id);
+      }
+      await ctx.db.patch(args.to, {
+        childNotes: currentChildren,
+        updated_at: new Date().toISOString(),
+      });
+      return note;
     }
 
-    const newChildrenNotesFrom = noteFrom.childNotes.filter(
-      id => id !== args.id,
+    // 8. If from !== to (moving to a different parent)
+    // Remove from `args.from`
+    const newChildrenFrom = (noteFrom.childNotes || []).filter(
+      childId => childId !== args.id,
     );
-
     await ctx.db.patch(args.from, {
-      childNotes: newChildrenNotesFrom,
+      childNotes: newChildrenFrom,
+      updated_at: new Date().toISOString(),
     });
 
-    // Remove existing if any, then insert
-    const newChildrenNotesTo = noteTo.childNotes
-      ? noteTo.childNotes.filter(id => id !== args.id)
-      : [];
-
-    if (args.index !== undefined) {
-      newChildrenNotesTo.splice(args.index, 0, args.id);
-    } else {
-      newChildrenNotesTo.push(args.id);
+    // Also if note.parentNote !== args.from (drift safeguard), clean up note.parentNote
+    if (note.parentNote && note.parentNote !== args.from) {
+      const actualParent = await ctx.db.get(note.parentNote);
+      if (actualParent?.childNotes) {
+        await ctx.db.patch(note.parentNote, {
+          childNotes: actualParent.childNotes.filter(
+            childId => childId !== args.id,
+          ),
+          updated_at: new Date().toISOString(),
+        });
+      }
     }
 
-    // add to childNotes of to
+    // Add to `args.to`
+    const newChildrenTo = (noteTo.childNotes || []).filter(
+      childId => childId !== args.id,
+    );
+    if (args.index !== undefined && args.index >= 0) {
+      newChildrenTo.splice(args.index, 0, args.id);
+    } else {
+      newChildrenTo.push(args.id);
+    }
     await ctx.db.patch(args.to, {
-      childNotes: newChildrenNotesTo,
+      childNotes: newChildrenTo,
+      updated_at: new Date().toISOString(),
     });
 
-    const note = await ctx.db.patch(args.id, {
+    // Update parentNote on args.id
+    const updatedNote = await ctx.db.patch(args.id, {
       parentNote: args.to,
+      updated_at: new Date().toISOString(),
     });
-    return note;
+
+    return updatedNote;
+  },
+});
+
+export const repairNoteHierarchy = mutation({
+  args: {},
+  handler: async ctx => {
+    const allNotes = await ctx.db.query("notes").collect();
+    const noteMap = new Map(allNotes.map(n => [n._id, n]));
+    const repaired: Array<{ id: Id<"notes">; title: string; reason: string }> =
+      [];
+
+    for (const note of allNotes) {
+      // 1. Direct self-loop (parentNote === _id)
+      if (note.parentNote === note._id) {
+        await ctx.db.patch(note._id, {
+          parentNote: undefined,
+          childNotes: (note.childNotes || []).filter(c => c !== note._id),
+          updated_at: new Date().toISOString(),
+        });
+        repaired.push({
+          id: note._id,
+          title: note.title,
+          reason: "Self-referencing parentNote repaired to root",
+        });
+        continue;
+      }
+
+      // 2. Cycle detection (A -> B -> A)
+      let curr = note.parentNote;
+      const visited = new Set<Id<"notes">>([note._id]);
+      let hasCycle = false;
+      while (curr) {
+        if (visited.has(curr)) {
+          hasCycle = true;
+          break;
+        }
+        visited.add(curr);
+        const parentDoc = noteMap.get(curr);
+        if (!parentDoc) break;
+        curr = parentDoc.parentNote;
+      }
+
+      if (hasCycle) {
+        await ctx.db.patch(note._id, {
+          parentNote: undefined,
+          childNotes: (note.childNotes || []).filter(c => c !== note._id),
+          updated_at: new Date().toISOString(),
+        });
+        repaired.push({
+          id: note._id,
+          title: note.title,
+          reason: "Cycle in parent chain; repaired to root",
+        });
+      } else if (note.childNotes?.includes(note._id)) {
+        await ctx.db.patch(note._id, {
+          childNotes: note.childNotes.filter(c => c !== note._id),
+          updated_at: new Date().toISOString(),
+        });
+        repaired.push({
+          id: note._id,
+          title: note.title,
+          reason: "Self removed from childNotes",
+        });
+      }
+    }
+
+    return { repairedCount: repaired.length, repaired };
   },
 });
 
@@ -1205,5 +1372,117 @@ export const updateShareRole = mutation({
 
     await ctx.db.patch(args.shareId, { role: args.role });
     return true;
+  },
+});
+
+/** Budget units per backfillPurchasedFlag call (writes and page reads). */
+const BACKFILL_WRITE_BUDGET = 200;
+/** Budget units charged per page read (keeps reads per call bounded). */
+const BACKFILL_READ_COST = 5;
+/** Copy roots read per page and children read per page. */
+const BACKFILL_ROOT_PAGE = 20;
+const BACKFILL_CHILD_PAGE = 50;
+
+type BackfillFrontier = { id: Id<"notes">; after: number | null };
+type BackfillResult = {
+  flagged: number;
+  done: boolean;
+  next: {
+    rootCursor: string | null;
+    rootsDone: boolean;
+    frontier: BackfillFrontier[];
+  };
+};
+
+/**
+ * One-off, idempotent, INTERNAL backfill for Phase 18 D-06. Flags every
+ * existing copy root (by_purchaseId index) and all of its descendants with
+ * isPurchasedContent, for data created before the flag existed. Bounded: each
+ * call spends at most BACKFILL_WRITE_BUDGET units (1 per write, 5 per read
+ * page) and, unless autoContinue is false, schedules itself with the returned
+ * state until done. Re-running is safe: already flagged notes are traversed
+ * but never rewritten.
+ *
+ * Convex allows ONE paginate() per function, so roots use it (at most once
+ * per call) and children use a _creationTime key cursor on by_parent.
+ *
+ * Run (against the deployment YOU choose): npx convex run notes:backfillPurchasedFlag
+ */
+export const backfillPurchasedFlag = internalMutation({
+  args: {
+    rootCursor: v.optional(v.union(v.string(), v.null())),
+    rootsDone: v.optional(v.boolean()),
+    frontier: v.optional(
+      v.array(
+        v.object({ id: v.id("notes"), after: v.union(v.number(), v.null()) }),
+      ),
+    ),
+    autoContinue: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<BackfillResult> => {
+    let rootCursor = args.rootCursor ?? null;
+    let rootsDone = args.rootsDone ?? false;
+    const frontier: BackfillFrontier[] = [...(args.frontier ?? [])];
+    let flagged = 0;
+    let budget = BACKFILL_WRITE_BUDGET;
+    let rootsFetched = false;
+
+    while (budget > 0) {
+      const top = frontier.pop();
+      if (!top) {
+        if (rootsDone || rootsFetched) break;
+        rootsFetched = true;
+        const page = await ctx.db
+          .query("notes")
+          .withIndex("by_purchaseId", q => q.gt("purchaseId", undefined))
+          .paginate({ numItems: BACKFILL_ROOT_PAGE, cursor: rootCursor });
+        budget -= BACKFILL_READ_COST;
+        for (const root of page.page) {
+          if (root.isPurchasedContent !== true) {
+            await ctx.db.patch("notes", root._id, { isPurchasedContent: true });
+            flagged++;
+            budget--;
+          }
+          frontier.push({ id: root._id, after: null });
+        }
+        rootCursor = page.continueCursor;
+        rootsDone = page.isDone;
+        continue;
+      }
+      const children = await ctx.db
+        .query("notes")
+        .withIndex("by_parent", q =>
+          top.after === null
+            ? q.eq("parentNote", top.id)
+            : q.eq("parentNote", top.id).gt("_creationTime", top.after),
+        )
+        .take(BACKFILL_CHILD_PAGE);
+      budget -= BACKFILL_READ_COST;
+      if (children.length === BACKFILL_CHILD_PAGE) {
+        frontier.push({
+          id: top.id,
+          after: children[children.length - 1]._creationTime,
+        });
+      }
+      for (const child of children) {
+        if (child.isPurchasedContent !== true) {
+          await ctx.db.patch("notes", child._id, { isPurchasedContent: true });
+          flagged++;
+          budget--;
+        }
+        frontier.push({ id: child._id, after: null });
+      }
+    }
+
+    const done = frontier.length === 0 && rootsDone;
+    const next = { rootCursor, rootsDone, frontier };
+    if (!done && args.autoContinue !== false) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notes.backfillPurchasedFlag,
+        next,
+      );
+    }
+    return { flagged, done, next };
   },
 });
