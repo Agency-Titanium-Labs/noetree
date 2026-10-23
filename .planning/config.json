@@ -1,0 +1,9 @@
+{
+  "workflow": {
+    "_auto_chain_active": false
+  },
+  "git": {
+    "base_branch": "dev",
+    "branching_strategy": "phase"
+  }
+}

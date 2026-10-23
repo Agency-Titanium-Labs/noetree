@@ -8,7 +8,7 @@ export default defineConfig({
       return clerkSetup({ config });
     },
     video: true,
-    baseUrl: "http://localhost:3000"
+    baseUrl: "http://localhost:3000",
   },
-  projectId: "e3zwoh"
+  projectId: "e3zwoh",
 });

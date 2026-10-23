@@ -2,6 +2,7 @@ import { useEditorContext } from "@/providers/EditorProvider";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { ToolbarItem } from "./toolbarItems";
+import { useTranslations } from "next-intl";
 
 interface ToolbarGroupProps {
   items: ToolbarItem[];
@@ -9,6 +10,7 @@ interface ToolbarGroupProps {
 
 export function ToolbarGroup({ items }: Readonly<ToolbarGroupProps>) {
   const { editor } = useEditorContext();
+  const t = useTranslations("Editor");
 
   return (
     <>
@@ -26,7 +28,9 @@ export function ToolbarGroup({ items }: Readonly<ToolbarGroupProps>) {
                 {item.icon}
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">{item.tooltip}</TooltipContent>
+            <TooltipContent side="bottom">
+              {t(`tooltips.${item.name}`)}
+            </TooltipContent>
           </Tooltip>
         ))}
     </>

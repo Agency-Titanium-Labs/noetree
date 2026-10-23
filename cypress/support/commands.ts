@@ -35,5 +35,13 @@
 //     }
 //   }
 // }
+
+// Registers cy.clerkSignIn / cy.clerkSignOut / cy.clerkLoaded, needed by any
+// spec (e.g. checkout-redirect.spec.ts) that must exercise an authenticated
+// flow — setupClerkTestingToken() alone only bypasses bot protection, it
+// does not establish a signed-in session.
+import { addClerkCommands } from "@clerk/testing/cypress";
+addClerkCommands({ Cypress, cy });
+
 const asModule = {};
 export default asModule;

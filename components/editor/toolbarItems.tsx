@@ -16,7 +16,7 @@ import {
   Strikethrough,
   CornerDownRight,
   Minus,
-  ListOrdered
+  ListOrdered,
 } from "lucide-react";
 import { Editor } from "@tiptap/react";
 import { JSX } from "react";
@@ -36,15 +36,15 @@ export const historyItems: ToolbarItem[] = [
     icon: <Undo className="h-4 w-4" />,
     action: editor => editor.chain().focus().undo().run(),
     isDisabled: editor => !editor.can().undo(),
-    tooltip: "Undo (Ctrl+Z)"
+    tooltip: "Undo (Ctrl+Z)",
   },
   {
     name: "redo",
     icon: <Redo className="h-4 w-4" />,
     action: editor => editor.chain().focus().redo().run(),
     isDisabled: editor => !editor.can().redo(),
-    tooltip: "Redo (Ctrl+Shift+Z)"
-  }
+    tooltip: "Redo (Ctrl+Shift+Z)",
+  },
 ];
 
 export const headingItems: ToolbarItem[] = [
@@ -53,43 +53,43 @@ export const headingItems: ToolbarItem[] = [
     icon: <Heading1 className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleHeading({ level: 1 }).run(),
     isActive: editor => editor.isActive("heading", { level: 1 }),
-    tooltip: "Heading 1"
+    tooltip: "Heading 1",
   },
   {
     name: "heading-2",
     icon: <Heading2 className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleHeading({ level: 2 }).run(),
     isActive: editor => editor.isActive("heading", { level: 2 }),
-    tooltip: "Heading 2"
+    tooltip: "Heading 2",
   },
   {
     name: "heading-3",
     icon: <Heading3 className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleHeading({ level: 3 }).run(),
     isActive: editor => editor.isActive("heading", { level: 3 }),
-    tooltip: "Heading 3"
+    tooltip: "Heading 3",
   },
   {
     name: "heading-4",
     icon: <Heading4 className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleHeading({ level: 4 }).run(),
     isActive: editor => editor.isActive("heading", { level: 4 }),
-    tooltip: "Heading 4"
+    tooltip: "Heading 4",
   },
   {
     name: "heading-5",
     icon: <Heading5 className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleHeading({ level: 5 }).run(),
     isActive: editor => editor.isActive("heading", { level: 5 }),
-    tooltip: "Heading 5"
+    tooltip: "Heading 5",
   },
   {
     name: "heading-6",
     icon: <Heading6 className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleHeading({ level: 6 }).run(),
     isActive: editor => editor.isActive("heading", { level: 6 }),
-    tooltip: "Heading 6"
-  }
+    tooltip: "Heading 6",
+  },
 ];
 
 export const formattingItems: ToolbarItem[] = [
@@ -98,29 +98,29 @@ export const formattingItems: ToolbarItem[] = [
     icon: <Bold className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleBold().run(),
     isActive: editor => editor.isActive("bold"),
-    tooltip: "Bold (Ctrl+B)"
+    tooltip: "Bold (Ctrl+B)",
   },
   {
     name: "italic",
     icon: <Italic className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleItalic().run(),
     isActive: editor => editor.isActive("italic"),
-    tooltip: "Italic (Ctrl+I)"
+    tooltip: "Italic (Ctrl+I)",
   },
   {
     name: "strike",
     icon: <Strikethrough className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleStrike().run(),
     isActive: editor => editor.isActive("strike"),
-    tooltip: "Strikethrough"
+    tooltip: "Strikethrough",
   },
   {
     name: "code",
     icon: <Code className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleCode().run(),
     isActive: editor => editor.isActive("code"),
-    tooltip: "Inline Code (Ctrl+E)"
-  }
+    tooltip: "Inline Code (Ctrl+E)",
+  },
 ];
 
 export const listItems: ToolbarItem[] = [
@@ -129,22 +129,22 @@ export const listItems: ToolbarItem[] = [
     icon: <List className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleBulletList().run(),
     isActive: editor => editor.isActive("bulletList"),
-    tooltip: "Bullet List"
+    tooltip: "Bullet List",
   },
   {
     name: "orderedList",
     icon: <ListOrdered className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleOrderedList().run(),
     isActive: editor => editor.isActive("orderedList"),
-    tooltip: "Ordered List"
+    tooltip: "Ordered List",
   },
   {
     name: "blockquote",
     icon: <Quote className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleBlockquote().run(),
     isActive: editor => editor.isActive("blockquote"),
-    tooltip: "Blockquote"
-  }
+    tooltip: "Blockquote",
+  },
 ];
 
 export const specialItems: ToolbarItem[] = [
@@ -153,18 +153,18 @@ export const specialItems: ToolbarItem[] = [
     icon: <TerminalSquare className="h-4 w-4" />,
     action: editor => editor.chain().focus().toggleCodeBlock().run(),
     isActive: editor => editor.isActive("codeBlock"),
-    tooltip: "Code Block"
+    tooltip: "Code Block",
   },
   {
     name: "hardBreak",
     icon: <CornerDownRight className="h-4 w-4" />,
     action: editor => editor.chain().focus().setHardBreak().run(),
-    tooltip: "Hard Break"
+    tooltip: "Hard Break",
   },
   {
     name: "horizontalRule",
     icon: <Minus className="h-4 w-4" />,
     action: editor => editor.chain().focus().setHorizontalRule().run(),
-    tooltip: "Horizontal Rule"
-  }
+    tooltip: "Horizontal Rule",
+  },
 ];

@@ -10,28 +10,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
       - name: Cache Cypress
         uses: actions/cache@v3
         with:
           path: ~/.cache/Cypress
-          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: cypress-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             cypress-${{ runner.os }}-
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
 
       - name: Run Cypress tests
         uses: cypress-io/github-action@v6
         with:
-          install-command: npm ci --legacy-peer-deps
-          build: npm run build
-          start: npm run start:ci
+          install-command: pnpm install --frozen-lockfile
+          build: pnpm run build
+          start: pnpm run start:ci
           browser: chrome
           record: true
           parallel: true
@@ -44,3 +47,18 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+          # Clerk test user for the signed-in checkout spec (read by the spec
+          # via Cypress.env("E2E_CLERK_USER_IDENTIFIER" / "..._PASSWORD")).
+          CYPRESS_E2E_CLERK_USER_IDENTIFIER: ${{ secrets.E2E_CLERK_USER_IDENTIFIER }}
+          CYPRESS_E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          # Build-time placeholders for the webhook secrets: `next build` evaluates the Stripe
+          # webhook routes, whose modules construct a Stripe client on import.
+          # No Stripe API call is made in CI, so these never need to be real.
+          # The signed-in checkout spec creates a real (test-mode) Checkout session.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PREMIUM_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_PREMIUM_MONTHLY_PRICE_ID }}
+          STRIPE_PREMIUM_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_PREMIUM_ANNUAL_PRICE_ID }}
+          APP_URL: http://localhost:3000
+          STRIPE_WEBHOOK_SECRET: whsec_ci_build_placeholder
+          STRIPE_CONNECT_WEBHOOK_SECRET: whsec_ci_build_placeholder
+          INTERNAL_WEBHOOK_SECRET: ci-build-placeholder
