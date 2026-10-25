@@ -254,6 +254,7 @@ export default function NoteContent() {
                 onKeyDown={event => {
                   if (event.key === "Escape" && previewVersion) exitPreview();
                 }}
+                className="flex flex-1"
               >
                 <EditorContent editor={editor} />
               </div>
