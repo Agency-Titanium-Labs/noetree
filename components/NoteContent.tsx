@@ -20,6 +20,7 @@ import HistoryButton from "./HistoryButton";
 import HistoryPanel from "./HistoryPanel";
 import LinkedNotesBlock from "./LinkedNotesBlock";
 import VersionPreviewBanner from "./VersionPreviewBanner";
+import CollaboratorsPile from "./CollaboratorsPile";
 import dynamic from "next/dynamic";
 import {
   ResizableHandle,
@@ -182,6 +183,7 @@ export default function NoteContent() {
                   {tListing("triggerLabel")}
                 </Button>
               )}
+              <CollaboratorsPile noteId={selectedNote?._id} />
             </div>
             <div className="flex items-center gap-2">
               <ConditionChecker condition={saveStatus === "error"}>

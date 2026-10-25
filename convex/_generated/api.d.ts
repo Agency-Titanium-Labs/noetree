@@ -53,6 +53,8 @@ import type * as marketplace from "../marketplace.js";
 import type * as noteVersions from "../noteVersions.js";
 import type * as notes from "../notes.js";
 import type * as notifications from "../notifications.js";
+import type * as presence from "../presence.js";
+import type * as prosemirrorSync from "../prosemirrorSync.js";
 import type * as purchases from "../purchases.js";
 import type * as sales from "../sales.js";
 import type * as shareLinks from "../shareLinks.js";
@@ -113,6 +115,8 @@ declare const fullApi: ApiFromModules<{
   noteVersions: typeof noteVersions;
   notes: typeof notes;
   notifications: typeof notifications;
+  presence: typeof presence;
+  prosemirrorSync: typeof prosemirrorSync;
   purchases: typeof purchases;
   sales: typeof sales;
   shareLinks: typeof shareLinks;
@@ -148,4 +152,7 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  prosemirrorSync: import("@convex-dev/prosemirror-sync/_generated/component.js").ComponentApi<"prosemirrorSync">;
+  presence: import("@convex-dev/presence/_generated/component.js").ComponentApi<"presence">;
+};

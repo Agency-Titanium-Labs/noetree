@@ -343,6 +343,9 @@
   },
   "Editor": {
     "placeholder": "Write something...",
+    "you": "You",
+    "collaborator": "Collaborator",
+    "collaborators": "Other collaborators",
     "tooltips": {
       "undo": "Undo (Ctrl+Z)",
       "redo": "Redo (Ctrl+Shift+Z)",

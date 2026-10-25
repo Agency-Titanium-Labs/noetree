@@ -77,6 +77,7 @@ vi.mock("./HistoryButton", () => ({ default: () => null }));
 vi.mock("./HistoryPanel", () => ({ default: () => null }));
 vi.mock("./LinkedNotesBlock", () => ({ default: () => null }));
 vi.mock("./VersionPreviewBanner", () => ({ default: () => null }));
+vi.mock("./CollaboratorsPile", () => ({ default: () => null }));
 
 // next/dynamic: resolve to a small stateful chat so M2 is observable.
 vi.mock("next/dynamic", () => ({

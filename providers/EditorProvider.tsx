@@ -1,10 +1,9 @@
-import { Editor } from "@tiptap/core";
+import { Editor, JSONContent } from "@tiptap/core";
 import { Content, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
-import React, {
+import {
   createContext,
   ReactNode,
   useCallback,
@@ -18,6 +17,17 @@ import { useTreeContext } from "./TreeProvider";
 import { useTranslations } from "next-intl";
 import { GhostText } from "@/lib/editor/ghostText";
 import { useAutocompleteBridge } from "@/lib/editor/useAutocompleteBridge";
+import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap";
+import { api } from "@/convex/_generated/api";
+import { useMutation, useQuery } from "convex/react";
+import usePresence, { type PresenceState } from "@convex-dev/presence/react";
+import { useUser } from "@clerk/nextjs";
+import {
+  CollaborativeCursors,
+  collaborativeCursorsKey,
+  getUserColor,
+  type RemoteUserCursor,
+} from "@/lib/editor/collaborativeCursors";
 
 type saveStatusType = "idle" | "unsaved" | "saving" | "success" | "error";
 
@@ -37,6 +47,7 @@ interface EditorContextType {
   previewVersion: PreviewVersion | null;
   enterPreview: (version: PreviewVersion) => void;
   exitPreview: (contentOverride?: string) => void;
+  presenceList?: PresenceState[];
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -46,6 +57,7 @@ const EditorContext = createContext<EditorContextType>({
   previewVersion: null,
   enterPreview: () => {},
   exitPreview: () => {},
+  presenceList: undefined,
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -98,15 +110,69 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const { options: autocomplete, enabled: autocompleteEnabled } =
     useAutocompleteBridge(selectedNote?._id);
 
+  const sync = useTiptapSync(api.prosemirrorSync, selectedNote?._id ?? "");
+
+  const { user } = useUser();
+  const me = useQuery(api.users.me);
+  const currentUserId = me?._id ?? user?.id ?? "";
+
+  const presenceList = usePresence(
+    api.presence,
+    selectedNote?._id ?? "",
+    currentUserId,
+    10000,
+  );
+
+  const updateCursorMutation = useMutation(api.presence.updateCursor);
+
+  const debouncedSendCursor = useDebouncedCallback(
+    (from: number, to: number) => {
+      if (!selectedNote?._id || previewRef.current) return;
+      void updateCursorMutation({
+        roomId: selectedNote._id,
+        cursor: { from, to },
+      });
+    },
+    150,
+    { maxWait: 400 },
+  );
+
+  const clearCursor = useCallback(() => {
+    if (!selectedNote?._id) return;
+    void updateCursorMutation({
+      roomId: selectedNote._id,
+      cursor: undefined,
+    });
+  }, [selectedNote?._id, updateCursorMutation]);
+
+  // When a note is opened for the first time in prosemirrorSync, initialize it
+  useEffect(() => {
+    if (!sync.isLoading && sync.initialContent === null && selectedNote?._id) {
+      const parsed = parseNoteContent(selectedNote.content);
+      const doc =
+        parsed && typeof parsed === "object" && "type" in parsed
+          ? (parsed as JSONContent)
+          : { type: "doc", content: [] };
+      void sync.create(doc);
+    }
+  }, [
+    sync.isLoading,
+    sync.initialContent,
+    selectedNote?._id,
+    selectedNote?.content,
+    sync,
+  ]);
+
   const editor = useEditor(
     {
       content: initialContent,
       extensions: [
         StarterKit,
+        ...(sync.extension ? [sync.extension] : []),
+        CollaborativeCursors,
         Placeholder.configure({
           placeholder: t("placeholder"),
         }),
-        Link,
         Image,
         GhostText.configure(autocomplete),
       ],
@@ -115,11 +181,77 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
           class: "flex-1 overflow-y-auto border rounded-md p-4",
         },
       },
+      onSelectionUpdate: ({ editor: ed }) => {
+        if (previewRef.current) return;
+        const { from, to } = ed.state.selection;
+        debouncedSendCursor(from, to);
+      },
+      onBlur: () => {
+        clearCursor();
+      },
       immediatelyRender: false,
       shouldRerenderOnTransaction: true,
     },
-    [selectedNote?._id, t],
+    [selectedNote?._id, sync.extension, t],
   );
+
+  // Sync remote collaborators' cursors into TipTap decorations
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    const remoteUsers: RemoteUserCursor[] = (presenceList ?? [])
+      .filter(
+        p =>
+          p.online &&
+          p.userId !== currentUserId &&
+          (!user?.id || p.userId !== user.id) &&
+          p.data &&
+          typeof p.data === "object" &&
+          "cursor" in (p.data as Record<string, unknown>),
+      )
+      .map(p => {
+        const data = p.data as { cursor?: { from: number; to: number } };
+        return {
+          userId: p.userId,
+          name: p.name || t("collaborator"),
+          color: getUserColor(p.userId),
+          cursor: data.cursor,
+        };
+      })
+      .filter(
+        (
+          u,
+        ): u is RemoteUserCursor & {
+          cursor: { from: number; to: number };
+        } => Boolean(u.cursor),
+      );
+
+    const tr = editor.state.tr.setMeta(collaborativeCursorsKey, remoteUsers);
+    editor.view.dispatch(tr);
+  }, [presenceList, currentUserId, user?.id, editor, t]);
+
+  // Clear cursor on note change or unmount
+  useEffect(() => {
+    return () => {
+      clearCursor();
+    };
+  }, [selectedNote?._id, clearCursor]);
+
+  // Clear cursor when tab/document is hidden, restore on focus
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearCursor();
+      } else if (editor && !editor.isDestroyed && editor.isFocused) {
+        const { from, to } = editor.state.selection;
+        debouncedSendCursor(from, to);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [editor, clearCursor, debouncedSendCursor]);
 
   // Switching autocomplete off (here or on another device) drops a shown
   // suggestion and any pending request immediately.
@@ -209,6 +341,11 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
     // While previewing, remote changes must not touch the editor.
     if (previewRef.current && !isNoteChanged) return;
+
+    // When sync.extension is active, remote changes on the same note are
+    // merged cleanly in real time via ProseMirror collab. Calling setContent
+    // would clobber the user's cursor and local unsynced edits.
+    if (!isNoteChanged && sync.extension) return;
 
     const content = parseNoteContent(latestContentRef.current);
 
@@ -306,6 +443,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     previewVersion,
     enterPreview,
     exitPreview,
+    presenceList,
   };
 
   return (

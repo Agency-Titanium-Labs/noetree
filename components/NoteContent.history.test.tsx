@@ -48,6 +48,7 @@ vi.mock("next-intl", () => ({
 }));
 vi.mock("./editor/EditorToolbar", () => ({ default: () => null }));
 vi.mock("./ShareDialog", () => ({ default: () => null }));
+vi.mock("./CollaboratorsPile", () => ({ default: () => null }));
 vi.mock("./ListingFormDialog", () => ({ default: () => null }));
 vi.mock("./CommentsButton", () => ({ default: () => null }));
 vi.mock("./CommentsPanel", () => ({ default: () => null }));

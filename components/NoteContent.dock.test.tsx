@@ -65,6 +65,7 @@ vi.mock("./HistoryButton", () => ({ default: () => null }));
 vi.mock("./HistoryPanel", () => ({ default: () => null }));
 vi.mock("./LinkedNotesBlock", () => ({ default: () => null }));
 vi.mock("./VersionPreviewBanner", () => ({ default: () => null }));
+vi.mock("./CollaboratorsPile", () => ({ default: () => null }));
 
 // NoteContent calls dynamic() twice, in this order: chat, then links.
 const counter = vi.hoisted(() => ({ calls: 0 }));

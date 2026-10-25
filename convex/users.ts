@@ -22,7 +22,9 @@ export const store = mutation({
       )
       .unique();
     if (user !== null) {
-      // If we've seen this identity before but the name has changed, patch the value.
+      const avatarUrl =
+        identity.pictureUrl ??
+        (typeof identity.picture === "string" ? identity.picture : undefined);
 
       await ctx.db.patch(user._id, {
         name: identity.name,
@@ -30,10 +32,7 @@ export const store = mutation({
         email: (identity.email || identity.preferredUsername)
           ?.trim()
           .toLowerCase(),
-        picture:
-          typeof typeof identity.picture !== "undefined"
-            ? JSON.stringify(identity.picture)
-            : undefined,
+        picture: avatarUrl ? JSON.stringify(avatarUrl) : undefined,
         nickname: identity.nickname,
         given_name: identity.givenName,
         updated_at: new Date().toISOString(),
@@ -87,7 +86,10 @@ export const store = mutation({
         (await ctx.db.insert("roles", { role: "user" }));
     }
 
-    // If it's a new identity, create a new `User`.
+    const avatarUrl =
+      identity.pictureUrl ??
+      (typeof identity.picture === "string" ? identity.picture : undefined);
+
     const newUserId = await ctx.db.insert("users", {
       name: identity.name,
       tokenIdentifier: identity.tokenIdentifier,
@@ -95,10 +97,7 @@ export const store = mutation({
       email: (identity.email || identity.preferredUsername)
         ?.trim()
         .toLowerCase(),
-      picture:
-        typeof typeof identity.picture !== "undefined"
-          ? JSON.stringify(identity.picture)
-          : undefined,
+      picture: avatarUrl ? JSON.stringify(avatarUrl) : undefined,
       nickname: identity.nickname,
       given_name: identity.givenName,
       updated_at: new Date().toISOString(),

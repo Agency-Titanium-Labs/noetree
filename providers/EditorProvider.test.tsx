@@ -21,6 +21,11 @@ const h = vi.hoisted(() => {
     on: vi.fn(),
     off: vi.fn(),
     commands: { setContent: vi.fn() },
+    state: {
+      tr: { setMeta: vi.fn(() => ({})), selection: { from: 0, to: 0 } },
+      selection: { from: 0, to: 0 },
+    },
+    view: { dispatch: vi.fn() },
   };
   return {
     fake,
@@ -50,6 +55,30 @@ vi.mock("@/lib/editor/ghostText", () => ({
 }));
 vi.mock("@/lib/editor/useAutocompleteBridge", () => ({
   useAutocompleteBridge: () => ({ options: {}, enabled: false }),
+}));
+vi.mock("@convex-dev/prosemirror-sync/tiptap", () => ({
+  useTiptapSync: () => ({
+    isLoading: false,
+    initialContent: null,
+    extension: null,
+    create: vi.fn(),
+  }),
+}));
+vi.mock("@clerk/nextjs", () => ({
+  useUser: () => ({ user: { id: "user_test", imageUrl: "" } }),
+}));
+vi.mock("convex/react", () => ({
+  useQuery: () => null,
+  useMutation: () => vi.fn(),
+}));
+vi.mock("@convex-dev/presence/react", () => ({
+  default: () => [],
+}));
+vi.mock("@/lib/editor/collaborativeCursors", () => ({
+  CollaborativeCursors: {},
+  collaborativeCursorsKey: { getState: () => null },
+  getUserColor: () => "#0284c7",
+  getContrastTextColor: () => "#ffffff",
 }));
 vi.mock("use-debounce", () => ({
   useDebouncedCallback: () => {

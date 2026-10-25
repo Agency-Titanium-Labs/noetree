@@ -26,6 +26,8 @@
   "dependencies": {
     "@ai-sdk/react": "^4.0.147",
     "@clerk/nextjs": "^7.4.3",
+    "@convex-dev/presence": "^0.4.0",
+    "@convex-dev/prosemirror-sync": "^0.2.7",
     "@dnd-kit/dom": "^0.4.0",
     "@dnd-kit/react": "^0.4.0",
     "@hookform/resolvers": "^5.4.0",
@@ -50,6 +52,7 @@
     "ai": "^7.0.143",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cn": "^0.5.0",
     "convex": "^1.47.0",
     "js-cookie": "^3.0.8",
     "lucide-react": "^1.17.0",
