@@ -47,13 +47,29 @@ export default function CollaboratorsPile({
   const { user } = useUser();
   const currentUserId = me?._id ?? user?.id ?? "";
 
-  if (!noteId || !presenceList || presenceList.length <= 1) {
+  const isMe = (userId: string) =>
+    Boolean(currentUserId && userId === currentUserId) ||
+    Boolean(user?.id && userId === user.id);
+
+  // Keep only online users and deduplicate multiple tabs of the same user
+  const onlineUsers = (presenceList ?? []).filter(p => p.online);
+  const uniqueUsers = Array.from(
+    new Map(onlineUsers.map(p => [p.userId, p])).values(),
+  );
+
+  if (!noteId || uniqueUsers.length <= 1) {
     return null;
   }
 
-  const onlineUsers = presenceList.filter(p => p.online);
-  const visibleUsers = onlineUsers.slice(0, maxVisible);
-  const remainingUsers = onlineUsers.slice(maxVisible);
+  // Current user first in the pile
+  const sortedUsers = [...uniqueUsers].sort((a, b) => {
+    if (isMe(a.userId)) return -1;
+    if (isMe(b.userId)) return 1;
+    return 0;
+  });
+
+  const visibleUsers = sortedUsers.slice(0, maxVisible);
+  const remainingUsers = sortedUsers.slice(maxVisible);
   const remainingCount = remainingUsers.length;
 
   const youLabel = t("you");
@@ -62,11 +78,9 @@ export default function CollaboratorsPile({
     <TooltipProvider delayDuration={200}>
       <AvatarGroup>
         {visibleUsers.map(p => {
-          const isMe =
-            Boolean(currentUserId && p.userId === currentUserId) ||
-            Boolean(user?.id && p.userId === user.id);
-          const rawName = p.name ?? (isMe ? youLabel : t("collaborator"));
-          const displayName = isMe ? `${rawName} (${youLabel})` : rawName;
+          const userIsMe = isMe(p.userId);
+          const rawName = p.name ?? (userIsMe ? youLabel : t("collaborator"));
+          const displayName = userIsMe ? `${rawName} (${youLabel})` : rawName;
           const userColor = getUserColor(p.userId);
           const textColor = getContrastTextColor(userColor);
 
@@ -106,12 +120,10 @@ export default function CollaboratorsPile({
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 {remainingUsers.map(p => {
-                  const isMe =
-                    Boolean(currentUserId && p.userId === currentUserId) ||
-                    Boolean(user?.id && p.userId === user.id);
+                  const userIsMe = isMe(p.userId);
                   const rawName =
-                    p.name ?? (isMe ? youLabel : t("collaborator"));
-                  const displayName = isMe
+                    p.name ?? (userIsMe ? youLabel : t("collaborator"));
+                  const displayName = userIsMe
                     ? `${rawName} (${youLabel})`
                     : rawName;
                   const userColor = getUserColor(p.userId);

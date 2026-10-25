@@ -52,6 +52,24 @@ describe("CollaboratorsPile", () => {
     expect(c2.firstChild).toBeNull();
   });
 
+  it("renders null when only the current user is on the note across multiple tabs or offline users exist", () => {
+    // Multiple tabs of the same user
+    mockContext.presenceList = [
+      { userId: "user_me", name: "Me", online: true },
+      { userId: "user_me", name: "Me", online: true },
+    ];
+    const { container: c1 } = render(<CollaboratorsPile noteId="note123" />);
+    expect(c1.firstChild).toBeNull();
+
+    // Current user online + other user offline
+    mockContext.presenceList = [
+      { userId: "user_me", name: "Me", online: true },
+      { userId: "user_other", name: "Other", online: false },
+    ];
+    const { container: c2 } = render(<CollaboratorsPile noteId="note123" />);
+    expect(c2.firstChild).toBeNull();
+  });
+
   it("renders visible collaborators with initials when multiple users are online", () => {
     mockContext.presenceList = [
       { userId: "user_me", name: "Antoine F", online: true },
