@@ -61,9 +61,10 @@ export default function CollaboratorsPile({
   // If noteId is provided, filter for that note; otherwise use the tree presence list
   const sourceList = noteId ? presenceList : (treePresenceList ?? presenceList);
 
-  // Keep only online users and deduplicate multiple tabs of the same user
-  const onlineUsers = (sourceList ?? []).filter(p => {
+  // Keep only OTHER online users and deduplicate multiple tabs of the same user
+  const otherOnlineUsers = (sourceList ?? []).filter(p => {
     if (!p.online) return false;
+    if (isMe(p.userId)) return false;
     if (
       noteId &&
       p.data &&
@@ -75,34 +76,23 @@ export default function CollaboratorsPile({
     return true;
   });
   const uniqueUsers = Array.from(
-    new Map(onlineUsers.map(p => [p.userId, p])).values(),
+    new Map(otherOnlineUsers.map(p => [p.userId, p])).values(),
   );
 
-  if (uniqueUsers.length <= 1) {
+  if (uniqueUsers.length === 0) {
     return null;
   }
 
-  // Current user first in the pile
-  const sortedUsers = [...uniqueUsers].sort((a, b) => {
-    if (isMe(a.userId)) return -1;
-    if (isMe(b.userId)) return 1;
-    return 0;
-  });
-
-  const visibleUsers = sortedUsers.slice(0, maxVisible);
-  const remainingUsers = sortedUsers.slice(maxVisible);
+  const visibleUsers = uniqueUsers.slice(0, maxVisible);
+  const remainingUsers = uniqueUsers.slice(maxVisible);
   const remainingCount = remainingUsers.length;
-
-  const youLabel = t("you");
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className={className}>
         <AvatarGroup>
           {visibleUsers.map(p => {
-            const userIsMe = isMe(p.userId);
-            const rawName = p.name ?? (userIsMe ? youLabel : t("collaborator"));
-            const displayName = userIsMe ? `${rawName} (${youLabel})` : rawName;
+            const displayName = p.name ?? t("collaborator");
             const userColor = getUserColor(p.userId);
             const textColor = getContrastTextColor(userColor);
 
@@ -124,10 +114,10 @@ export default function CollaboratorsPile({
                   <Avatar
                     className={cn(
                       "transition-transform hover:scale-110 hover:z-30",
-                      activeNote && !userIsMe && "cursor-pointer",
+                      activeNote && "cursor-pointer",
                     )}
                     onClick={() => {
-                      if (activeNote && !userIsMe) {
+                      if (activeNote) {
                         onSelectNote(activeNote);
                       }
                     }}
@@ -135,7 +125,7 @@ export default function CollaboratorsPile({
                     <AvatarFallback
                       style={{ backgroundColor: userColor, color: textColor }}
                     >
-                      {getInitials(rawName)}
+                      {getInitials(displayName)}
                     </AvatarFallback>
                   </Avatar>
                 </TooltipTrigger>
@@ -167,12 +157,7 @@ export default function CollaboratorsPile({
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   {remainingUsers.map(p => {
-                    const userIsMe = isMe(p.userId);
-                    const rawName =
-                      p.name ?? (userIsMe ? youLabel : t("collaborator"));
-                    const displayName = userIsMe
-                      ? `${rawName} (${youLabel})`
-                      : rawName;
+                    const displayName = p.name ?? t("collaborator");
                     const userColor = getUserColor(p.userId);
                     const textColor = getContrastTextColor(userColor);
 
@@ -193,10 +178,10 @@ export default function CollaboratorsPile({
                         key={p.userId}
                         className={cn(
                           "flex items-center gap-2",
-                          activeNote && !userIsMe && "cursor-pointer",
+                          activeNote && "cursor-pointer",
                         )}
                         onClick={() => {
-                          if (activeNote && !userIsMe) {
+                          if (activeNote) {
                             onSelectNote(activeNote);
                           }
                         }}
@@ -208,7 +193,7 @@ export default function CollaboratorsPile({
                               color: textColor,
                             }}
                           >
-                            {getInitials(rawName)}
+                            {getInitials(displayName)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col min-w-0">
