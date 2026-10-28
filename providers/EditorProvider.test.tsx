@@ -30,9 +30,12 @@ const h = vi.hoisted(() => {
   return {
     fake,
     tree: {
+      rootNoteId: "tree_root_123" as string | null,
       selectedNote: null as null | Record<string, unknown>,
       onUpdateNoteContent: vi.fn(),
     },
+    presenceList: [] as unknown[],
+    usePresenceRoomId: null as string | null,
     debounced: vi.fn(),
     flush: vi.fn(),
     cancel: vi.fn(),
@@ -72,7 +75,10 @@ vi.mock("convex/react", () => ({
   useMutation: () => vi.fn(),
 }));
 vi.mock("@convex-dev/presence/react", () => ({
-  default: () => [],
+  default: (_presence: unknown, roomId: string) => {
+    h.usePresenceRoomId = roomId;
+    return h.presenceList;
+  },
 }));
 vi.mock("@/lib/editor/collaborativeCursors", () => ({
   CollaborativeCursors: {},
@@ -331,5 +337,33 @@ describe("leaving preview does not autosave (GAP-1)", () => {
     act(() => h.fake.listener?.({ editor: h.fake }));
     expect(ctx.saveStatus).toBe("unsaved");
     expect(h.debounced).toHaveBeenCalledTimes(1);
+  });
+
+  describe("tree-level presence", () => {
+    it("connects presence room to rootNoteId", () => {
+      h.tree.rootNoteId = "tree_root_xyz";
+      mount();
+      expect(h.usePresenceRoomId).toBe("tree_root_xyz");
+    });
+
+    it("filters presenceList to current note while keeping treePresenceList complete", () => {
+      h.tree.rootNoteId = "tree_root_xyz";
+      h.presenceList = [
+        {
+          userId: "user_on_same_note",
+          online: true,
+          data: { activeNoteId: "n1", cursor: { from: 1, to: 2 } },
+        },
+        {
+          userId: "user_on_other_note",
+          online: true,
+          data: { activeNoteId: "other_note", cursor: { from: 5, to: 10 } },
+        },
+      ];
+      mount();
+      expect(ctx.treePresenceList).toHaveLength(2);
+      expect(ctx.presenceList).toHaveLength(1);
+      expect(ctx.presenceList?.[0]?.userId).toBe("user_on_same_note");
+    });
   });
 });

@@ -28,6 +28,7 @@ import { PointerActivationConstraints } from "@dnd-kit/dom";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { cn } from "@/lib/utils";
 import { canLeaveShare, useGuardNotice } from "@/lib/purchaseShareUi";
+import CollaboratorsPile from "./CollaboratorsPile";
 
 const customSensors = [
   PointerSensor.configure({
@@ -697,6 +698,7 @@ export default function NotesTree() {
           </div>
         </DragDropProvider>
       </div>
+      <CollaboratorsPile className="absolute top-4 right-4 z-10" />
       {selectedNote && (
         <Button
           variant="outline"

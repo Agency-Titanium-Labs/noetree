@@ -9,6 +9,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -48,6 +49,7 @@ interface EditorContextType {
   enterPreview: (version: PreviewVersion) => void;
   exitPreview: (contentOverride?: string) => void;
   presenceList?: PresenceState[];
+  treePresenceList?: PresenceState[];
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -58,6 +60,7 @@ const EditorContext = createContext<EditorContextType>({
   enterPreview: () => {},
   exitPreview: () => {},
   presenceList: undefined,
+  treePresenceList: undefined,
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -92,7 +95,8 @@ interface EditorProviderProps {
 
 export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const t = useTranslations("Editor");
-  const { selectedNote, onUpdateNoteContent } = useTreeContext();
+  const { selectedNote, onUpdateNoteContent, rootNoteId } = useTreeContext();
+  const treeRoomId = rootNoteId ?? selectedNote?._id ?? "";
 
   const [saveStatus, setSaveStatus] = useState<saveStatusType>("idle");
   const lastNoteIdRef = useRef<string | undefined>(undefined);
@@ -116,20 +120,41 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const me = useQuery(api.users.me);
   const currentUserId = me?._id ?? user?.id ?? "";
 
-  const presenceList = usePresence(
+  const treePresenceList = usePresence(
     api.presence,
-    selectedNote?._id ?? "",
+    treeRoomId,
     currentUserId,
     10000,
   );
 
   const updateCursorMutation = useMutation(api.presence.updateCursor);
 
+  // Filter tree presence to get collaborators active on the currently selected note
+  const presenceList = useMemo(() => {
+    if (!selectedNote?._id) return [];
+    return (treePresenceList ?? []).filter(p => {
+      if (!p.data || typeof p.data !== "object") return true;
+      const data = p.data as { activeNoteId?: string };
+      return !data.activeNoteId || data.activeNoteId === selectedNote._id;
+    });
+  }, [treePresenceList, selectedNote?._id]);
+
+  // Sync active note presence across the tree room
+  useEffect(() => {
+    if (!treeRoomId) return;
+    void updateCursorMutation({
+      roomId: treeRoomId,
+      activeNoteId: selectedNote?._id,
+      cursor: undefined,
+    });
+  }, [treeRoomId, selectedNote?._id, updateCursorMutation]);
+
   const debouncedSendCursor = useDebouncedCallback(
     (from: number, to: number) => {
-      if (!selectedNote?._id || previewRef.current) return;
+      if (!treeRoomId || previewRef.current) return;
       void updateCursorMutation({
-        roomId: selectedNote._id,
+        roomId: treeRoomId,
+        activeNoteId: selectedNote?._id,
         cursor: { from, to },
       });
     },
@@ -138,12 +163,13 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   );
 
   const clearCursor = useCallback(() => {
-    if (!selectedNote?._id) return;
+    if (!treeRoomId) return;
     void updateCursorMutation({
-      roomId: selectedNote._id,
+      roomId: treeRoomId,
+      activeNoteId: selectedNote?._id,
       cursor: undefined,
     });
-  }, [selectedNote?._id, updateCursorMutation]);
+  }, [treeRoomId, selectedNote?._id, updateCursorMutation]);
 
   // When a note is opened for the first time in prosemirrorSync, initialize it
   useEffect(() => {
@@ -444,6 +470,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     enterPreview,
     exitPreview,
     presenceList,
+    treePresenceList,
   };
 
   return (

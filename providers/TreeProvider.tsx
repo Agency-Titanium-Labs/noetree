@@ -36,6 +36,7 @@ interface Action {
 
 interface TreeContextType {
   tree: NoteTree | null;
+  rootNoteId: Id<"notes"> | null;
   selectedNote: NoteTree | null;
   isDrawerOpen: boolean;
   setIsDrawerOpen: (open: boolean) => void;
@@ -70,6 +71,7 @@ interface TreeContextType {
 
 const TreeContext = createContext<TreeContextType>({
   tree: null,
+  rootNoteId: null,
   selectedNote: null,
   isDrawerOpen: false,
   setIsDrawerOpen: () => {},
@@ -202,6 +204,7 @@ export function TreeProvider({ children }: Readonly<TreeProviderProps>) {
   const contextValue = useMemo(
     () => ({
       tree: tree as unknown as NoteTree,
+      rootNoteId: noteId,
       selectedNote,
       isDrawerOpen,
       setIsDrawerOpen,

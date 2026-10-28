@@ -5,12 +5,23 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 
 const mockContext = {
   presenceList: [] as unknown[],
+  treePresenceList: [] as unknown[],
+};
+
+const mockTreeContext = {
+  tree: null as unknown,
+  onSelectNote: vi.fn(),
 };
 
 vi.mock("@/providers/EditorProvider", () => ({
   useEditorContext: () => ({
     presenceList: mockContext.presenceList,
+    treePresenceList: mockContext.treePresenceList,
   }),
+}));
+
+vi.mock("@/providers/TreeProvider", () => ({
+  useTreeContext: () => mockTreeContext,
 }));
 
 vi.mock("convex/react", () => ({
@@ -116,5 +127,42 @@ describe("CollaboratorsPile", () => {
     // Overflow users should appear in the dropdown menu
     expect(screen.getByText("Jane Doe")).toBeInTheDocument();
     expect(screen.getByText("Bob Smith")).toBeInTheDocument();
+  });
+
+  it("renders tree-level collaborators and selects note on click", () => {
+    mockTreeContext.tree = {
+      _id: "root_1",
+      title: "Root Note",
+      childNotes: [
+        {
+          _id: "child_1",
+          title: "Sub Note",
+          childNotes: [],
+        },
+      ],
+    };
+
+    mockContext.presenceList = [];
+    mockContext.treePresenceList = [
+      { userId: "user_me", name: "Antoine F", online: true },
+      {
+        userId: "user_2",
+        name: "Jane Doe",
+        online: true,
+        data: { activeNoteId: "child_1" },
+      },
+    ];
+
+    render(<CollaboratorsPile />);
+
+    expect(screen.getByText("AF")).toBeInTheDocument();
+    const janeAvatar = screen.getByText("JD");
+    expect(janeAvatar).toBeInTheDocument();
+
+    // Clicking Jane's avatar navigates to her note
+    fireEvent.click(janeAvatar);
+    expect(mockTreeContext.onSelectNote).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: "child_1", title: "Sub Note" }),
+    );
   });
 });

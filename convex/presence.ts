@@ -78,6 +78,7 @@ export const updateCursor = mutation({
   args: {
     roomId: v.string(),
     userId: v.optional(v.string()),
+    activeNoteId: v.optional(v.string()),
     cursor: v.optional(
       v.object({
         from: v.number(),
@@ -89,7 +90,10 @@ export const updateCursor = mutation({
     const user = await getUser(ctx);
     const resolvedUserId = user ? user._id : args.userId || "anonymous";
     await presence.updateRoomUser(ctx, args.roomId, resolvedUserId, {
+      activeNoteId: args.activeNoteId,
       cursor: args.cursor,
     });
   },
 });
+
+export const updatePresence = updateCursor;
