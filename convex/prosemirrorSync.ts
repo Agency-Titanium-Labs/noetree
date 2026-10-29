@@ -1,4 +1,6 @@
 import { components } from "./_generated/api";
+import { mutation } from "./_generated/server";
+import { v } from "convex/values";
 import { ProsemirrorSync } from "@convex-dev/prosemirror-sync";
 import { DataModel, Id } from "./_generated/dataModel";
 import { getUser } from "./helpers/helper";
@@ -45,5 +47,38 @@ export const {
     if (note && user) {
       await writeNoteContent(ctx, note, snapshot, user._id);
     }
+  },
+});
+
+export const resyncDocument = mutation({
+  args: {
+    id: v.string(),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await getUser(ctx);
+    if (!user) throw new Error("UNAUTHENTICATED");
+    const role = await getUserPermission(ctx, args.id as Id<"notes">, user._id);
+    if (role !== "owner" && role !== "admin" && role !== "edit") {
+      throw new Error("UNAUTHORIZED");
+    }
+
+    // Delete all corrupted deltas and snapshots synchronously
+    await ctx.runMutation(components.prosemirrorSync.lib.deleteSteps, {
+      id: args.id,
+      beforeTs: Infinity,
+      deleteNewerThanLatestSnapshot: true,
+    });
+
+    await ctx.runMutation(components.prosemirrorSync.lib.deleteSnapshots, {
+      id: args.id,
+    });
+
+    // Create fresh snapshot at version 1 with the authoritative content
+    await ctx.runMutation(components.prosemirrorSync.lib.submitSnapshot, {
+      id: args.id,
+      version: 1,
+      content: args.content,
+    });
   },
 });

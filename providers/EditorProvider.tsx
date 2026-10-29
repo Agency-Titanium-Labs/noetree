@@ -137,15 +137,52 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   );
   const previewRef = useRef<PreviewVersion | null>(null);
   const latestContentRef = useRef<string | undefined>(selectedNote?.content);
-
-  const initialContent: Content = parseNoteContent(selectedNote?.content);
+  const isRepairingRef = useRef(false);
 
   // Phase 21: premium ghost-text autocomplete (off unless the account turned
   // it on; a Free user never makes a request).
   const { options: autocomplete, enabled: autocompleteEnabled } =
     useAutocompleteBridge(selectedNote?._id);
 
-  const sync = useTiptapSync(api.prosemirrorSync, selectedNote?._id ?? "");
+  const resyncDocumentMutation = useMutation(
+    api.prosemirrorSync.resyncDocument,
+  );
+
+  const sync = useTiptapSync(api.prosemirrorSync, selectedNote?._id ?? "", {
+    onSyncError: error => {
+      console.warn("Collaborative sync warning:", error);
+      if (
+        !isRepairingRef.current &&
+        selectedNote?._id &&
+        ((error as Error)?.message?.includes("out of range") ||
+          error instanceof RangeError)
+      ) {
+        isRepairingRef.current = true;
+        setTimeout(() => {
+          isRepairingRef.current = false;
+        }, 5000);
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem(`convex-sync-${selectedNote._id}`);
+          } catch {}
+        }
+        const content =
+          editorRef.current?.getJSON() ??
+          parseNoteContent(selectedNote.content);
+        void resyncDocumentMutation({
+          id: selectedNote._id,
+          content: JSON.stringify(content),
+        }).catch(err => {
+          console.error("Failed to repair document:", err);
+        });
+      }
+    },
+    snapshotDebounceMs: 500,
+  });
+
+  const initialContent: Content = sync.initialContent
+    ? (sync.initialContent as Content)
+    : parseNoteContent(selectedNote?.content);
 
   const { user } = useUser();
   const me = useQuery(api.users.me);
@@ -242,6 +279,11 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       // prosemirror-sync handles content synchronization, and remote editors map the cursor
       // automatically as steps arrive to prevent cursor jumps!
       if (isTypingRef.current) return;
+      // Guard against stale selections exceeding document bounds
+      const docSize = editorRef.current?.state.doc.content.size;
+      if (docSize !== undefined && (from > docSize || to > docSize)) {
+        return;
+      }
       lastSyncedCursorRef.current = { from, to };
       void updateCursorMutation({
         roomId: treeRoomId,
@@ -257,6 +299,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const clearCursor = useCallback(() => {
     if (!treeRoomId) return;
     debouncedStopTyping.cancel();
+    debouncedSendCursor.cancel();
     isTypingRef.current = false;
     lastSyncedCursorRef.current = undefined;
     void updateCursorMutation({
@@ -270,6 +313,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     selectedNote?._id,
     updateCursorMutation,
     debouncedStopTyping,
+    debouncedSendCursor,
   ]);
 
   // When a note is opened for the first time in prosemirrorSync, initialize it
@@ -349,6 +393,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       selectedNote?._id,
       selectedNote?.role,
       sync.extension,
+      sync.initialContent,
       t,
       handleUserTyping,
     ],
@@ -396,10 +441,12 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
   // Clear cursor on note change or unmount
   useEffect(() => {
+    isRepairingRef.current = false;
     return () => {
       clearCursor();
+      debouncedSendCursor.cancel();
     };
-  }, [selectedNote?._id, clearCursor]);
+  }, [selectedNote?._id, clearCursor, debouncedSendCursor]);
 
   // Clear cursor when tab/document is hidden, restore on focus
   useEffect(() => {
@@ -561,6 +608,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       // The editor is re-created on note switch, so just drop preview state.
       previewRef.current = null;
       setPreviewVersion(null);
+      return;
     }
 
     if (!selectedNote) {
@@ -571,15 +619,12 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     }
 
     // While previewing, remote changes must not touch the editor.
-    if (previewRef.current && !isNoteChanged) return;
+    if (previewRef.current) return;
 
-    // Do not clobber local unsaved typing while actively editing
-    if (
-      !isNoteChanged &&
-      (saveStatus === "unsaved" || saveStatus === "saving")
-    ) {
-      return;
-    }
+    // When sync.extension is active, remote changes on the same note are
+    // merged cleanly in real time via ProseMirror collab. Calling setContent
+    // would clobber the user's cursor and local unsynced edits.
+    if (sync.extension) return;
 
     const content = parseNoteContent(latestContentRef.current);
 
