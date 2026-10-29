@@ -71,6 +71,7 @@ interface EditorContextType {
   setFollowedUserId: (userId: string | null) => void;
   followedCollaborator: FollowedCollaborator | null;
   retrySave: () => void;
+  isSyncLoading?: boolean;
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -88,6 +89,7 @@ const EditorContext = createContext<EditorContextType>({
   setFollowedUserId: () => {},
   followedCollaborator: null,
   retrySave: () => {},
+  isSyncLoading: false,
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -177,12 +179,14 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
         });
       }
     },
-    snapshotDebounceMs: 500,
+    snapshotDebounceMs: 100,
   });
 
   const initialContent: Content = sync.initialContent
     ? (sync.initialContent as Content)
-    : parseNoteContent(selectedNote?.content);
+    : sync.isLoading
+      ? { type: "doc", content: [] }
+      : parseNoteContent(selectedNote?.content);
 
   const { user } = useUser();
   const me = useQuery(api.users.me);
@@ -386,12 +390,16 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       onBlur: () => {
         clearCursor();
       },
+      onCreate: ({ editor: ed }) => {
+        (ed as unknown as { _noteId?: string })._noteId = selectedNote?._id;
+      },
       immediatelyRender: false,
       shouldRerenderOnTransaction: true,
     },
     [
       selectedNote?._id,
       selectedNote?.role,
+      sync.isLoading,
       sync.extension,
       sync.initialContent,
       t,
@@ -399,6 +407,12 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     ],
   );
   editorRef.current = editor;
+
+  useEffect(() => {
+    if (editor && selectedNote?._id) {
+      (editor as unknown as { _noteId?: string })._noteId = selectedNote._id;
+    }
+  }, [editor, selectedNote?._id]);
 
   // Sync remote collaborators' cursors into TipTap decorations
   useEffect(() => {
@@ -603,6 +617,30 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     lastNoteIdRef.current = selectedNote?._id;
 
     if (isNoteChanged) {
+      if (
+        previousNoteId &&
+        editorRef.current &&
+        !editorRef.current.isDestroyed &&
+        !previewRef.current
+      ) {
+        try {
+          const json = editorRef.current.getJSON();
+          const collabPlugin = editorRef.current.state?.plugins?.find(
+            p => (p as unknown as { key: string })?.key === "collab$",
+          );
+          const version = collabPlugin
+            ? (collabPlugin.getState(editorRef.current.state)?.version ?? 1)
+            : 1;
+          sessionStorage.setItem(
+            `convex-sync-${previousNoteId}`,
+            JSON.stringify({
+              content: json,
+              version,
+              steps: [],
+            }),
+          );
+        } catch {}
+      }
       debouncedSave.cancel();
       setSaveStatus("idle");
       // The editor is re-created on note switch, so just drop preview state.
@@ -653,7 +691,27 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       if (previewRef.current) return; // Never save while previewing a version
       if (!editor.isEditable || selectedNote.role === "view") return; // Do not save if view-only
       setSaveStatus("unsaved");
-      debouncedSave(editor.getJSON());
+      const json = editor.getJSON();
+      debouncedSave(json);
+
+      if (typeof window !== "undefined" && selectedNote?._id) {
+        try {
+          const collabPlugin = editor.state?.plugins?.find(
+            p => (p as unknown as { key: string })?.key === "collab$",
+          );
+          const version = collabPlugin
+            ? (collabPlugin.getState(editor.state)?.version ?? 1)
+            : 1;
+          sessionStorage.setItem(
+            `convex-sync-${selectedNote._id}`,
+            JSON.stringify({
+              content: json,
+              version,
+              steps: [],
+            }),
+          );
+        } catch {}
+      }
     };
 
     editor.on("update", updateListener);
@@ -824,6 +882,16 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     };
   }, [editor, followedUserId]);
 
+  const isNoteChanging = Boolean(
+    selectedNote &&
+    editor &&
+    (editor as unknown as { _noteId?: string })._noteId !== undefined &&
+    (editor as unknown as { _noteId?: string })._noteId !== selectedNote._id,
+  );
+  const isSyncLoading = Boolean(
+    selectedNote && (sync.isLoading || isNoteChanging),
+  );
+
   const contextValue = useMemo(
     () => ({
       editor,
@@ -840,6 +908,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       setFollowedUserId,
       followedCollaborator,
       retrySave,
+      isSyncLoading,
     }),
     [
       editor,
@@ -856,6 +925,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       setFollowedUserId,
       followedCollaborator,
       retrySave,
+      isSyncLoading,
     ],
   );
 

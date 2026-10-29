@@ -5,7 +5,7 @@ import {
   QueryCtx,
   MutationCtx,
 } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import { v, ConvexError } from "convex/values";
 import { getUser } from "./helpers/helper";
 import { Doc, Id } from "./_generated/dataModel";
@@ -698,6 +698,43 @@ export const updateNoteContent = mutation({
       throw new ConvexError("INVALID_CONTENT");
     }
     await writeNoteContent(ctx, note, args.content, user._id);
+
+    try {
+      const latestVersion = await ctx.runQuery(
+        components.prosemirrorSync.lib.latestVersion,
+        { id: args.id },
+      );
+      if (latestVersion !== null) {
+        const existing = await ctx.runQuery(
+          components.prosemirrorSync.lib.getSnapshot,
+          { id: args.id, version: latestVersion },
+        );
+        if (existing.content !== args.content) {
+          if ("version" in existing && existing.version === latestVersion) {
+            await ctx.runMutation(
+              components.prosemirrorSync.lib.deleteSnapshots,
+              {
+                id: args.id,
+                afterVersion: latestVersion - 1,
+                beforeVersion: latestVersion + 1,
+              },
+            );
+          }
+          await ctx.runMutation(components.prosemirrorSync.lib.submitSnapshot, {
+            id: args.id,
+            version: latestVersion,
+            content: args.content,
+            pruneSnapshots: true,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn(
+        "Failed to update prosemirror snapshot in updateNoteContent:",
+        e,
+      );
+    }
+
     return null;
   },
 });

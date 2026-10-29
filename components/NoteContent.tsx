@@ -79,6 +79,7 @@ export default function NoteContent() {
     getCurrentContent,
     previewVersion,
     exitPreview,
+    isSyncLoading,
   } = useEditorContext();
 
   const searchParams = useSearchParams();
@@ -219,7 +220,7 @@ export default function NoteContent() {
               setIsLinksOpen(true);
             }}
           />
-          <ConditionChecker condition={!selectedNote}>
+          <ConditionChecker condition={!selectedNote || Boolean(isSyncLoading)}>
             <div className="flex-1 p-4 flex flex-col gap-4 border rounded-md">
               <Skeleton className="w-56 h-8 mt-4" />
               <div className="flex flex-col gap-2">
@@ -228,7 +229,7 @@ export default function NoteContent() {
               </div>
             </div>
           </ConditionChecker>
-          <ConditionChecker condition={!!selectedNote}>
+          <ConditionChecker condition={Boolean(selectedNote) && !isSyncLoading}>
             <>
               <VersionPreviewBanner />
               <div
