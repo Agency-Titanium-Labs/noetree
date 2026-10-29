@@ -24,26 +24,31 @@ export const collaborativeCursorsKey = new PluginKey<State>(
   "collaborativeCursors",
 );
 
+// Exclude purple / violet / indigo shades to avoid clashing with the UI primary color (#7e10b2)
 const CURSOR_COLORS = [
   "#0284c7", // sky-600
-  "#7c3aed", // violet-600
-  "#db2777", // pink-600
   "#059669", // emerald-600
-  "#d97706", // amber-600
-  "#4f46e5", // indigo-600
-  "#0d9488", // teal-600
   "#ea580c", // orange-600
-  "#9333ea", // purple-600
-];
+  "#2563eb", // blue-600
+  "#d97706", // amber-600
+  "#0d9488", // teal-600
+  "#e11d48", // rose-600
+  "#16a34a", // green-600
+  "#0891b2", // cyan-600
+] as const;
 
 export function getUserColor(userId: string): string {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
-    hash = (hash << 5) - hash + userId.charCodeAt(i);
-    hash |= 0;
+    hash = Math.trunc((hash << 5) - hash + (userId.codePointAt(i) ?? 0));
   }
   const index = Math.abs(hash) % CURSOR_COLORS.length;
   return CURSOR_COLORS[index];
+}
+
+function toLinear(c: number): number {
+  const s = c / 255;
+  return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
 }
 
 /**
@@ -51,15 +56,10 @@ export function getUserColor(userId: string): string {
  * according to WCAG 2 relative luminance standards to maximize contrast and accessibility.
  */
 export function getContrastTextColor(hexColor: string): "#000000" | "#ffffff" {
-  const hex = hexColor.replace("#", "");
-  const r = parseInt(hex.substring(0, 2), 16) || 0;
-  const g = parseInt(hex.substring(2, 4), 16) || 0;
-  const b = parseInt(hex.substring(4, 6), 16) || 0;
-
-  const toLinear = (c: number) => {
-    const s = c / 255;
-    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  };
+  const hex = hexColor.startsWith("#") ? hexColor.slice(1) : hexColor;
+  const r = Number.parseInt(hex.slice(0, 2), 16) || 0;
+  const g = Number.parseInt(hex.slice(2, 4), 16) || 0;
+  const b = Number.parseInt(hex.slice(4, 6), 16) || 0;
 
   const luminance =
     0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
@@ -80,8 +80,12 @@ function createCursorElement(user: RemoteUserCursor): HTMLElement {
   label.textContent = user.name;
   label.style.color = textColor;
 
-  span.appendChild(label);
+  span.append(label);
   return span;
+}
+
+function createWidgetFactory(user: RemoteUserCursor) {
+  return () => createCursorElement(user);
 }
 
 export const CollaborativeCursors = Extension.create<
@@ -129,7 +133,7 @@ export const CollaborativeCursors = Extension.create<
         props: {
           decorations(state) {
             const pluginState = collaborativeCursorsKey.getState(state);
-            if (!pluginState || !pluginState.users.length) {
+            if (!pluginState || pluginState.users.length === 0) {
               return DecorationSet.empty;
             }
 
@@ -140,10 +144,12 @@ export const CollaborativeCursors = Extension.create<
               if (!user.cursor) continue;
               const from = Math.max(0, Math.min(user.cursor.from, docSize));
               const to = Math.max(0, Math.min(user.cursor.to, docSize));
+              const start = Math.min(from, to);
+              const end = Math.max(from, to);
 
-              if (from !== to) {
+              if (start !== end) {
                 decos.push(
-                  Decoration.inline(Math.min(from, to), Math.max(from, to), {
+                  Decoration.inline(start, end, {
                     style: `background-color: ${user.color}33;`,
                     class: "collaborative-selection",
                   }),
@@ -151,7 +157,7 @@ export const CollaborativeCursors = Extension.create<
               }
 
               decos.push(
-                Decoration.widget(to, () => createCursorElement(user), {
+                Decoration.widget(to, createWidgetFactory(user), {
                   side: 0,
                   key: `cursor-${user.userId}`,
                   ignoreSelection: true,
