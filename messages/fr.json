@@ -124,13 +124,9 @@
       "listForSale": "Mettre en vente"
     }
   },
-  "NoteContent": {
-    "status": {
-      "failed": "Échec de la sauvegarde",
-      "saved": "Enregistré",
-      "saving": "Sauvegarde...",
-      "unsaved": "Modifications non enregistrées"
-    }
+  "SyncStatus": {
+    "failedTooltip": "Impossible de synchroniser vos modifications. Vérifiez votre connexion.",
+    "retryTooltip": "Cliquez pour réessayer la synchronisation."
   },
   "ShareDialog": {
     "title": "Partager la note",
@@ -658,9 +654,6 @@
     "badgePublic": "Note publique",
     "signInBanner": "Connectez-vous pour modifier cette note.",
     "signInCta": "Se connecter pour modifier",
-    "saving": "Enregistrement...",
-    "saved": "Enregistré",
-    "saveError": "Impossible d'enregistrer vos modifications. Vérifiez votre connexion.",
     "revokedEditError": "Ce lien a été désactivé. Vous ne pouvez plus modifier cette note.",
     "childrenHeading": "Sous-notes",
     "untitled": "Sans titre",

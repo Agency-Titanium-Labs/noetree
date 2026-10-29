@@ -124,13 +124,9 @@
       "listForSale": "List for sale"
     }
   },
-  "NoteContent": {
-    "status": {
-      "failed": "Save failed",
-      "saved": "Saved",
-      "saving": "Saving...",
-      "unsaved": "Unsaved changes"
-    }
+  "SyncStatus": {
+    "failedTooltip": "Unable to sync your changes. Check your connection.",
+    "retryTooltip": "Click to retry syncing."
   },
   "ShareDialog": {
     "title": "Share note",
@@ -658,9 +654,6 @@
     "badgePublic": "Public note",
     "signInBanner": "Sign in to edit this note.",
     "signInCta": "Sign in to edit",
-    "saving": "Saving...",
-    "saved": "Saved",
-    "saveError": "Couldn't save your changes. Check your connection.",
     "revokedEditError": "This link was turned off. You can no longer edit this note.",
     "childrenHeading": "Sub-notes",
     "untitled": "Untitled",

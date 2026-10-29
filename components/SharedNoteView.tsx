@@ -17,6 +17,7 @@ import CommentsButton from "@/components/CommentsButton";
 import CommentsPanel from "@/components/CommentsPanel";
 import SharedHeader from "@/components/SharedHeader";
 import SharedUnavailable from "@/components/SharedUnavailable";
+import SyncStatus from "@/components/SyncStatus";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
@@ -157,7 +158,7 @@ function SharedNoteBody({
     const updateListener = ({ editor }: { editor: Editor }) => {
       if (!editor.isEditable) return;
       setSaveStatus("unsaved");
-      debouncedSave(editor.getJSON());
+      void debouncedSave(editor.getJSON());
     };
     editor.on("update", updateListener);
     return () => {
@@ -177,14 +178,12 @@ function SharedNoteBody({
     return <SharedUnavailable message={t("revokedEditError")} />;
   }
 
-  const status =
-    saveStatus === "saving"
-      ? t("saving")
-      : saveStatus === "success"
-        ? t("saved")
-        : saveStatus === "error"
-          ? t("saveError")
-          : undefined;
+  const retrySave =
+    editable && editor
+      ? () => {
+          void saveContent(editor.getJSON());
+        }
+      : undefined;
 
   return (
     <>
@@ -197,7 +196,7 @@ function SharedNoteBody({
             <Eye className="size-4" />
           )
         }
-        status={status}
+        status={<SyncStatus status={saveStatus} onRetry={retrySave} />}
         actions={
           <CommentsButton
             target={commentsTarget}

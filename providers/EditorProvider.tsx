@@ -70,6 +70,7 @@ interface EditorContextType {
   followedUserId: string | null;
   setFollowedUserId: (userId: string | null) => void;
   followedCollaborator: FollowedCollaborator | null;
+  retrySave: () => void;
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -86,6 +87,7 @@ const EditorContext = createContext<EditorContextType>({
   followedUserId: null,
   setFollowedUserId: () => {},
   followedCollaborator: null,
+  retrySave: () => {},
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -454,6 +456,18 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
   const debouncedSave = useDebouncedCallback(saveContent, 3000);
 
+  const retrySave = useCallback(() => {
+    if (
+      editor &&
+      !editor.isDestroyed &&
+      !previewRef.current &&
+      selectedNote?.role !== "view"
+    ) {
+      debouncedSave.cancel();
+      void saveContent(editor.getJSON());
+    }
+  }, [editor, debouncedSave, saveContent, selectedNote?.role]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === "s") {
@@ -722,6 +736,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       followedUserId,
       setFollowedUserId,
       followedCollaborator,
+      retrySave,
     }),
     [
       editor,
@@ -737,6 +752,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       followedUserId,
       setFollowedUserId,
       followedCollaborator,
+      retrySave,
     ],
   );
 

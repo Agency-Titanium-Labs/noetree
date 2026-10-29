@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import EditorToolbar from "./editor/EditorToolbar";
 import { EditorContent } from "@tiptap/react";
 import ConditionChecker from "./helpers/ConditionChecker";
-import { AlertCircle, CheckCircle2, Store, UserPlus } from "lucide-react";
+import { Store, UserPlus } from "lucide-react";
 import { useEditorContext } from "@/providers/EditorProvider";
 import { useTreeContext, type NoteTree } from "@/providers/TreeProvider";
 import { usePathname, useRouter } from "@/i18n/routing";
@@ -21,6 +21,7 @@ import HistoryPanel from "./HistoryPanel";
 import LinkedNotesBlock from "./LinkedNotesBlock";
 import VersionPreviewBanner from "./VersionPreviewBanner";
 import CollaboratorsPile from "./CollaboratorsPile";
+import SyncStatus from "./SyncStatus";
 import dynamic from "next/dynamic";
 import {
   ResizableHandle,
@@ -47,7 +48,6 @@ function findInTree(id: string, note: NoteTree): NoteTree | null {
 }
 
 export default function NoteContent() {
-  const t = useTranslations("NoteContent");
   const tShare = useTranslations("ShareDialog");
   const { selectedNote, tree, onSelectNote } = useTreeContext();
   const tListing = useTranslations("ListingForm");
@@ -72,8 +72,14 @@ export default function NoteContent() {
   }>({ mode: "chat", seq: 0 });
   const [isListingOpen, setIsListingOpen] = useState(false);
 
-  const { editor, saveStatus, getCurrentContent, previewVersion, exitPreview } =
-    useEditorContext();
+  const {
+    editor,
+    saveStatus,
+    retrySave,
+    getCurrentContent,
+    previewVersion,
+    exitPreview,
+  } = useEditorContext();
 
   const searchParams = useSearchParams();
   const params = useParams();
@@ -185,32 +191,7 @@ export default function NoteContent() {
               )}
               <CollaboratorsPile noteId={selectedNote?._id} />
             </div>
-            <div className="flex items-center gap-2">
-              <ConditionChecker condition={saveStatus === "error"}>
-                <div className="flex items-center text-destructive gap-1">
-                  <AlertCircle />
-                  <span className="text-sm">{t("status.failed")}</span>
-                </div>
-              </ConditionChecker>
-              <ConditionChecker condition={saveStatus === "success"}>
-                <div className="flex items-center text-green-600 gap-1">
-                  <CheckCircle2 />
-                  <span className="text-sm">{t("status.saved")}</span>
-                </div>
-              </ConditionChecker>
-              <ConditionChecker condition={saveStatus === "saving"}>
-                <span className="text-sm text-gray-500 animate-pulse">
-                  {t("status.saving")}
-                </span>
-              </ConditionChecker>
-              <ConditionChecker
-                condition={saveStatus === "unsaved" && !!selectedNote}
-              >
-                <span className="text-sm text-amber-500">
-                  {t("status.unsaved")}
-                </span>
-              </ConditionChecker>
-            </div>
+            <SyncStatus status={saveStatus} onRetry={retrySave} />
           </>
         </ConditionChecker>
       </div>
@@ -315,7 +296,7 @@ export default function NoteContent() {
   return (
     <ResizablePanelGroup
       orientation="vertical"
-      className="h-[calc(100dvh-7rem)] min-h-[480px]"
+      className="h-[calc(100dvh-7rem)] min-h-120"
     >
       <ResizablePanel
         id="note"
