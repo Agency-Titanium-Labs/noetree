@@ -40,10 +40,14 @@ import { useTranslations } from "next-intl";
 import { canLeaveShare } from "@/lib/purchaseShareUi";
 import ShareDialog from "@/components/ShareDialog";
 import ListingFormDialog from "@/components/ListingFormDialog";
+import CollaboratorsPile from "@/components/CollaboratorsPile";
 
 interface NoteCardProps {
   note: NoteTree;
   isRoot: boolean;
+  isTargetHighlighted?: boolean;
+  isPathHighlighted?: boolean;
+  highlightColor?: string;
   onAddChild: () => void;
   onDelete: () => void;
   onRef?: (el: HTMLDivElement | null) => void;
@@ -60,6 +64,9 @@ interface NoteCardProps {
 export function NoteCard({
   note,
   isRoot,
+  isTargetHighlighted,
+  isPathHighlighted,
+  highlightColor,
   onAddChild,
   onDelete,
   onRef,
@@ -71,7 +78,7 @@ export function NoteCard({
   onContextMenuOpenChange: setControlledContextMenuOpen,
   isDropdownOpen: controlledDropdownOpen,
   onDropdownOpenChange: setControlledDropdownOpen,
-}: NoteCardProps) {
+}: Readonly<NoteCardProps>) {
   const t = useTranslations("NoteCard");
   const { onSelectNote, onUpdateNoteTitle, onDuplicateNote, selectedNote } =
     useTreeContext();
@@ -84,16 +91,11 @@ export function NoteCard({
   const [internalDropdownOpen, setInternalDropdownOpen] = useState(false);
 
   const isContextMenuOpen =
-    controlledContextMenuOpen !== undefined
-      ? controlledContextMenuOpen
-      : internalContextMenuOpen;
+    controlledContextMenuOpen ?? internalContextMenuOpen;
   const setContextMenuOpen =
     setControlledContextMenuOpen ?? setInternalContextMenuOpen;
 
-  const isDropdownOpen =
-    controlledDropdownOpen !== undefined
-      ? controlledDropdownOpen
-      : internalDropdownOpen;
+  const isDropdownOpen = controlledDropdownOpen ?? internalDropdownOpen;
   const setDropdownOpen = setControlledDropdownOpen ?? setInternalDropdownOpen;
 
   const [editedTitle, setEditedTitle] = useState(note.title);
@@ -243,6 +245,19 @@ export function NoteCard({
     }
   };
 
+  let highlightStyle: React.CSSProperties | undefined;
+  if (highlightColor && isTargetHighlighted) {
+    highlightStyle = {
+      borderColor: highlightColor,
+      boxShadow: `0 0 0 2px ${highlightColor}, 0 0 16px ${highlightColor}88`,
+    };
+  } else if (highlightColor && isPathHighlighted) {
+    highlightStyle = {
+      borderColor: highlightColor,
+      boxShadow: `0 0 0 2px ${highlightColor}`,
+    };
+  }
+
   return (
     <div
       ref={combinedRef}
@@ -257,6 +272,12 @@ export function NoteCard({
         }
       }}
     >
+      <CollaboratorsPile
+        noteId={note._id}
+        size="sm"
+        maxVisible={3}
+        className="absolute -top-2.5 -left-2.5 z-30 pointer-events-auto"
+      />
       <ContextMenu
         open={!isDraggingActive && isContextMenuOpen}
         onOpenChange={open => {
@@ -269,12 +290,15 @@ export function NoteCard({
       >
         <ContextMenuTrigger disabled={isRenaming || isTemp || isDraggingActive}>
           <Card
+            data-note-card-id={note._id}
             className={cn(
               "cursor-pointer transition-all bg-background hover:bg-accent/50 group border-border shadow-md min-w-30 max-w-60 relative overflow-hidden",
               isSelected
                 ? "bg-accent/30 border-primary ring-2 ring-primary/20"
                 : "",
+              isTargetHighlighted && "scale-105 z-20",
             )}
+            style={highlightStyle}
             onClick={() =>
               !isRenaming && !isTemp && onSelectNote(note, getCurrentContent)
             }

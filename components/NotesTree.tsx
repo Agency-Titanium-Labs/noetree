@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Crosshair } from "lucide-react";
 import { Button } from "./ui/button";
 import { useMutation } from "convex/react";
@@ -29,6 +29,7 @@ import { useSortable } from "@dnd-kit/react/sortable";
 import { cn } from "@/lib/utils";
 import { canLeaveShare, useGuardNotice } from "@/lib/purchaseShareUi";
 import CollaboratorsPile from "./CollaboratorsPile";
+import { findPathToNote } from "@/lib/treeUtils";
 
 const customSensors = [
   PointerSensor.configure({
@@ -169,7 +170,6 @@ interface TreeSortableBranchProps {
   index: number;
   parentId: Id<"notes">;
   hasChildren?: boolean;
-  className?: string;
   disabled?: boolean;
   children: (
     handleRef: (element: Element | null) => void,
@@ -182,10 +182,9 @@ function TreeSortableBranch({
   index,
   parentId,
   hasChildren,
-  className,
   disabled,
   children,
-}: TreeSortableBranchProps) {
+}: Readonly<TreeSortableBranchProps>) {
   const { ref, handleRef, targetRef, isDragging } = useSortable({
     id,
     index,
@@ -204,12 +203,101 @@ function TreeSortableBranch({
       ref={ref}
       className={cn(
         "tree-child relative flex flex-col items-center",
-        className,
         isDragging && "opacity-50 scale-95 z-20",
       )}
     >
       {children(handleRef, targetRef)}
     </div>
+  );
+}
+
+interface TreePathHighlightProps {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  path: string[] | null;
+  color?: string;
+}
+
+function TreePathHighlight({
+  containerRef,
+  path,
+  color,
+}: Readonly<TreePathHighlightProps>) {
+  const [d, setD] = useState<string>("");
+
+  useEffect(() => {
+    if (!path || path.length < 2 || !color) {
+      setD("");
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const update = () => {
+      const containerRect = container.getBoundingClientRect();
+      const segments: string[] = [];
+
+      for (let i = 0; i < path.length - 1; i++) {
+        const parentId = path[i];
+        const childId = path[i + 1];
+
+        const parentEl = container.querySelector<HTMLElement>(
+          `[data-note-card-id="${parentId}"]`,
+        );
+        const childEl = container.querySelector<HTMLElement>(
+          `[data-note-card-id="${childId}"]`,
+        );
+
+        if (!parentEl || !childEl) continue;
+
+        const pRect = parentEl.getBoundingClientRect();
+        const cRect = childEl.getBoundingClientRect();
+
+        const xP = pRect.left + pRect.width / 2 - containerRect.left;
+        const yPB = pRect.bottom - containerRect.top;
+
+        const xC = cRect.left + cRect.width / 2 - containerRect.left;
+        const yCT = cRect.top - containerRect.top;
+
+        // Gap is 32px (gap-8 = 2rem)
+        const yH = yPB + 32;
+
+        segments.push(`M ${xP} ${yPB} V ${yH} H ${xC} V ${yCT}`);
+      }
+
+      setD(segments.join(" "));
+    };
+
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(container);
+    window.addEventListener("resize", update);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [containerRef, path, color]);
+
+  if (!d || !color) return null;
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible"
+    >
+      <path
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        style={{
+          filter: `drop-shadow(0 0 6px ${color})`,
+          transition: "stroke 0.3s ease",
+        }}
+      />
+    </svg>
   );
 }
 
@@ -231,7 +319,13 @@ export default function NotesTree() {
   useHeaderConfig({
     title: tree?.title || "",
   });
-  const { getCurrentContent } = useEditorContext();
+  const { getCurrentContent, hoveredCollaborator } = useEditorContext();
+
+  const highlightedPath = useMemo(() => {
+    if (!tree || !hoveredCollaborator?.activeNoteId) return null;
+    return findPathToNote(tree, hoveredCollaborator.activeNoteId);
+  }, [tree, hoveredCollaborator?.activeNoteId]);
+
   const [isDraggingActive, setIsDraggingActive] = useState(false);
   const [openMenuNoteId, setOpenMenuNoteId] = useState<Id<"notes"> | null>(
     null,
@@ -275,6 +369,7 @@ export default function NotesTree() {
   const [noteToDelete, setNoteToDelete] = useState<Id<"notes"> | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const treeContainerRef = useRef<HTMLDivElement>(null);
   const selectedCardRef = useRef<HTMLDivElement | null>(null);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -348,6 +443,9 @@ export default function NotesTree() {
           <NoteCard
             note={note}
             isRoot={note._id === tree?._id}
+            isTargetHighlighted={hoveredCollaborator?.activeNoteId === note._id}
+            isPathHighlighted={highlightedPath?.includes(note._id) ?? false}
+            highlightColor={hoveredCollaborator?.color}
             onAddChild={() => handleStartAddingNote(note._id)}
             onDelete={() => setNoteToDelete(note._id)}
             onRef={handleSelectedRef}
@@ -384,6 +482,7 @@ export default function NotesTree() {
         >
           {note.childNotes?.map((childNote, idx) => {
             if (!childNote || !childNote._id || !childNote.title) return null;
+
             return (
               <TreeSortableBranch
                 key={childNote._id}
@@ -683,7 +782,8 @@ export default function NotesTree() {
         >
           <div
             key={treeKey}
-            className="min-w-full inline-flex justify-center items-start p-4"
+            ref={treeContainerRef}
+            className="min-w-full inline-flex justify-center items-start p-4 relative"
           >
             <ConditionChecker condition={!tree}>
               <div className="flex flex-col gap-8 items-center">
@@ -695,6 +795,11 @@ export default function NotesTree() {
               </div>
             </ConditionChecker>
             {tree ? renderNote(tree, 0, undefined, rootDroppableRef) : null}
+            <TreePathHighlight
+              containerRef={treeContainerRef}
+              path={highlightedPath}
+              color={hoveredCollaborator?.color}
+            />
           </div>
         </DragDropProvider>
       </div>

@@ -77,6 +77,22 @@ export const findNoteInTree = (
 };
 
 /**
+ * Returns the path of note IDs from root down to targetId (inclusive), or null if not found.
+ */
+export const findPathToNote = (
+  root: NoteTree,
+  targetId: string,
+): string[] | null => {
+  if (root._id === targetId) return [root._id];
+  if (!root.childNotes?.length) return null;
+  for (const child of root.childNotes) {
+    const subPath = findPathToNote(child, targetId);
+    if (subPath) return [root._id, ...subPath];
+  }
+  return null;
+};
+
+/**
  * Helper to check if a node or any of its descendants has the target ID.
  */
 export const isNodeInSubtree = (

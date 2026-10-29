@@ -3,6 +3,7 @@ import {
   moveNoteInTree,
   updateChildOrderInTree,
   findNoteInTree,
+  findPathToNote,
   isNodeInSubtree,
   NoteTree,
 } from "./treeUtils";
@@ -59,6 +60,18 @@ describe("treeUtils - Zero-Note-Loss Integrity Safeguards", () => {
       "grandchild-A1",
     );
     expect(findNoteInTree(tree, id("non-existent"))).toBeNull();
+  });
+
+  test("findPathToNote returns array of IDs along the branch from root to target", () => {
+    const tree = createSampleTree();
+    expect(findPathToNote(tree, "root")).toEqual(["root"]);
+    expect(findPathToNote(tree, "child-A")).toEqual(["root", "child-A"]);
+    expect(findPathToNote(tree, "grandchild-A1")).toEqual([
+      "root",
+      "child-A",
+      "grandchild-A1",
+    ]);
+    expect(findPathToNote(tree, "non-existent")).toBeNull();
   });
 
   test("isNodeInSubtree detects self and descendant relationships", () => {

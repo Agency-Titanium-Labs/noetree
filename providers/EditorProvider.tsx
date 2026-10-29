@@ -41,6 +41,12 @@ export type PreviewVersion = {
   author: { name: string | null; avatarUrl: string | null } | null;
 };
 
+export type HoveredCollaborator = {
+  userId: string;
+  activeNoteId: string;
+  color: string;
+};
+
 interface EditorContextType {
   editor: Editor | null;
   saveStatus: saveStatusType;
@@ -50,6 +56,8 @@ interface EditorContextType {
   exitPreview: (contentOverride?: string) => void;
   presenceList?: PresenceState[];
   treePresenceList?: PresenceState[];
+  hoveredCollaborator: HoveredCollaborator | null;
+  setHoveredCollaborator: (collab: HoveredCollaborator | null) => void;
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -61,6 +69,8 @@ const EditorContext = createContext<EditorContextType>({
   exitPreview: () => {},
   presenceList: undefined,
   treePresenceList: undefined,
+  hoveredCollaborator: null,
+  setHoveredCollaborator: () => {},
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -100,6 +110,8 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
   const [saveStatus, setSaveStatus] = useState<saveStatusType>("idle");
   const lastNoteIdRef = useRef<string | undefined>(undefined);
+  const [hoveredCollaborator, setHoveredCollaborator] =
+    useState<HoveredCollaborator | null>(null);
 
   const [previewVersion, setPreviewVersion] = useState<PreviewVersion | null>(
     null,
@@ -456,22 +468,38 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     [editor],
   );
 
-  const getCurrentContent = () => {
+  const getCurrentContent = useCallback(() => {
     if (previewRef.current) return null;
     if (!editor || editor.isDestroyed) return null;
     return JSON.stringify(editor.getJSON());
-  };
+  }, [editor]);
 
-  const contextValue = {
-    editor,
-    saveStatus,
-    getCurrentContent,
-    previewVersion,
-    enterPreview,
-    exitPreview,
-    presenceList,
-    treePresenceList,
-  };
+  const contextValue = useMemo(
+    () => ({
+      editor,
+      saveStatus,
+      getCurrentContent,
+      previewVersion,
+      enterPreview,
+      exitPreview,
+      presenceList,
+      treePresenceList,
+      hoveredCollaborator,
+      setHoveredCollaborator,
+    }),
+    [
+      editor,
+      saveStatus,
+      getCurrentContent,
+      previewVersion,
+      enterPreview,
+      exitPreview,
+      presenceList,
+      treePresenceList,
+      hoveredCollaborator,
+      setHoveredCollaborator,
+    ],
+  );
 
   return (
     <EditorContext.Provider value={contextValue}>

@@ -170,4 +170,31 @@ describe("CollaboratorsPile", () => {
       expect.objectContaining({ _id: "child_1", title: "Sub Note" }),
     );
   });
+
+  it("filters treePresenceList for specific noteId and supports size='sm'", () => {
+    mockContext.presenceList = [];
+    mockContext.treePresenceList = [
+      {
+        userId: "user_2",
+        name: "Jane Doe",
+        online: true,
+        data: { activeNoteId: "note_a" },
+      },
+      {
+        userId: "user_3",
+        name: "Bob Smith",
+        online: true,
+        data: { activeNoteId: "note_b" },
+      },
+    ];
+
+    const { unmount } = render(<CollaboratorsPile noteId="note_a" size="sm" />);
+    expect(screen.getByText("JD")).toBeInTheDocument();
+    expect(screen.queryByText("BS")).toBeNull();
+    unmount();
+
+    render(<CollaboratorsPile noteId="note_b" size="sm" />);
+    expect(screen.getByText("BS")).toBeInTheDocument();
+    expect(screen.queryByText("JD")).toBeNull();
+  });
 });

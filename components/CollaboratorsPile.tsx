@@ -40,15 +40,18 @@ interface CollaboratorsPileProps {
   noteId?: string;
   maxVisible?: number;
   className?: string;
+  size?: "default" | "sm";
 }
 
 export default function CollaboratorsPile({
   noteId,
   maxVisible = 4,
   className,
+  size = "default",
 }: Readonly<CollaboratorsPileProps>) {
   const t = useTranslations("Editor");
-  const { presenceList, treePresenceList } = useEditorContext();
+  const { presenceList, treePresenceList, setHoveredCollaborator } =
+    useEditorContext();
   const { tree, onSelectNote } = useTreeContext();
   const me = useQuery(api.users.me);
   const { user } = useUser();
@@ -58,20 +61,25 @@ export default function CollaboratorsPile({
     Boolean(currentUserId && userId === currentUserId) ||
     Boolean(user?.id && userId === user.id);
 
-  // If noteId is provided, filter for that note; otherwise use the tree presence list
-  const sourceList = noteId ? presenceList : (treePresenceList ?? presenceList);
+  // Use treePresenceList when non-empty, otherwise fallback to presenceList
+  const sourceList =
+    treePresenceList && treePresenceList.length > 0
+      ? treePresenceList
+      : presenceList;
 
   // Keep only OTHER online users and deduplicate multiple tabs of the same user
   const otherOnlineUsers = (sourceList ?? []).filter(p => {
     if (!p.online) return false;
     if (isMe(p.userId)) return false;
-    if (
-      noteId &&
-      p.data &&
-      typeof p.data === "object" &&
-      "activeNoteId" in (p.data as Record<string, unknown>)
-    ) {
-      return (p.data as { activeNoteId?: string }).activeNoteId === noteId;
+    if (noteId) {
+      if (
+        p.data &&
+        typeof p.data === "object" &&
+        "activeNoteId" in (p.data as Record<string, unknown>)
+      ) {
+        return (p.data as { activeNoteId?: string }).activeNoteId === noteId;
+      }
+      return true;
     }
     return true;
   });
@@ -86,11 +94,12 @@ export default function CollaboratorsPile({
   const visibleUsers = uniqueUsers.slice(0, maxVisible);
   const remainingUsers = uniqueUsers.slice(maxVisible);
   const remainingCount = remainingUsers.length;
+  const tooltipSide = noteId ? "top" : "bottom";
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className={className}>
-        <AvatarGroup>
+        <AvatarGroup className={cn(size === "sm" && "-space-x-1.5")}>
           {visibleUsers.map(p => {
             const displayName = p.name ?? t("collaborator");
             const userColor = getUserColor(p.userId);
@@ -112,11 +121,27 @@ export default function CollaboratorsPile({
               <Tooltip key={p.userId}>
                 <TooltipTrigger asChild>
                   <Avatar
+                    size={size}
                     className={cn(
                       "transition-transform hover:scale-110 hover:z-30",
                       activeNote && "cursor-pointer",
                     )}
-                    onClick={() => {
+                    onMouseEnter={() => {
+                      const activeId =
+                        userActiveNoteId ?? (noteId as Id<"notes"> | undefined);
+                      if (activeId) {
+                        setHoveredCollaborator({
+                          userId: p.userId,
+                          activeNoteId: activeId,
+                          color: userColor,
+                        });
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredCollaborator(null);
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
                       if (activeNote) {
                         onSelectNote(activeNote);
                       }
@@ -124,14 +149,15 @@ export default function CollaboratorsPile({
                   >
                     <AvatarFallback
                       style={{ backgroundColor: userColor, color: textColor }}
+                      className={cn("font-bold", size === "sm" && "text-xs")}
                     >
                       {getInitials(displayName)}
                     </AvatarFallback>
                   </Avatar>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-center">
+                <TooltipContent side={tooltipSide} className="text-center">
                   <p className="font-medium">{displayName}</p>
-                  {noteTitle && (
+                  {!noteId && noteTitle && (
                     <p className="text-xs text-muted-foreground">{noteTitle}</p>
                   )}
                 </TooltipContent>
@@ -145,7 +171,10 @@ export default function CollaboratorsPile({
                 <AvatarGroupCount
                   role="button"
                   tabIndex={0}
-                  className="cursor-pointer select-none transition-transform hover:scale-110 hover:z-30"
+                  className={cn(
+                    "cursor-pointer select-none transition-transform hover:scale-110 hover:z-30",
+                    size === "sm" && "size-6 text-[10px]",
+                  )}
                 >
                   +{remainingCount}
                 </AvatarGroupCount>
@@ -180,6 +209,18 @@ export default function CollaboratorsPile({
                           "flex items-center gap-2",
                           activeNote && "cursor-pointer",
                         )}
+                        onMouseEnter={() => {
+                          if (userActiveNoteId) {
+                            setHoveredCollaborator({
+                              userId: p.userId,
+                              activeNoteId: userActiveNoteId,
+                              color: userColor,
+                            });
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredCollaborator(null);
+                        }}
                         onClick={() => {
                           if (activeNote) {
                             onSelectNote(activeNote);
