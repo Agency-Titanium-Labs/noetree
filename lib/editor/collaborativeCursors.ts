@@ -10,6 +10,7 @@ export type RemoteUserCursor = {
     from: number;
     to: number;
   };
+  isTyping?: boolean;
 };
 
 export type CollaborativeCursorsStorage = {
@@ -80,6 +81,18 @@ function createCursorElement(user: RemoteUserCursor): HTMLElement {
   label.className = "collaborative-cursor-label";
   label.textContent = user.name;
   label.style.color = textColor;
+
+  if (user.isTyping) {
+    const dots = document.createElement("span");
+    dots.className = "collaborative-cursor-typing";
+    dots.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement("span");
+      dot.className = "collaborative-cursor-dot";
+      dots.append(dot);
+    }
+    label.append(dots);
+  }
 
   span.append(label);
   return span;
@@ -160,7 +173,7 @@ export const CollaborativeCursors = Extension.create<
               decos.push(
                 Decoration.widget(to, createWidgetFactory(user), {
                   side: 0,
-                  key: `cursor-${user.userId}`,
+                  key: `cursor-${user.userId}-${user.isTyping ? "typing" : "idle"}`,
                   ignoreSelection: true,
                 }),
               );

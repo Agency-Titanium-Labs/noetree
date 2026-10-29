@@ -7,10 +7,12 @@ import { useUser } from "@clerk/nextjs";
 import { useTranslations } from "next-intl";
 import {
   Avatar,
+  AvatarBadge,
   AvatarFallback,
   AvatarGroup,
   AvatarGroupCount,
 } from "@/components/ui/avatar";
+import TypingDots from "./TypingDots";
 import {
   Tooltip,
   TooltipContent,
@@ -111,6 +113,12 @@ export default function CollaboratorsPile({
             const userColor = getUserColor(p.userId);
             const textColor = getContrastTextColor(userColor);
             const isFollowed = followedUserId === p.userId;
+            const isTyping = Boolean(
+              p.data &&
+              typeof p.data === "object" &&
+              "isTyping" in (p.data as Record<string, unknown>) &&
+              (p.data as { isTyping?: boolean }).isTyping,
+            );
 
             const userActiveNoteId =
               p.data &&
@@ -165,10 +173,24 @@ export default function CollaboratorsPile({
                     >
                       {getInitials(displayName)}
                     </AvatarFallback>
+                    {isTyping && (
+                      <AvatarBadge
+                        title={t("isTyping", { name: displayName })}
+                        className="h-3 px-1 w-auto rounded-full bg-background text-foreground border border-border shadow-xs group-data-[size=sm]/avatar:size-auto group-data-[size=default]/avatar:size-auto"
+                      >
+                        <TypingDots />
+                      </AvatarBadge>
+                    )}
                   </Avatar>
                 </TooltipTrigger>
                 <TooltipContent side={tooltipSide} className="text-center">
                   <p className="font-medium">{displayName}</p>
+                  {isTyping && (
+                    <div className="text-xs font-semibold text-muted-foreground flex items-center justify-center gap-1.5">
+                      <span>{t("isTyping", { name: displayName })}</span>
+                      <TypingDots />
+                    </div>
+                  )}
                   <p
                     className="text-xs font-semibold"
                     style={{ color: userColor }}
@@ -205,6 +227,12 @@ export default function CollaboratorsPile({
                     const userColor = getUserColor(p.userId);
                     const textColor = getContrastTextColor(userColor);
                     const isFollowed = followedUserId === p.userId;
+                    const isTyping = Boolean(
+                      p.data &&
+                      typeof p.data === "object" &&
+                      "isTyping" in (p.data as Record<string, unknown>) &&
+                      (p.data as { isTyping?: boolean }).isTyping,
+                    );
 
                     const userActiveNoteId =
                       p.data &&
@@ -255,11 +283,24 @@ export default function CollaboratorsPile({
                             >
                               {getInitials(displayName)}
                             </AvatarFallback>
+                            {isTyping && (
+                              <AvatarBadge
+                                title={t("isTyping", { name: displayName })}
+                                className="h-3 px-1 w-auto rounded-full bg-background text-foreground border border-border shadow-xs group-data-[size=sm]/avatar:size-auto group-data-[size=default]/avatar:size-auto"
+                              >
+                                <TypingDots />
+                              </AvatarBadge>
+                            )}
                           </Avatar>
                           <div className="flex flex-col min-w-0">
-                            <span className="truncate font-medium">
-                              {displayName}
-                            </span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="truncate font-medium">
+                                {displayName}
+                              </span>
+                              {isTyping && (
+                                <TypingDots className="text-muted-foreground shrink-0" />
+                              )}
+                            </div>
                             {noteTitle && (
                               <span className="text-xs text-muted-foreground truncate">
                                 {noteTitle}

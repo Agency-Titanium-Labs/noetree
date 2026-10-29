@@ -284,6 +284,69 @@
   pointer-events: none;
   z-index: 20;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  align-items: center;
+}
+
+.collaborative-cursor-typing,
+.tiptap .collaborative-cursor-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.tiptap .collaborative-cursor-typing {
+  margin-left: 3px;
+}
+
+.collaborative-cursor-dot,
+.tiptap .collaborative-cursor-dot {
+  width: 3px;
+  height: 3px;
+  min-width: 3px;
+  min-height: 3px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: currentColor;
+  display: inline-block;
+  animation: collaborative-typing-bounce 1.2s infinite ease-in-out;
+}
+
+.collaborative-cursor-dot:nth-child(1),
+.tiptap .collaborative-cursor-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.collaborative-cursor-dot:nth-child(2),
+.tiptap .collaborative-cursor-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.collaborative-cursor-dot:nth-child(3),
+.tiptap .collaborative-cursor-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes collaborative-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collaborative-cursor-dot,
+  .tiptap .collaborative-cursor-dot {
+    animation: none;
+    opacity: 0.75;
+  }
 }
 
 .tiptap .collaborative-selection {
@@ -308,7 +371,7 @@ div:has(> .tiptap) {
   }
 
   /* Reset all styles */
-  * {
+  *:not(.collaborative-cursor, .collaborative-cursor *) {
     all: revert;
   }
 }

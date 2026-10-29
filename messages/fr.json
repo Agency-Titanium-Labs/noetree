@@ -104,6 +104,7 @@
     }
   },
   "NoteCard": {
+    "someoneTyping": "Écriture en cours...",
     "newNotePlaceholder": "Titre de la nouvelle note...",
     "tooltips": {
       "addChild": "Ajouter une note enfant",
@@ -352,6 +353,8 @@
     "follow": "Suivre",
     "clickToFollow": "Cliquer pour suivre",
     "followingTooltip": "Suivi en cours • Cliquer pour arrêter",
+    "isTyping": "{name} est en train d'écrire...",
+    "typing": "écrit...",
     "tooltips": {
       "undo": "Annuler (Ctrl+Z)",
       "redo": "Rétablir (Ctrl+Shift+Z)",

@@ -41,11 +41,13 @@ vi.mock("@clerk/nextjs", () => ({
 }));
 
 vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => {
+  useTranslations: () => (key: string, params?: Record<string, string>) => {
     const translations: Record<string, string> = {
       you: "vous",
       collaborator: "Collaborateur",
       collaborators: "Collaborateurs",
+      isTyping: `${params?.name} est en train d'écrire...`,
+      typing: "écrit...",
     };
     return translations[key] ?? key;
   },
@@ -206,5 +208,22 @@ describe("CollaboratorsPile", () => {
     render(<CollaboratorsPile noteId="note_b" size="sm" />);
     expect(screen.getByText("BS")).toBeInTheDocument();
     expect(screen.queryByText("JD")).toBeNull();
+  });
+
+  it("renders typing badge and status when a collaborator is typing", () => {
+    mockContext.treePresenceList = [
+      {
+        userId: "user_2",
+        name: "Jane Doe",
+        online: true,
+        data: { activeNoteId: "note123", isTyping: true },
+      },
+    ];
+
+    const { container } = render(<CollaboratorsPile noteId="note123" />);
+    expect(screen.getByText("JD")).toBeInTheDocument();
+    const badge = container.querySelector("[data-slot='avatar-badge']");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute("title", "Jane Doe est en train d'écrire...");
   });
 });

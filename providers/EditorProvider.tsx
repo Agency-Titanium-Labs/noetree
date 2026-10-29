@@ -169,14 +169,59 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   }, [treePresenceList, selectedNote?._id]);
 
   // Sync active note presence across the tree room
+  const isTypingRef = useRef(false);
+  const editorRef = useRef<Editor | null>(null);
+
+  const debouncedStopTyping = useDebouncedCallback(() => {
+    if (!isTypingRef.current || !treeRoomId) return;
+    isTypingRef.current = false;
+    const currentCursor = editorRef.current?.isFocused
+      ? {
+          from: editorRef.current.state.selection.from,
+          to: editorRef.current.state.selection.to,
+        }
+      : undefined;
+    void updateCursorMutation({
+      roomId: treeRoomId,
+      activeNoteId: selectedNote?._id,
+      cursor: currentCursor,
+      isTyping: false,
+    });
+  }, 1500);
+
+  const handleUserTyping = useCallback(
+    (from: number, to: number) => {
+      if (!treeRoomId || previewRef.current) return;
+      if (!isTypingRef.current) {
+        isTypingRef.current = true;
+        void updateCursorMutation({
+          roomId: treeRoomId,
+          activeNoteId: selectedNote?._id,
+          cursor: { from, to },
+          isTyping: true,
+        });
+      }
+      debouncedStopTyping();
+    },
+    [treeRoomId, selectedNote?._id, updateCursorMutation, debouncedStopTyping],
+  );
+
   useEffect(() => {
     if (!treeRoomId) return;
+    debouncedStopTyping.cancel();
+    isTypingRef.current = false;
     void updateCursorMutation({
       roomId: treeRoomId,
       activeNoteId: selectedNote?._id,
       cursor: undefined,
+      isTyping: false,
     });
-  }, [treeRoomId, selectedNote?._id, updateCursorMutation]);
+  }, [
+    treeRoomId,
+    selectedNote?._id,
+    updateCursorMutation,
+    debouncedStopTyping,
+  ]);
 
   const debouncedSendCursor = useDebouncedCallback(
     (from: number, to: number) => {
@@ -185,6 +230,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
         roomId: treeRoomId,
         activeNoteId: selectedNote?._id,
         cursor: { from, to },
+        isTyping: isTypingRef.current,
       });
     },
     150,
@@ -193,12 +239,20 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
   const clearCursor = useCallback(() => {
     if (!treeRoomId) return;
+    debouncedStopTyping.cancel();
+    isTypingRef.current = false;
     void updateCursorMutation({
       roomId: treeRoomId,
       activeNoteId: selectedNote?._id,
       cursor: undefined,
+      isTyping: false,
     });
-  }, [treeRoomId, selectedNote?._id, updateCursorMutation]);
+  }, [
+    treeRoomId,
+    selectedNote?._id,
+    updateCursorMutation,
+    debouncedStopTyping,
+  ]);
 
   // When a note is opened for the first time in prosemirrorSync, initialize it
   useEffect(() => {
@@ -241,14 +295,32 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
         const { from, to } = ed.state.selection;
         debouncedSendCursor(from, to);
       },
+      onTransaction: ({ editor: ed, transaction }) => {
+        if (
+          transaction.docChanged &&
+          ed.isFocused &&
+          !previewRef.current &&
+          selectedNote?.role !== "view"
+        ) {
+          const { from, to } = ed.state.selection;
+          handleUserTyping(from, to);
+        }
+      },
       onBlur: () => {
         clearCursor();
       },
       immediatelyRender: false,
       shouldRerenderOnTransaction: true,
     },
-    [selectedNote?._id, sync.extension, t],
+    [
+      selectedNote?._id,
+      selectedNote?.role,
+      sync.extension,
+      t,
+      handleUserTyping,
+    ],
   );
+  editorRef.current = editor;
 
   // Sync remote collaborators' cursors into TipTap decorations
   useEffect(() => {
@@ -264,13 +336,17 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
           typeof p.data === "object" &&
           "cursor" in (p.data as Record<string, unknown>),
       )
-      .map(p => {
-        const data = p.data as { cursor?: { from: number; to: number } };
+      .map((p): RemoteUserCursor => {
+        const data = p.data as {
+          cursor?: { from: number; to: number };
+          isTyping?: boolean;
+        };
         return {
           userId: p.userId,
           name: p.name || t("collaborator"),
           color: getUserColor(p.userId),
           cursor: data.cursor,
+          isTyping: data.isTyping,
         };
       })
       .filter(

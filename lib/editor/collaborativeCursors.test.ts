@@ -165,4 +165,44 @@ describe("CollaborativeCursors", () => {
     const labelEl = document.querySelector(".collaborative-cursor-label");
     expect(labelEl?.textContent).toBe("David");
   });
+
+  it("renders typing dots when collaborator is typing", () => {
+    const editor = createEditor("<p>Hello world</p>");
+
+    const remoteUsers: RemoteUserCursor[] = [
+      {
+        userId: "user_remote_typing",
+        name: "Alice",
+        color: "#059669",
+        cursor: { from: 5, to: 5 },
+        isTyping: true,
+      },
+    ];
+
+    editor.view.dispatch(
+      editor.state.tr.setMeta(collaborativeCursorsKey, remoteUsers),
+    );
+
+    const typingEl = document.querySelector(".collaborative-cursor-typing");
+    expect(typingEl).not.toBeNull();
+    const dots = typingEl?.querySelectorAll(".collaborative-cursor-dot");
+    expect(dots?.length).toBe(3);
+
+    // When typing stops
+    const idleUsers: RemoteUserCursor[] = [
+      {
+        ...remoteUsers[0],
+        isTyping: false,
+      },
+    ];
+
+    editor.view.dispatch(
+      editor.state.tr.setMeta(collaborativeCursorsKey, idleUsers),
+    );
+
+    const typingElAfter = document.querySelector(
+      ".collaborative-cursor-typing",
+    );
+    expect(typingElAfter).toBeNull();
+  });
 });

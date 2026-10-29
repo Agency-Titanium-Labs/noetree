@@ -85,6 +85,7 @@ export const updateCursor = mutation({
         to: v.number(),
       }),
     ),
+    isTyping: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await getUser(ctx);
@@ -92,6 +93,7 @@ export const updateCursor = mutation({
     await presence.updateRoomUser(ctx, args.roomId, resolvedUserId, {
       activeNoteId: args.activeNoteId,
       cursor: args.cursor,
+      isTyping: args.isTyping,
     });
   },
 });
