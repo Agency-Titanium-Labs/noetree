@@ -366,4 +366,69 @@ describe("leaving preview does not autosave (GAP-1)", () => {
       expect(ctx.presenceList?.[0]?.userId).toBe("user_on_same_note");
     });
   });
+
+  describe("closing or navigating away flushes pending edits", () => {
+    it("flushes pending edits when EditorProvider unmounts", () => {
+      const { unmount } = mount();
+      h.flush.mockClear();
+      unmount();
+      expect(h.flush).toHaveBeenCalledTimes(1);
+    });
+
+    it("flushes and prompts confirmation on beforeunload when unsaved", () => {
+      mount();
+      act(() => h.fake.listener?.({ editor: h.fake }));
+      expect(ctx.saveStatus).toBe("unsaved");
+
+      h.flush.mockClear();
+      const event = new Event("beforeunload", {
+        cancelable: true,
+      }) as BeforeUnloadEvent;
+      const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+
+      window.dispatchEvent(event);
+
+      expect(h.flush).toHaveBeenCalledTimes(1);
+      expect(preventDefaultSpy).toHaveBeenCalled();
+    });
+
+    it("does not flush or prompt on beforeunload when idle", () => {
+      mount();
+      expect(ctx.saveStatus).toBe("idle");
+
+      h.flush.mockClear();
+      const event = new Event("beforeunload", {
+        cancelable: true,
+      }) as BeforeUnloadEvent;
+      const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+
+      window.dispatchEvent(event);
+
+      expect(h.flush).not.toHaveBeenCalled();
+      expect(preventDefaultSpy).not.toHaveBeenCalled();
+    });
+
+    it("flushes on visibilitychange when hidden and unsaved", () => {
+      mount();
+      act(() => h.fake.listener?.({ editor: h.fake }));
+      expect(ctx.saveStatus).toBe("unsaved");
+
+      h.flush.mockClear();
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      document.dispatchEvent(new Event("visibilitychange"));
+
+      expect(h.flush).toHaveBeenCalledTimes(1);
+    });
+
+    it("applies incoming remote content changes when user is idle", () => {
+      const { rerender } = mount();
+      h.fake.commands.setContent.mockClear();
+      setNote({ content: doc("incoming remote changes") });
+      rerender(ui());
+      expect(h.fake.commands.setContent).toHaveBeenCalledWith(
+        JSON.parse(doc("incoming remote changes")),
+        { emitUpdate: false },
+      );
+    });
+  });
 });

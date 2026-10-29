@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SignInButton } from "@clerk/nextjs";
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -106,24 +106,73 @@ function SharedNoteBody({
     api.shareLinks.updateSharedNoteContent,
   );
 
+  const isMountedRef = useRef(true);
+  const saveStatusRef = useRef(saveStatus);
+  saveStatusRef.current = saveStatus;
+
   const saveContent = async (json: Content) => {
-    setSaveStatus("saving");
+    if (isMountedRef.current) setSaveStatus("saving");
     try {
       await saveMutation({ token, content: JSON.stringify(json) });
-      setSaveStatus("success");
+      if (isMountedRef.current) setSaveStatus("success");
     } catch (err) {
       if (
         err instanceof ConvexError &&
         (err.data === "LINK_INVALID" || err.data === "UNAUTHENTICATED")
       ) {
-        setRevoked(true);
-      } else {
-        setSaveStatus("error");
-      }
+        if (isMountedRef.current) setRevoked(true);
+      } else if (isMountedRef.current) setSaveStatus("error");
     }
   };
 
-  const debouncedSave = useDebouncedCallback(saveContent, 3000);
+  const debouncedSave = useDebouncedCallback(saveContent, 1000);
+  const debouncedSaveRef = useRef(debouncedSave);
+  debouncedSaveRef.current = debouncedSave;
+
+  // Handle unmount (navigating away): flush pending debounced save
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      void debouncedSaveRef.current.flush();
+    };
+  }, []);
+
+  // Handle browser close / reload / visibility change (minimize or background tab)
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (saveStatusRef.current === "unsaved") {
+        void debouncedSaveRef.current.flush();
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        saveStatusRef.current === "unsaved"
+      ) {
+        void debouncedSaveRef.current.flush();
+      }
+    };
+
+    const handlePageHide = () => {
+      if (saveStatusRef.current === "unsaved") {
+        void debouncedSaveRef.current.flush();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
 
   useEffect(() => {
     setHref(window.location.href);

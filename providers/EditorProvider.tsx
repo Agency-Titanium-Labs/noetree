@@ -428,6 +428,10 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     )?.ghostText?.clear?.();
   }, [autocompleteEnabled, editor]);
 
+  const isMountedRef = useRef(true);
+  const saveStatusRef = useRef(saveStatus);
+  saveStatusRef.current = saveStatus;
+
   const saveContent = useCallback(
     async (content: Content) => {
       if (!selectedNote) return;
@@ -435,26 +439,77 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       if (previewRef.current) return; // Never save while previewing a version
 
       try {
-        setSaveStatus("saving");
+        if (isMountedRef.current) setSaveStatus("saving");
 
         onUpdateNoteContent(JSON.stringify(content));
 
-        setSaveStatus("success");
+        if (isMountedRef.current) {
+          setSaveStatus("success");
 
-        setTimeout(() => {
-          setSaveStatus(currentStatus =>
-            currentStatus === "success" ? "idle" : currentStatus,
-          );
-        }, 2000);
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              setSaveStatus(currentStatus =>
+                currentStatus === "success" ? "idle" : currentStatus,
+              );
+            }
+          }, 2000);
+        }
       } catch (error) {
         console.error("Failed to save note content", error);
-        setSaveStatus("error");
+        if (isMountedRef.current) setSaveStatus("error");
       }
     },
     [selectedNote, onUpdateNoteContent],
   );
 
-  const debouncedSave = useDebouncedCallback(saveContent, 3000);
+  const debouncedSave = useDebouncedCallback(saveContent, 1000);
+  const debouncedSaveRef = useRef(debouncedSave);
+  debouncedSaveRef.current = debouncedSave;
+
+  // Handle unmount (route change, page navigation): flush pending debounced save
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      void debouncedSaveRef.current.flush();
+    };
+  }, []);
+
+  // Handle browser close / reload / visibility change (minimize or background tab)
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (saveStatusRef.current === "unsaved") {
+        void debouncedSaveRef.current.flush();
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        saveStatusRef.current === "unsaved"
+      ) {
+        void debouncedSaveRef.current.flush();
+      }
+    };
+
+    const handlePageHide = () => {
+      if (saveStatusRef.current === "unsaved") {
+        void debouncedSaveRef.current.flush();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
 
   const retrySave = useCallback(() => {
     if (
@@ -496,12 +551,12 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
 
-    debouncedSave.cancel();
-
-    const isNoteChanged = lastNoteIdRef.current !== selectedNote?._id;
+    const previousNoteId = lastNoteIdRef.current;
+    const isNoteChanged = previousNoteId !== selectedNote?._id;
     lastNoteIdRef.current = selectedNote?._id;
 
     if (isNoteChanged) {
+      debouncedSave.cancel();
       setSaveStatus("idle");
       // The editor is re-created on note switch, so just drop preview state.
       previewRef.current = null;
@@ -518,10 +573,13 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     // While previewing, remote changes must not touch the editor.
     if (previewRef.current && !isNoteChanged) return;
 
-    // When sync.extension is active, remote changes on the same note are
-    // merged cleanly in real time via ProseMirror collab. Calling setContent
-    // would clobber the user's cursor and local unsynced edits.
-    if (!isNoteChanged && sync.extension) return;
+    // Do not clobber local unsaved typing while actively editing
+    if (
+      !isNoteChanged &&
+      (saveStatus === "unsaved" || saveStatus === "saving")
+    ) {
+      return;
+    }
 
     const content = parseNoteContent(latestContentRef.current);
 
