@@ -70,6 +70,7 @@ export function getContrastTextColor(hexColor: string): "#000000" | "#ffffff" {
 function createCursorElement(user: RemoteUserCursor): HTMLElement {
   const span = document.createElement("span");
   span.className = "collaborative-cursor";
+  span.dataset.cursorUserId = user.userId;
   span.style.setProperty("--cursor-color", user.color);
 
   const textColor = getContrastTextColor(user.color);

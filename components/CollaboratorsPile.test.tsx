@@ -6,6 +6,10 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 const mockContext = {
   presenceList: [] as unknown[],
   treePresenceList: [] as unknown[],
+  followedUserId: null as string | null,
+  setFollowedUserId: vi.fn(),
+  setHoveredCollaborator: vi.fn(),
+  getCurrentContent: vi.fn(() => null),
 };
 
 const mockTreeContext = {
@@ -17,6 +21,10 @@ vi.mock("@/providers/EditorProvider", () => ({
   useEditorContext: () => ({
     presenceList: mockContext.presenceList,
     treePresenceList: mockContext.treePresenceList,
+    followedUserId: mockContext.followedUserId,
+    setFollowedUserId: mockContext.setFollowedUserId,
+    setHoveredCollaborator: mockContext.setHoveredCollaborator,
+    getCurrentContent: mockContext.getCurrentContent,
   }),
 }));
 
@@ -164,10 +172,12 @@ describe("CollaboratorsPile", () => {
     const janeAvatar = screen.getByText("JD");
     expect(janeAvatar).toBeInTheDocument();
 
-    // Clicking Jane's avatar navigates to her note
+    // Clicking Jane's avatar navigates to her note and activates follow mode
     fireEvent.click(janeAvatar);
+    expect(mockContext.setFollowedUserId).toHaveBeenCalledWith("user_2");
     expect(mockTreeContext.onSelectNote).toHaveBeenCalledWith(
       expect.objectContaining({ _id: "child_1", title: "Sub Note" }),
+      expect.any(Function),
     );
   });
 

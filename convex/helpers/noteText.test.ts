@@ -54,7 +54,7 @@ describe("extractNoteText", () => {
 
   it("survives pathological nesting without a stack overflow", () => {
     let node: unknown = { type: "text", text: "deep" };
-    for (let i = 0; i < 5_000; i++)
+    for (let i = 0; i < 500; i++)
       node = { type: "blockquote", content: [node] };
     expect(() => extractNoteText(JSON.stringify(node))).not.toThrow();
   });

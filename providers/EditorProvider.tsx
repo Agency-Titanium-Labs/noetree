@@ -29,6 +29,8 @@ import {
   getUserColor,
   type RemoteUserCursor,
 } from "@/lib/editor/collaborativeCursors";
+import { findNoteInTree } from "@/lib/treeUtils";
+import { Id } from "@/convex/_generated/dataModel";
 
 type saveStatusType = "idle" | "unsaved" | "saving" | "success" | "error";
 
@@ -47,6 +49,13 @@ export type HoveredCollaborator = {
   color: string;
 };
 
+export type FollowedCollaborator = {
+  userId: string;
+  name: string;
+  activeNoteId?: string;
+  color: string;
+};
+
 interface EditorContextType {
   editor: Editor | null;
   saveStatus: saveStatusType;
@@ -58,6 +67,9 @@ interface EditorContextType {
   treePresenceList?: PresenceState[];
   hoveredCollaborator: HoveredCollaborator | null;
   setHoveredCollaborator: (collab: HoveredCollaborator | null) => void;
+  followedUserId: string | null;
+  setFollowedUserId: (userId: string | null) => void;
+  followedCollaborator: FollowedCollaborator | null;
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -71,6 +83,9 @@ const EditorContext = createContext<EditorContextType>({
   treePresenceList: undefined,
   hoveredCollaborator: null,
   setHoveredCollaborator: () => {},
+  followedUserId: null,
+  setFollowedUserId: () => {},
+  followedCollaborator: null,
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -105,13 +120,15 @@ interface EditorProviderProps {
 
 export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const t = useTranslations("Editor");
-  const { selectedNote, onUpdateNoteContent, rootNoteId } = useTreeContext();
+  const { selectedNote, onUpdateNoteContent, rootNoteId, tree, onSelectNote } =
+    useTreeContext();
   const treeRoomId = rootNoteId ?? selectedNote?._id ?? "";
 
   const [saveStatus, setSaveStatus] = useState<saveStatusType>("idle");
   const lastNoteIdRef = useRef<string | undefined>(undefined);
   const [hoveredCollaborator, setHoveredCollaborator] =
     useState<HoveredCollaborator | null>(null);
+  const [followedUserId, setFollowedUserId] = useState<string | null>(null);
 
   const [previewVersion, setPreviewVersion] = useState<PreviewVersion | null>(
     null,
@@ -474,6 +491,115 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     return JSON.stringify(editor.getJSON());
   }, [editor]);
 
+  const followedUser = useMemo(() => {
+    if (!followedUserId || !treePresenceList) return null;
+    return (
+      treePresenceList.find(p => p.userId === followedUserId && p.online) ??
+      null
+    );
+  }, [followedUserId, treePresenceList]);
+
+  const followedCollaborator = useMemo<FollowedCollaborator | null>(() => {
+    if (!followedUser) return null;
+    const activeNoteId =
+      followedUser.data &&
+      typeof followedUser.data === "object" &&
+      "activeNoteId" in (followedUser.data as Record<string, unknown>)
+        ? (followedUser.data as { activeNoteId?: string }).activeNoteId
+        : undefined;
+
+    return {
+      userId: followedUser.userId,
+      name: followedUser.name ?? t("collaborator"),
+      activeNoteId,
+      color: getUserColor(followedUser.userId),
+    };
+  }, [followedUser, t]);
+
+  // If followed user leaves or goes offline, stop following
+  useEffect(() => {
+    if (followedUserId && !followedUser) {
+      setFollowedUserId(null);
+    }
+  }, [followedUserId, followedUser]);
+
+  // Follow note navigation across the tree
+  useEffect(() => {
+    if (!followedCollaborator?.activeNoteId || !tree) return;
+    if (selectedNote?._id === followedCollaborator.activeNoteId) return;
+
+    const target = findNoteInTree(
+      tree,
+      followedCollaborator.activeNoteId as Id<"notes">,
+    );
+    if (target) {
+      onSelectNote(target, getCurrentContent);
+    }
+  }, [
+    followedCollaborator?.activeNoteId,
+    tree,
+    selectedNote?._id,
+    onSelectNote,
+    getCurrentContent,
+  ]);
+
+  const followedCursor = useMemo(() => {
+    if (
+      !followedUser?.data ||
+      typeof followedUser.data !== "object" ||
+      !("cursor" in (followedUser.data as Record<string, unknown>))
+    ) {
+      return undefined;
+    }
+    return (followedUser.data as { cursor?: { from: number; to: number } })
+      .cursor;
+  }, [followedUser?.data]);
+
+  // Follow cursor scroll in editor
+  useEffect(() => {
+    if (!followedUserId || !followedCursor || !editor || editor.isDestroyed)
+      return;
+    const timer = setTimeout(() => {
+      const cursorEl = document.querySelector<HTMLElement>(
+        `[data-cursor-user-id="${followedUserId}"]`,
+      );
+      if (cursorEl) {
+        cursorEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [followedUserId, followedCursor, editor]);
+
+  // Disengage follow on Escape key
+  useEffect(() => {
+    if (!followedUserId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setFollowedUserId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [followedUserId]);
+
+  // Disengage follow when local user edits document
+  useEffect(() => {
+    if (!editor || !followedUserId) return;
+    const handleTransaction = ({
+      transaction,
+    }: {
+      transaction: { docChanged: boolean };
+    }) => {
+      if (transaction.docChanged) {
+        setFollowedUserId(null);
+      }
+    };
+    editor.on("transaction", handleTransaction);
+    return () => {
+      editor.off("transaction", handleTransaction);
+    };
+  }, [editor, followedUserId]);
+
   const contextValue = useMemo(
     () => ({
       editor,
@@ -486,6 +612,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       treePresenceList,
       hoveredCollaborator,
       setHoveredCollaborator,
+      followedUserId,
+      setFollowedUserId,
+      followedCollaborator,
     }),
     [
       editor,
@@ -498,6 +627,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       treePresenceList,
       hoveredCollaborator,
       setHoveredCollaborator,
+      followedUserId,
+      setFollowedUserId,
+      followedCollaborator,
     ],
   );
 

@@ -2,6 +2,7 @@
 
 import NoteTree from "@/components/NotesTree";
 import NoteContent from "@/components/NoteContent";
+import FollowBanner from "@/components/FollowBanner";
 import { EditorProvider } from "@/providers/EditorProvider";
 import { TreeProvider } from "@/providers/TreeProvider";
 import {
@@ -42,6 +43,7 @@ const NotePageContent = () => {
             <NoteTree />
           </div>
           <MobileDrawer />
+          <FollowBanner />
         </>
       </EditorProvider>
     );
@@ -58,6 +60,7 @@ const NotePageContent = () => {
           <NoteContent />
         </ResizablePanel>
       </ResizablePanelGroup>
+      <FollowBanner />
     </EditorProvider>
   );
 };

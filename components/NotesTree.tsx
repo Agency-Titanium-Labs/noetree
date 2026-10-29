@@ -319,12 +319,28 @@ export default function NotesTree() {
   useHeaderConfig({
     title: tree?.title || "",
   });
-  const { getCurrentContent, hoveredCollaborator } = useEditorContext();
+  const { getCurrentContent, hoveredCollaborator, followedCollaborator } =
+    useEditorContext();
 
   const highlightedPath = useMemo(() => {
     if (!tree || !hoveredCollaborator?.activeNoteId) return null;
     return findPathToNote(tree, hoveredCollaborator.activeNoteId);
   }, [tree, hoveredCollaborator?.activeNoteId]);
+
+  // Auto-scroll tree to followed collaborator's active note card
+  useEffect(() => {
+    if (!followedCollaborator?.activeNoteId) return;
+    const cardEl = treeContainerRef.current?.querySelector<HTMLElement>(
+      `[data-note-card-id="${followedCollaborator.activeNoteId}"]`,
+    );
+    if (cardEl) {
+      cardEl.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "center",
+      });
+    }
+  }, [followedCollaborator?.activeNoteId]);
 
   const [isDraggingActive, setIsDraggingActive] = useState(false);
   const [openMenuNoteId, setOpenMenuNoteId] = useState<Id<"notes"> | null>(

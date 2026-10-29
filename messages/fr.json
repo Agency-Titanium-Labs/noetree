@@ -346,6 +346,12 @@
     "you": "Vous",
     "collaborator": "Collaborateur",
     "collaborators": "Autres collaborateurs",
+    "following": "Vous suivez {name}",
+    "stopFollowing": "Arrêter",
+    "escapeKey": "Échap",
+    "follow": "Suivre",
+    "clickToFollow": "Cliquer pour suivre",
+    "followingTooltip": "Suivi en cours • Cliquer pour arrêter",
     "tooltips": {
       "undo": "Annuler (Ctrl+Z)",
       "redo": "Rétablir (Ctrl+Shift+Z)",

@@ -82,7 +82,8 @@ export function NoteCard({
   const t = useTranslations("NoteCard");
   const { onSelectNote, onUpdateNoteTitle, onDuplicateNote, selectedNote } =
     useTreeContext();
-  const { getCurrentContent } = useEditorContext();
+  const { getCurrentContent, followedUserId, setFollowedUserId } =
+    useEditorContext();
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -299,9 +300,13 @@ export function NoteCard({
               isTargetHighlighted && "scale-105 z-20",
             )}
             style={highlightStyle}
-            onClick={() =>
-              !isRenaming && !isTemp && onSelectNote(note, getCurrentContent)
-            }
+            onClick={() => {
+              if (isRenaming || isTemp) return;
+              if (followedUserId) {
+                setFollowedUserId(null);
+              }
+              onSelectNote(note, getCurrentContent);
+            }}
             onDoubleClick={() =>
               !isTemp && note.role !== "view" && setIsRenaming(true)
             }

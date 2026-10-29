@@ -45,13 +45,19 @@ interface CollaboratorsPileProps {
 
 export default function CollaboratorsPile({
   noteId,
-  maxVisible = 4,
+  maxVisible = 3,
   className,
   size = "default",
 }: Readonly<CollaboratorsPileProps>) {
   const t = useTranslations("Editor");
-  const { presenceList, treePresenceList, setHoveredCollaborator } =
-    useEditorContext();
+  const {
+    presenceList,
+    treePresenceList,
+    setHoveredCollaborator,
+    followedUserId,
+    setFollowedUserId,
+    getCurrentContent,
+  } = useEditorContext();
   const { tree, onSelectNote } = useTreeContext();
   const me = useQuery(api.users.me);
   const { user } = useUser();
@@ -104,6 +110,7 @@ export default function CollaboratorsPile({
             const displayName = p.name ?? t("collaborator");
             const userColor = getUserColor(p.userId);
             const textColor = getContrastTextColor(userColor);
+            const isFollowed = followedUserId === p.userId;
 
             const userActiveNoteId =
               p.data &&
@@ -115,7 +122,6 @@ export default function CollaboratorsPile({
               userActiveNoteId && tree
                 ? findNoteInTree(tree, userActiveNoteId as Id<"notes">)
                 : null;
-            const noteTitle = activeNote?.title;
 
             return (
               <Tooltip key={p.userId}>
@@ -123,8 +129,9 @@ export default function CollaboratorsPile({
                   <Avatar
                     size={size}
                     className={cn(
-                      "transition-transform hover:scale-110 hover:z-30",
-                      activeNote && "cursor-pointer",
+                      "transition-transform hover:scale-110 hover:z-30 cursor-pointer",
+                      isFollowed &&
+                        "z-30 ring-2 ring-offset-1 ring-offset-background animate-pulse",
                     )}
                     onMouseEnter={() => {
                       const activeId =
@@ -142,8 +149,13 @@ export default function CollaboratorsPile({
                     }}
                     onClick={e => {
                       e.stopPropagation();
-                      if (activeNote) {
-                        onSelectNote(activeNote);
+                      if (isFollowed) {
+                        setFollowedUserId(null);
+                      } else {
+                        setFollowedUserId(p.userId);
+                        if (activeNote) {
+                          onSelectNote(activeNote, getCurrentContent);
+                        }
                       }
                     }}
                   >
@@ -157,9 +169,12 @@ export default function CollaboratorsPile({
                 </TooltipTrigger>
                 <TooltipContent side={tooltipSide} className="text-center">
                   <p className="font-medium">{displayName}</p>
-                  {!noteId && noteTitle && (
-                    <p className="text-xs text-muted-foreground">{noteTitle}</p>
-                  )}
+                  <p
+                    className="text-xs font-semibold"
+                    style={{ color: userColor }}
+                  >
+                    {isFollowed ? t("followingTooltip") : t("clickToFollow")}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             );
@@ -189,6 +204,7 @@ export default function CollaboratorsPile({
                     const displayName = p.name ?? t("collaborator");
                     const userColor = getUserColor(p.userId);
                     const textColor = getContrastTextColor(userColor);
+                    const isFollowed = followedUserId === p.userId;
 
                     const userActiveNoteId =
                       p.data &&
@@ -205,10 +221,7 @@ export default function CollaboratorsPile({
                     return (
                       <DropdownMenuItem
                         key={p.userId}
-                        className={cn(
-                          "flex items-center gap-2",
-                          activeNote && "cursor-pointer",
-                        )}
+                        className="flex items-center justify-between gap-2 cursor-pointer"
                         onMouseEnter={() => {
                           if (userActiveNoteId) {
                             setHoveredCollaborator({
@@ -222,31 +235,48 @@ export default function CollaboratorsPile({
                           setHoveredCollaborator(null);
                         }}
                         onClick={() => {
-                          if (activeNote) {
-                            onSelectNote(activeNote);
+                          if (isFollowed) {
+                            setFollowedUserId(null);
+                          } else {
+                            setFollowedUserId(p.userId);
+                            if (activeNote) {
+                              onSelectNote(activeNote, getCurrentContent);
+                            }
                           }
                         }}
                       >
-                        <Avatar size="sm">
-                          <AvatarFallback
-                            style={{
-                              backgroundColor: userColor,
-                              color: textColor,
-                            }}
-                          >
-                            {getInitials(displayName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col min-w-0">
-                          <span className="truncate font-medium">
-                            {displayName}
-                          </span>
-                          {noteTitle && (
-                            <span className="text-xs text-muted-foreground truncate">
-                              {noteTitle}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Avatar size="sm">
+                            <AvatarFallback
+                              style={{
+                                backgroundColor: userColor,
+                                color: textColor,
+                              }}
+                            >
+                              {getInitials(displayName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate font-medium">
+                              {displayName}
                             </span>
-                          )}
+                            {noteTitle && (
+                              <span className="text-xs text-muted-foreground truncate">
+                                {noteTitle}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        <span
+                          className={cn(
+                            "text-xs px-2 py-0.5 rounded-full font-medium ml-2 shrink-0",
+                            isFollowed
+                              ? "bg-accent text-foreground"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {isFollowed ? t("stopFollowing") : t("follow")}
+                        </span>
                       </DropdownMenuItem>
                     );
                   })}
