@@ -125,7 +125,25 @@ export const CollaborativeCursors = Extension.create<
               | RemoteUserCursor[]
               | undefined;
             if (meta !== undefined) {
-              return { users: meta };
+              return {
+                users: meta.map(remoteUser => {
+                  // If the remote user is actively typing and already exists locally with a mapped cursor,
+                  // keep the locally mapped cursor so incoming content steps continue to move the cursor smoothly
+                  // instead of presence snapping it backwards or jumping ahead!
+                  if (remoteUser.isTyping) {
+                    const existing = value.users.find(
+                      u => u.userId === remoteUser.userId,
+                    );
+                    if (existing?.cursor) {
+                      return {
+                        ...remoteUser,
+                        cursor: existing.cursor,
+                      };
+                    }
+                  }
+                  return remoteUser;
+                }),
+              };
             }
             if (tr.docChanged && value.users.length > 0) {
               return {

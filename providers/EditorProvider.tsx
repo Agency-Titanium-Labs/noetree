@@ -171,6 +171,10 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   // Sync active note presence across the tree room
   const isTypingRef = useRef(false);
   const editorRef = useRef<Editor | null>(null);
+  const lastSyncedCursorRef = useRef<{ from: number; to: number } | undefined>(
+    undefined,
+  );
+  const lastDocChangeTimeRef = useRef(0);
 
   const debouncedStopTyping = useDebouncedCallback(() => {
     if (!isTypingRef.current || !treeRoomId) return;
@@ -181,6 +185,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
           to: editorRef.current.state.selection.to,
         }
       : undefined;
+    lastSyncedCursorRef.current = currentCursor;
     void updateCursorMutation({
       roomId: treeRoomId,
       activeNoteId: selectedNote?._id,
@@ -189,27 +194,32 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     });
   }, 1500);
 
-  const handleUserTyping = useCallback(
-    (from: number, to: number) => {
-      if (!treeRoomId || previewRef.current) return;
-      if (!isTypingRef.current) {
-        isTypingRef.current = true;
-        void updateCursorMutation({
-          roomId: treeRoomId,
-          activeNoteId: selectedNote?._id,
-          cursor: { from, to },
-          isTyping: true,
-        });
-      }
-      debouncedStopTyping();
-    },
-    [treeRoomId, selectedNote?._id, updateCursorMutation, debouncedStopTyping],
-  );
+  const handleUserTyping = useCallback(() => {
+    if (!treeRoomId || previewRef.current) return;
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      // Send typing status with the stable pre-edit cursor position that remote peers already have in their doc.
+      // Remote peers will advance the cursor in sync with the incoming content steps to avoid premature line jumps!
+      void updateCursorMutation({
+        roomId: treeRoomId,
+        activeNoteId: selectedNote?._id,
+        cursor: lastSyncedCursorRef.current,
+        isTyping: true,
+      });
+    }
+    debouncedStopTyping();
+  }, [
+    treeRoomId,
+    selectedNote?._id,
+    updateCursorMutation,
+    debouncedStopTyping,
+  ]);
 
   useEffect(() => {
     if (!treeRoomId) return;
     debouncedStopTyping.cancel();
     isTypingRef.current = false;
+    lastSyncedCursorRef.current = undefined;
     void updateCursorMutation({
       roomId: treeRoomId,
       activeNoteId: selectedNote?._id,
@@ -226,11 +236,16 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const debouncedSendCursor = useDebouncedCallback(
     (from: number, to: number) => {
       if (!treeRoomId || previewRef.current) return;
+      // Do not send intermediate cursor positions while actively typing:
+      // prosemirror-sync handles content synchronization, and remote editors map the cursor
+      // automatically as steps arrive to prevent cursor jumps!
+      if (isTypingRef.current) return;
+      lastSyncedCursorRef.current = { from, to };
       void updateCursorMutation({
         roomId: treeRoomId,
         activeNoteId: selectedNote?._id,
         cursor: { from, to },
-        isTyping: isTypingRef.current,
+        isTyping: false,
       });
     },
     150,
@@ -241,6 +256,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     if (!treeRoomId) return;
     debouncedStopTyping.cancel();
     isTypingRef.current = false;
+    lastSyncedCursorRef.current = undefined;
     void updateCursorMutation({
       roomId: treeRoomId,
       activeNoteId: selectedNote?._id,
@@ -293,17 +309,32 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       onSelectionUpdate: ({ editor: ed }) => {
         if (previewRef.current) return;
         const { from, to } = ed.state.selection;
+        // Keep track of the selection so that if the user starts typing, we know the exact edit origin
+        if (!isTypingRef.current) {
+          lastSyncedCursorRef.current = { from, to };
+        }
+        // If selection update happened as part of a document change (typing), don't race presence ahead of sync steps
+        const isTypingEdit = Date.now() - lastDocChangeTimeRef.current < 50;
+        if (isTypingEdit) {
+          return;
+        }
+        // If selection changed without docChanged (arrow keys or mouse click), user moved cursor without typing
+        if (isTypingRef.current) {
+          debouncedStopTyping.cancel();
+          isTypingRef.current = false;
+        }
         debouncedSendCursor(from, to);
       },
       onTransaction: ({ editor: ed, transaction }) => {
-        if (
-          transaction.docChanged &&
-          ed.isFocused &&
-          !previewRef.current &&
-          selectedNote?.role !== "view"
-        ) {
-          const { from, to } = ed.state.selection;
-          handleUserTyping(from, to);
+        if (transaction.docChanged) {
+          lastDocChangeTimeRef.current = Date.now();
+          if (
+            ed.isFocused &&
+            !previewRef.current &&
+            selectedNote?.role !== "view"
+          ) {
+            handleUserTyping();
+          }
         }
       },
       onBlur: () => {

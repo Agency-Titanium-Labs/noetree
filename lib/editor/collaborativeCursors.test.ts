@@ -205,4 +205,68 @@ describe("CollaborativeCursors", () => {
     );
     expect(typingElAfter).toBeNull();
   });
+
+  it("preserves locally mapped cursor when remote user is typing and doc changes arrive", () => {
+    const editor = createEditor("<p>Hello world</p>");
+
+    const initialUsers: RemoteUserCursor[] = [
+      {
+        userId: "user_remote_typing",
+        name: "Alice",
+        color: "#059669",
+        cursor: { from: 5, to: 5 },
+        isTyping: false,
+      },
+    ];
+
+    editor.view.dispatch(
+      editor.state.tr.setMeta(collaborativeCursorsKey, initialUsers),
+    );
+
+    // Document receives content edit (e.g. 5 characters inserted at position 1)
+    editor.view.dispatch(editor.state.tr.insertText("12345", 1));
+
+    // The cursor should have been mapped from 5 to 10
+    const pluginStateAfterDocChange = collaborativeCursorsKey.getState(
+      editor.state,
+    );
+    expect(pluginStateAfterDocChange?.users[0].cursor?.from).toBe(10);
+
+    // If a presence update arrives while Alice is still typing (with her original pre-edit cursor 5),
+    // her cursor should stay mapped at 10 to avoid jumping backwards or ahead of incoming content
+    const typingPresenceUpdate: RemoteUserCursor[] = [
+      {
+        ...initialUsers[0],
+        cursor: { from: 5, to: 5 },
+        isTyping: true,
+      },
+    ];
+
+    editor.view.dispatch(
+      editor.state.tr.setMeta(collaborativeCursorsKey, typingPresenceUpdate),
+    );
+
+    const pluginStateWhileTyping = collaborativeCursorsKey.getState(
+      editor.state,
+    );
+    expect(pluginStateWhileTyping?.users[0].cursor?.from).toBe(10);
+    expect(pluginStateWhileTyping?.users[0].isTyping).toBe(true);
+
+    // When Alice stops typing, the final confirmed cursor is accepted
+    const stoppedTypingUsers: RemoteUserCursor[] = [
+      {
+        ...initialUsers[0],
+        cursor: { from: 10, to: 10 },
+        isTyping: false,
+      },
+    ];
+
+    editor.view.dispatch(
+      editor.state.tr.setMeta(collaborativeCursorsKey, stoppedTypingUsers),
+    );
+
+    const pluginStateAfterStop = collaborativeCursorsKey.getState(editor.state);
+    expect(pluginStateAfterStop?.users[0].cursor?.from).toBe(10);
+    expect(pluginStateAfterStop?.users[0].isTyping).toBe(false);
+  });
 });
