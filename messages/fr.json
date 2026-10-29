@@ -126,7 +126,8 @@
   },
   "SyncStatus": {
     "failedTooltip": "Impossible de synchroniser vos modifications. Vérifiez votre connexion.",
-    "retryTooltip": "Cliquez pour réessayer la synchronisation."
+    "retryTooltip": "Cliquez pour réessayer la synchronisation.",
+    "offlineTooltip": "Connexion perdue. Les modifications locales ne sont plus diffusées."
   },
   "ShareDialog": {
     "title": "Partager la note",

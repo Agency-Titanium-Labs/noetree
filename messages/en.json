@@ -126,7 +126,8 @@
   },
   "SyncStatus": {
     "failedTooltip": "Unable to sync your changes. Check your connection.",
-    "retryTooltip": "Click to retry syncing."
+    "retryTooltip": "Click to retry syncing.",
+    "offlineTooltip": "Connection lost. Local changes are not being broadcast."
   },
   "ShareDialog": {
     "title": "Share note",

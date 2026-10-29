@@ -10,6 +10,8 @@ vi.mock("next-intl", () => ({
       return "Impossible de synchroniser vos modifications. Vérifiez votre connexion.";
     if (key === "retryTooltip")
       return "Cliquez pour réessayer la synchronisation.";
+    if (key === "offlineTooltip")
+      return "Connexion perdue. Les modifications locales ne sont plus diffusées.";
     return key;
   },
 }));
@@ -50,5 +52,16 @@ describe("SyncStatus (Option 1: Silent by default, alert on error)", () => {
 
     fireEvent.click(button);
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders offline indicator when isOffline is true", () => {
+    render(<SyncStatus isOffline={true} />);
+
+    const offlineStatus = screen.getByRole("status");
+    expect(offlineStatus).toBeInTheDocument();
+    expect(offlineStatus).toHaveAttribute(
+      "aria-label",
+      "Connexion perdue. Les modifications locales ne sont plus diffusées.",
+    );
   });
 });

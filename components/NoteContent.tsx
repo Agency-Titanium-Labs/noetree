@@ -22,6 +22,7 @@ import LinkedNotesBlock from "./LinkedNotesBlock";
 import VersionPreviewBanner from "./VersionPreviewBanner";
 import CollaboratorsPile from "./CollaboratorsPile";
 import SyncStatus from "./SyncStatus";
+import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import dynamic from "next/dynamic";
 import {
   ResizableHandle,
@@ -81,6 +82,8 @@ export default function NoteContent() {
     exitPreview,
     isSyncLoading,
   } = useEditorContext();
+
+  const { isDisconnected } = useConnectionStatus();
 
   const searchParams = useSearchParams();
   const params = useParams();
@@ -192,7 +195,11 @@ export default function NoteContent() {
               )}
               <CollaboratorsPile noteId={selectedNote?._id} />
             </div>
-            <SyncStatus status={saveStatus} onRetry={retrySave} />
+            <SyncStatus
+              status={saveStatus}
+              onRetry={retrySave}
+              isOffline={isDisconnected}
+            />
           </>
         </ConditionChecker>
       </div>
