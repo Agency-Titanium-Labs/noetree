@@ -51,7 +51,10 @@ describe("MoreDropdown", () => {
       screen.getByText("Editor.tooltips.horizontalRule"),
     ).toBeInTheDocument();
     expect(screen.getByText("Editor.tooltips.hardBreak")).toBeInTheDocument();
-    expect(screen.getByText("Ctrl+Alt+C")).toBeInTheDocument();
+    const shortcut = screen.getByText("Ctrl+Alt+C");
+    expect(shortcut).toBeInTheDocument();
+    expect(shortcut).toHaveClass("hidden");
+    expect(shortcut).toHaveClass("md:inline-flex");
   });
 
   it("toggles code block when clicked", () => {

@@ -23,6 +23,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useIsMac } from "@/hooks/useIsMac";
+import { cn } from "@/lib/utils";
 
 const HEADING_ICONS = [
   Heading1,
@@ -53,7 +54,10 @@ export default function HeadingDropdown() {
     return <Heading />;
   };
 
-  const shortcutClass = isMac ? "" : "tracking-normal text-xs";
+  const shortcutClass = cn(
+    "hidden md:inline-flex",
+    isMac ? "" : "tracking-normal text-xs",
+  );
 
   return (
     <DropdownMenu>

@@ -49,7 +49,10 @@ describe("ListDropdown", () => {
     expect(screen.getByText("Editor.tooltips.bulletList")).toBeInTheDocument();
     expect(screen.getByText("Editor.tooltips.orderedList")).toBeInTheDocument();
     expect(screen.getByText("Editor.tooltips.blockquote")).toBeInTheDocument();
-    expect(screen.getByText("Ctrl+Shift+8")).toBeInTheDocument();
+    const shortcut = screen.getByText("Ctrl+Shift+8");
+    expect(shortcut).toBeInTheDocument();
+    expect(shortcut).toHaveClass("hidden");
+    expect(shortcut).toHaveClass("md:inline-flex");
   });
 
   it("toggles bullet list when clicked", () => {

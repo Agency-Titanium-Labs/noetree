@@ -19,6 +19,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useIsMac } from "@/hooks/useIsMac";
+import { cn } from "@/lib/utils";
 
 export default function MoreDropdown() {
   const { editor } = useEditorContext();
@@ -28,7 +29,10 @@ export default function MoreDropdown() {
   if (!editor) return null;
 
   const isCodeBlockActive = editor.isActive("codeBlock");
-  const shortcutClass = isMac ? "" : "tracking-normal text-[11px]";
+  const shortcutClass = cn(
+    "hidden md:inline-flex",
+    isMac ? "" : "tracking-normal text-xs",
+  );
 
   return (
     <DropdownMenu>
@@ -64,7 +68,9 @@ export default function MoreDropdown() {
         >
           <Minus />
           <span>{t("tooltips.horizontalRule")}</span>
-          <DropdownMenuShortcut>---</DropdownMenuShortcut>
+          <DropdownMenuShortcut className={shortcutClass}>
+            ---
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => editor.chain().focus().setHardBreak().run()}

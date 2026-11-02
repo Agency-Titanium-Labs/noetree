@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
 import { List, ListOrdered, Quote, ChevronDown } from "lucide-react";
 import { useIsMac } from "@/hooks/useIsMac";
+import { cn } from "@/lib/utils";
 
 export default function ListDropdown() {
   const { editor } = useEditorContext();
@@ -32,7 +33,10 @@ export default function ListDropdown() {
     return <List />;
   };
 
-  const shortcutClass = isMac ? "" : "tracking-normal text-xs";
+  const shortcutClass = cn(
+    "hidden md:inline-flex",
+    isMac ? "" : "tracking-normal text-xs",
+  );
 
   return (
     <DropdownMenu>

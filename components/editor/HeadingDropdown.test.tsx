@@ -53,7 +53,10 @@ describe("HeadingDropdown", () => {
     expect(screen.getByText("Editor.tooltips.heading-4")).toBeInTheDocument();
     expect(screen.getByText("Editor.tooltips.heading-5")).toBeInTheDocument();
     expect(screen.getByText("Editor.tooltips.heading-6")).toBeInTheDocument();
-    expect(screen.getByText("Ctrl+Alt+1")).toBeInTheDocument();
+    const shortcut = screen.getByText("Ctrl+Alt+1");
+    expect(shortcut).toBeInTheDocument();
+    expect(shortcut).toHaveClass("hidden");
+    expect(shortcut).toHaveClass("md:inline-flex");
   });
 
   it("sets heading level when clicked", () => {
