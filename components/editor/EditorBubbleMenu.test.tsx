@@ -90,7 +90,7 @@ describe("EditorBubbleMenu", () => {
     expect(editor?.isActive("italic")).toBe(true);
   });
 
-  it("opens chat when AI button is clicked", () => {
+  it("opens chat and closes bubble menu when AI button is clicked", () => {
     const onOpenChat = vi.fn();
     render(<EditorBubbleMenu onOpenChat={onOpenChat} />);
 
@@ -100,6 +100,7 @@ describe("EditorBubbleMenu", () => {
     fireEvent.click(aiBtn);
 
     expect(onOpenChat).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("bubble-menu")).not.toBeInTheDocument();
   });
 
   it("opens inline link form and sets link on submit", () => {

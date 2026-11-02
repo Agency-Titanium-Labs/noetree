@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type SubmitEvent } from "react";
+import { useEffect, useState, type SubmitEvent } from "react";
 import { useTranslations } from "next-intl";
 import { BubbleMenu } from "@tiptap/react/menus";
 import {
@@ -50,12 +50,24 @@ export default function EditorBubbleMenu({
 }: Readonly<EditorBubbleMenuProps>) {
   const { editor, previewVersion } = useEditorContext();
   const t = useTranslations("Editor");
+  const [isDismissed, setIsDismissed] = useState(false);
   const [headingsOpen, setHeadingsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
 
-  if (!editor) return null;
+  useEffect(() => {
+    if (!editor) return;
+    const handleSelectionUpdate = () => {
+      setIsDismissed(false);
+    };
+    editor.on("selectionUpdate", handleSelectionUpdate);
+    return () => {
+      editor.off("selectionUpdate", handleSelectionUpdate);
+    };
+  }, [editor]);
+
+  if (!editor || isDismissed) return null;
 
   const isAnyMenuOpen = headingsOpen || moreOpen || linkOpen;
 
@@ -116,7 +128,10 @@ export default function EditorBubbleMenu({
             size="sm"
             onPointerDown={e => e.preventDefault()}
             onMouseDown={e => e.preventDefault()}
-            onClick={() => onOpenChat()}
+            onClick={() => {
+              setIsDismissed(true);
+              onOpenChat();
+            }}
             aria-label={t("bubbleMenu.aiAsk")}
           >
             <Sparkles />
