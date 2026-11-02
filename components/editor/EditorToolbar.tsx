@@ -2,7 +2,6 @@
 
 import { Button } from "../ui/button";
 import { Link as LinkIcon, Image as ImageIcon, Check } from "lucide-react";
-import { Separator } from "../ui/separator";
 import { Badge } from "../ui/badge";
 import { Skeleton } from "../ui/skeleton";
 import AiActionsMenu from "./AiActionsMenu";
@@ -17,13 +16,11 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { ToolbarGroup } from "./ToolbarGroup";
-import {
-  formattingItems,
-  headingItems,
-  historyItems,
-  listItems,
-  specialItems,
-} from "./toolbarItems";
+import HeadingDropdown from "./HeadingDropdown";
+import ListDropdown from "./ListDropdown";
+import MoreDropdown from "./MoreDropdown";
+import { ButtonGroup } from "../ui/button-group";
+import { formattingItems, historyItems } from "./toolbarItems";
 import {
   Dialog,
   DialogContent,
@@ -184,42 +181,32 @@ export default function EditorToolbar({
 
   return (
     <TooltipProvider delayDuration={1000}>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <ToolbarGroup items={historyItems} />
 
-        <Separator orientation="vertical" className="h-auto!" />
-
-        <ToolbarGroup items={headingItems} />
-
-        <Separator orientation="vertical" className="h-auto!" />
+        <HeadingDropdown />
 
         <ToolbarGroup items={formattingItems} />
 
-        <Separator orientation="vertical" className="h-auto!" />
+        <ListDropdown />
 
-        <ToolbarGroup items={listItems} />
+        {/* Media elements */}
+        <ButtonGroup>
+          <ToolbarButton
+            onClick={openLinkDialog}
+            active={editor?.isActive("link")}
+            tooltip={t("tooltips.link")}
+            icon={<LinkIcon />}
+          />
+          <ToolbarButton
+            onClick={openImageDialog}
+            tooltip={t("tooltips.image")}
+            icon={<ImageIcon />}
+          />
+        </ButtonGroup>
 
-        <Separator orientation="vertical" className="h-auto!" />
-
-        {/* Special elements group */}
-        <ToolbarGroup items={specialItems} />
-
-        <Separator orientation="vertical" className="h-auto!" />
-
-        {/* Extra features */}
-        <ToolbarButton
-          onClick={openLinkDialog}
-          active={editor?.isActive("link")}
-          tooltip={t("tooltips.link")}
-          icon={<LinkIcon className="h-4 w-4" />}
-        />
-        <ToolbarButton
-          onClick={openImageDialog}
-          tooltip={t("tooltips.image")}
-          icon={<ImageIcon className="h-4 w-4" />}
-        />
-
-        <Separator orientation="vertical" className="h-auto!" />
+        {/* Special elements dropdown */}
+        <MoreDropdown />
 
         {/* AI action + credits balance */}
         <AiActionsMenu
@@ -279,7 +266,7 @@ export default function EditorToolbar({
                 {t("dialogs.cancel")}
               </Button>
               <Button type="button" onClick={insertLink} className="gap-1">
-                <Check className="h-4 w-4" />
+                <Check />
                 {t("dialogs.insertLink")}
               </Button>
             </DialogFooter>
@@ -322,7 +309,7 @@ export default function EditorToolbar({
                 {t("dialogs.cancel")}
               </Button>
               <Button type="button" onClick={insertImage} className="gap-1">
-                <Check className="h-4 w-4" />
+                <Check />
                 {t("dialogs.insertImage")}
               </Button>
             </DialogFooter>
@@ -368,11 +355,11 @@ const ToolbarButton = ({
     <TooltipTrigger asChild>
       <Button
         type="button"
-        size="icon"
+        size="icon-sm"
         variant={active ? "secondary" : "ghost"}
         onClick={onClick}
         disabled={disabled}
-        className="h-8 w-8"
+        aria-label={tooltip}
       >
         {icon}
       </Button>
