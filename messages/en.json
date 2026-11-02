@@ -379,6 +379,14 @@
       "image": "Insert Image",
       "aiAction": "AI actions"
     },
+    "bubbleMenu": {
+      "linkPlaceholder": "Paste or type a link...",
+      "applyLink": "Apply link",
+      "removeLink": "Remove link",
+      "cancel": "Cancel",
+      "aiAsk": "Ask AI",
+      "more": "More formats"
+    },
     "dialogs": {
       "linkTitle": "Insert Link",
       "linkDesc": "Enter the URL and optional link text",

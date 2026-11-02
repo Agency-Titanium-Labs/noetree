@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import EditorToolbar from "./editor/EditorToolbar";
+import EditorBubbleMenu from "./editor/EditorBubbleMenu";
 import { EditorContent } from "@tiptap/react";
 import ConditionChecker from "./helpers/ConditionChecker";
 import { Store, UserPlus } from "lucide-react";
@@ -239,6 +240,17 @@ export default function NoteContent() {
           <ConditionChecker condition={Boolean(selectedNote) && !isSyncLoading}>
             <>
               <VersionPreviewBanner />
+              <EditorBubbleMenu
+                onOpenChat={mode => {
+                  setChatRequest(prev => ({
+                    mode: mode ?? "chat",
+                    seq: prev.seq + 1,
+                  }));
+                  setIsLinksOpen(false);
+                  setLinksRequest(null);
+                  setIsChatOpen(true);
+                }}
+              />
               <div
                 onKeyDown={event => {
                   if (event.key === "Escape" && previewVersion) exitPreview();

@@ -379,6 +379,14 @@
       "image": "Insérer une image",
       "aiAction": "Actions IA"
     },
+    "bubbleMenu": {
+      "linkPlaceholder": "Coller ou saisir un lien...",
+      "applyLink": "Appliquer le lien",
+      "removeLink": "Supprimer le lien",
+      "cancel": "Annuler",
+      "aiAsk": "Demander à l'IA",
+      "more": "Plus de formats"
+    },
     "dialogs": {
       "linkTitle": "Insérer un lien",
       "linkDesc": "Saisissez l'URL et le texte d'affichage facultatif",
