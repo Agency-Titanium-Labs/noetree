@@ -31,6 +31,7 @@ import {
 } from "@/lib/editor/collaborativeCursors";
 import { findNoteInTree } from "@/lib/treeUtils";
 import { Id } from "@/convex/_generated/dataModel";
+import { SlashCommand } from "@/components/editor/slashCommandExtension";
 
 type saveStatusType = "idle" | "unsaved" | "saving" | "success" | "error";
 
@@ -350,6 +351,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
         }),
         Image,
         GhostText.configure(autocomplete),
+        SlashCommand,
       ],
       editorProps: {
         attributes: {

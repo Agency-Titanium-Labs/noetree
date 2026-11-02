@@ -56,6 +56,9 @@ vi.mock("@tiptap/extension-image", () => ({ default: {} }));
 vi.mock("@/lib/editor/ghostText", () => ({
   GhostText: { configure: () => ({}) },
 }));
+vi.mock("@/components/editor/slashCommandExtension", () => ({
+  SlashCommand: {},
+}));
 vi.mock("@/lib/editor/useAutocompleteBridge", () => ({
   useAutocompleteBridge: () => ({ options: {}, enabled: false }),
 }));

@@ -49,6 +49,7 @@
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
+    "@tiptap/suggestion": "^3.32.2",
     "ai": "^7.0.143",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
