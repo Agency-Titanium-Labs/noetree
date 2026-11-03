@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
 import EditorBubbleMenu from "./EditorBubbleMenu";
 
 vi.mock("next-intl", () => ({
@@ -29,7 +31,7 @@ beforeEach(() => {
   previewVersion = null;
   editor = new Editor({
     element: document.createElement("div"),
-    extensions: [StarterKit],
+    extensions: [StarterKit, TaskList, TaskItem],
     content: "<p>Hello world selected text</p>",
   });
   // Select "selected"
@@ -155,5 +157,51 @@ describe("EditorBubbleMenu", () => {
     fireEvent.click(bulletItem);
 
     expect(editor?.isActive("bulletList")).toBe(true);
+  });
+
+  it("highlights active items in the more dropdown", () => {
+    editor?.chain().focus().toggleBlockquote().run();
+    expect(editor?.isActive("blockquote")).toBe(true);
+
+    render(<EditorBubbleMenu />);
+
+    const moreBtn = screen.getByRole("button", {
+      name: "Editor.bubbleMenu.more",
+    });
+    fireEvent.pointerDown(moreBtn, { button: 0, ctrlKey: false });
+    fireEvent.click(moreBtn);
+
+    const quoteItem = screen
+      .getByText("Editor.tooltips.blockquote")
+      .closest('[role="menuitem"]');
+    expect(quoteItem).toHaveClass("bg-accent", "font-medium");
+
+    const codeBlockItem = screen
+      .getByText("Editor.tooltips.codeBlock")
+      .closest('[role="menuitem"]');
+    expect(codeBlockItem).not.toHaveClass("bg-accent");
+  });
+
+  it("highlights active heading in headings dropdown", () => {
+    editor?.chain().focus().toggleHeading({ level: 2 }).run();
+    expect(editor?.isActive("heading", { level: 2 })).toBe(true);
+
+    render(<EditorBubbleMenu />);
+
+    const headingsBtn = screen.getByRole("button", {
+      name: "Editor.tooltips.headings",
+    });
+    fireEvent.pointerDown(headingsBtn, { button: 0, ctrlKey: false });
+    fireEvent.click(headingsBtn);
+
+    const h2Item = screen
+      .getByText("Editor.tooltips.heading-2")
+      .closest('[role="menuitem"]');
+    expect(h2Item).toHaveClass("bg-accent", "font-medium");
+
+    const h1Item = screen
+      .getByText("Editor.tooltips.heading-1")
+      .closest('[role="menuitem"]');
+    expect(h1Item).not.toHaveClass("bg-accent");
   });
 });

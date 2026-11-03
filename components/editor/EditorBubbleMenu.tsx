@@ -97,6 +97,19 @@ export default function EditorBubbleMenu({
   const activeHeading = ([1, 2, 3] as const).find(level =>
     editor.isActive("heading", { level }),
   );
+  const isParagraphActive = editor.isActive("paragraph");
+
+  const isBulletActive = editor.isActive("bulletList");
+  const isOrderedActive = editor.isActive("orderedList");
+  const isTaskActive = editor.isActive("taskList");
+  const isQuoteActive = editor.isActive("blockquote");
+  const isCodeBlockActive = editor.isActive("codeBlock");
+  const isMoreActive =
+    isBulletActive ||
+    isOrderedActive ||
+    isTaskActive ||
+    isQuoteActive ||
+    isCodeBlockActive;
 
   return (
     <BubbleMenu
@@ -167,6 +180,7 @@ export default function EditorBubbleMenu({
             <DropdownMenuItem
               onMouseDown={e => e.preventDefault()}
               onSelect={() => editor.chain().focus().setParagraph().run()}
+              className={isParagraphActive ? "bg-accent font-medium" : ""}
             >
               <Pilcrow />
               <span>{t("tooltips.paragraph")}</span>
@@ -176,6 +190,7 @@ export default function EditorBubbleMenu({
               onSelect={() =>
                 editor.chain().focus().toggleHeading({ level: 1 }).run()
               }
+              className={activeHeading === 1 ? "bg-accent font-medium" : ""}
             >
               <Heading1 />
               <span>{t("tooltips.heading-1")}</span>
@@ -185,6 +200,7 @@ export default function EditorBubbleMenu({
               onSelect={() =>
                 editor.chain().focus().toggleHeading({ level: 2 }).run()
               }
+              className={activeHeading === 2 ? "bg-accent font-medium" : ""}
             >
               <Heading2 />
               <span>{t("tooltips.heading-2")}</span>
@@ -194,6 +210,7 @@ export default function EditorBubbleMenu({
               onSelect={() =>
                 editor.chain().focus().toggleHeading({ level: 3 }).run()
               }
+              className={activeHeading === 3 ? "bg-accent font-medium" : ""}
             >
               <Heading3 />
               <span>{t("tooltips.heading-3")}</span>
@@ -313,7 +330,7 @@ export default function EditorBubbleMenu({
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
-              variant="ghost"
+              variant={isMoreActive ? "secondary" : "ghost"}
               size="icon"
               onMouseDown={e => e.preventDefault()}
               aria-label={t("bubbleMenu.more")}
@@ -328,6 +345,7 @@ export default function EditorBubbleMenu({
             <DropdownMenuItem
               onMouseDown={e => e.preventDefault()}
               onSelect={() => editor.chain().focus().toggleBulletList().run()}
+              className={isBulletActive ? "bg-accent font-medium" : ""}
             >
               <List />
               <span>{t("tooltips.bulletList")}</span>
@@ -335,6 +353,7 @@ export default function EditorBubbleMenu({
             <DropdownMenuItem
               onMouseDown={e => e.preventDefault()}
               onSelect={() => editor.chain().focus().toggleOrderedList().run()}
+              className={isOrderedActive ? "bg-accent font-medium" : ""}
             >
               <ListOrdered />
               <span>{t("tooltips.orderedList")}</span>
@@ -342,6 +361,7 @@ export default function EditorBubbleMenu({
             <DropdownMenuItem
               onMouseDown={e => e.preventDefault()}
               onSelect={() => editor.chain().focus().toggleTaskList().run()}
+              className={isTaskActive ? "bg-accent font-medium" : ""}
             >
               <ListTodo />
               <span>{t("tooltips.taskList")}</span>
@@ -349,6 +369,7 @@ export default function EditorBubbleMenu({
             <DropdownMenuItem
               onMouseDown={e => e.preventDefault()}
               onSelect={() => editor.chain().focus().toggleBlockquote().run()}
+              className={isQuoteActive ? "bg-accent font-medium" : ""}
             >
               <Quote />
               <span>{t("tooltips.blockquote")}</span>
@@ -356,6 +377,7 @@ export default function EditorBubbleMenu({
             <DropdownMenuItem
               onMouseDown={e => e.preventDefault()}
               onSelect={() => editor.chain().focus().toggleCodeBlock().run()}
+              className={isCodeBlockActive ? "bg-accent font-medium" : ""}
             >
               <TerminalSquare />
               <span>{t("tooltips.codeBlock")}</span>
