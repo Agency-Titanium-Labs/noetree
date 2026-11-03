@@ -361,6 +361,8 @@ div:has(> .tiptap) {
 }
 
 .tiptap {
+  accent-color: var(--primary);
+
   /* Placeholder */
   p.is-editor-empty:first-child::before {
     color: var(--color-muted-foreground);
@@ -373,5 +375,33 @@ div:has(> .tiptap) {
   /* Reset all styles */
   *:not(.collaborative-cursor, .collaborative-cursor *) {
     all: revert;
+  }
+
+  /* Task lists */
+  ul[data-type="taskList"] {
+    list-style: none !important;
+    padding: 0 !important;
+    padding-inline-start: 0 !important;
+    margin: 0 !important;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+
+      > div {
+        flex: 1;
+
+        > p {
+          margin: 0;
+        }
+      }
+    }
+
+    input[type="checkbox"] {
+      accent-color: var(--primary);
+      cursor: pointer;
+      margin-top: 0.25rem;
+    }
   }
 }

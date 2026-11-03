@@ -46,6 +46,7 @@ describe("MoreDropdown", () => {
     fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
     fireEvent.click(trigger);
 
+    expect(screen.getByText("Editor.tooltips.blockquote")).toBeInTheDocument();
     expect(screen.getByText("Editor.tooltips.codeBlock")).toBeInTheDocument();
     expect(
       screen.getByText("Editor.tooltips.horizontalRule"),
@@ -55,6 +56,29 @@ describe("MoreDropdown", () => {
     expect(shortcut).toBeInTheDocument();
     expect(shortcut).toHaveClass("hidden");
     expect(shortcut).toHaveClass("md:inline-flex");
+    const quoteShortcut = screen.getByText("Ctrl+Shift+B");
+    expect(quoteShortcut).toBeInTheDocument();
+    expect(quoteShortcut).toHaveClass("hidden");
+    expect(quoteShortcut).toHaveClass("md:inline-flex");
+  });
+
+  it("toggles blockquote when clicked", () => {
+    render(
+      <TooltipProvider>
+        <MoreDropdown />
+      </TooltipProvider>,
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: "Editor.tooltips.insert",
+    });
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+    fireEvent.click(trigger);
+
+    const blockquoteItem = screen.getByText("Editor.tooltips.blockquote");
+    fireEvent.click(blockquoteItem);
+
+    expect(editor?.isActive("blockquote")).toBe(true);
   });
 
   it("toggles code block when clicked", () => {

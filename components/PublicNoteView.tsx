@@ -8,6 +8,8 @@ import { Content, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TiptapLink from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
 import { FileText, Globe } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -89,7 +91,13 @@ function PublicNoteBody({ data }: Readonly<{ data: PublicNoteData }>) {
   }, [commentsParam, focusCommentId]);
 
   const editor = useEditor({
-    extensions: [StarterKit, TiptapLink, Image],
+    extensions: [
+      StarterKit,
+      TiptapLink,
+      Image,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+    ],
     content: safeParse(data.content),
     editable: false,
     immediatelyRender: false,

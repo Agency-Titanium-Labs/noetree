@@ -52,6 +52,10 @@ vi.mock("@tiptap/extension-placeholder", () => ({
 }));
 vi.mock("@tiptap/extension-link", () => ({ default: {} }));
 vi.mock("@tiptap/extension-image", () => ({ default: {} }));
+vi.mock("@tiptap/extension-task-list", () => ({ default: {} }));
+vi.mock("@tiptap/extension-task-item", () => ({
+  default: { configure: () => ({}) },
+}));
 // Phase 21: the ghost-text extension and its Convex bridge have their own tests.
 vi.mock("@/lib/editor/ghostText", () => ({
   GhostText: { configure: () => ({}) },

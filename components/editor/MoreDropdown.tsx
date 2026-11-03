@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
 import {
   TerminalSquare,
+  Quote,
   Minus,
   CornerDownRight,
   MoreHorizontal,
@@ -29,6 +30,8 @@ export default function MoreDropdown() {
   if (!editor) return null;
 
   const isCodeBlockActive = editor.isActive("codeBlock");
+  const isQuoteActive = editor.isActive("blockquote");
+  const isAnyActive = isCodeBlockActive || isQuoteActive;
   const shortcutClass = cn(
     "hidden md:inline-flex",
     isMac ? "" : "tracking-normal text-xs",
@@ -42,7 +45,7 @@ export default function MoreDropdown() {
             <Button
               type="button"
               size="sm"
-              variant={isCodeBlockActive ? "secondary" : "ghost"}
+              variant={isAnyActive ? "secondary" : "ghost"}
               aria-label={t("tooltips.insert")}
             >
               <MoreHorizontal />
@@ -53,6 +56,16 @@ export default function MoreDropdown() {
         <TooltipContent side="bottom">{t("tooltips.insert")}</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="start">
+        <DropdownMenuItem
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+          className={isQuoteActive ? "bg-accent font-medium" : ""}
+        >
+          <Quote />
+          <span>{t("tooltips.blockquote")}</span>
+          <DropdownMenuShortcut className={shortcutClass}>
+            {isMac ? "⇧⌘B" : "Ctrl+Shift+B"}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           className={isCodeBlockActive ? "bg-accent font-medium" : ""}

@@ -18,6 +18,7 @@ import {
   Pilcrow,
   List,
   ListOrdered,
+  ListTodo,
   Quote,
   TerminalSquare,
   MoreHorizontal,
@@ -337,6 +338,13 @@ export default function EditorBubbleMenu({
             >
               <ListOrdered />
               <span>{t("tooltips.orderedList")}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onMouseDown={e => e.preventDefault()}
+              onSelect={() => editor.chain().focus().toggleTaskList().run()}
+            >
+              <ListTodo />
+              <span>{t("tooltips.taskList")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onMouseDown={e => e.preventDefault()}

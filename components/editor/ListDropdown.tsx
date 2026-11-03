@@ -11,7 +11,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
-import { List, ListOrdered, Quote, ChevronDown } from "lucide-react";
+import { List, ListOrdered, ListTodo, ChevronDown } from "lucide-react";
 import { useIsMac } from "@/hooks/useIsMac";
 import { cn } from "@/lib/utils";
 
@@ -24,12 +24,12 @@ export default function ListDropdown() {
 
   const isBulletActive = editor.isActive("bulletList");
   const isOrderedActive = editor.isActive("orderedList");
-  const isQuoteActive = editor.isActive("blockquote");
-  const isAnyActive = isBulletActive || isOrderedActive || isQuoteActive;
+  const isTaskActive = editor.isActive("taskList");
+  const isAnyActive = isBulletActive || isOrderedActive || isTaskActive;
 
   const renderActiveIcon = () => {
     if (isOrderedActive) return <ListOrdered />;
-    if (isQuoteActive) return <Quote />;
+    if (isTaskActive) return <ListTodo />;
     return <List />;
   };
 
@@ -78,13 +78,13 @@ export default function ListDropdown() {
           </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={isQuoteActive ? "bg-accent font-medium" : ""}
+          onClick={() => editor.chain().focus().toggleTaskList().run()}
+          className={isTaskActive ? "bg-accent font-medium" : ""}
         >
-          <Quote />
-          <span>{t("tooltips.blockquote")}</span>
+          <ListTodo />
+          <span>{t("tooltips.taskList")}</span>
           <DropdownMenuShortcut className={shortcutClass}>
-            {isMac ? "⇧⌘B" : "Ctrl+Shift+B"}
+            {isMac ? "⇧⌘9" : "Ctrl+Shift+9"}
           </DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>

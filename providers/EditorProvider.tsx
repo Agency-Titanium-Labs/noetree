@@ -3,6 +3,8 @@ import { Content, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
 import {
   createContext,
   ReactNode,
@@ -350,6 +352,10 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
           placeholder: t("placeholder"),
         }),
         Image,
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+        }),
         GhostText.configure(autocomplete),
         SlashCommand,
       ],

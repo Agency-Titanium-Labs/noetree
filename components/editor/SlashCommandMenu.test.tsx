@@ -141,8 +141,8 @@ describe("SlashCommandMenu", () => {
 });
 
 describe("slashCommandItems", () => {
-  it("has all 21 toolbar actions configured across 5 categories", () => {
-    expect(slashCommandItems).toHaveLength(21);
+  it("has all 22 toolbar actions configured across 5 categories", () => {
+    expect(slashCommandItems).toHaveLength(22);
     for (const item of slashCommandItems) {
       expect(item.id).toBeTruthy();
       expect(item.category).toBeTruthy();
@@ -168,6 +168,9 @@ describe("slashCommandItems", () => {
     ]);
     expect(filter("bullet")).toEqual([
       expect.objectContaining({ id: "bullet-list" }),
+    ]);
+    expect(filter("todo")).toEqual([
+      expect.objectContaining({ id: "task-list" }),
     ]);
     expect(filter("gras")).toEqual([expect.objectContaining({ id: "bold" })]);
     expect(filter("url")).toEqual([expect.objectContaining({ id: "link" })]);
