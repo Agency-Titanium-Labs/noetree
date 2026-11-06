@@ -66,6 +66,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --hljs-comment: #6a737d;
+  --hljs-keyword: #d73a49;
+  --hljs-string: #032f62;
+  --hljs-title: #6f42c1;
+  --hljs-built-in: #005cc5;
+  --hljs-number: #005cc5;
+  --hljs-variable: #e36209;
+  --hljs-attr: #22863a;
 }
 
 /*
@@ -105,6 +113,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --hljs-comment: #8b949e;
+  --hljs-keyword: #ff7b72;
+  --hljs-string: #a5d6ff;
+  --hljs-title: #d2a8ff;
+  --hljs-built-in: #79c0ff;
+  --hljs-number: #79c0ff;
+  --hljs-variable: #ffa657;
+  --hljs-attr: #7ee787;
 }
 
 /*
@@ -373,8 +389,79 @@ div:has(> .tiptap) {
   }
 
   /* Reset all styles */
-  *:not(.collaborative-cursor, .collaborative-cursor *) {
+  *:not(
+    .collaborative-cursor,
+    .collaborative-cursor *,
+    .code-block-wrapper,
+    .code-block-wrapper *
+  ) {
     all: revert;
+  }
+
+  /* Code blocks & syntax highlighting */
+  .code-block-wrapper pre {
+    margin: 0;
+    tab-size: 2;
+  }
+
+  .hljs-comment,
+  .hljs-quote {
+    color: var(--hljs-comment);
+    font-style: italic;
+  }
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-subst {
+    color: var(--hljs-keyword);
+    font-weight: 600;
+  }
+  .hljs-string,
+  .hljs-doctag,
+  .hljs-template-tag,
+  .hljs-template-variable {
+    color: var(--hljs-string);
+  }
+  .hljs-title,
+  .hljs-title.class_,
+  .hljs-title.function_,
+  .hljs-section,
+  .hljs-selector-id {
+    color: var(--hljs-title);
+    font-weight: 600;
+  }
+  .hljs-type,
+  .hljs-built_in,
+  .hljs-builtin-name {
+    color: var(--hljs-built-in);
+  }
+  .hljs-number,
+  .hljs-literal {
+    color: var(--hljs-number);
+  }
+  .hljs-variable,
+  .hljs-params {
+    color: var(--hljs-variable);
+  }
+  .hljs-attr,
+  .hljs-attribute {
+    color: var(--hljs-attr);
+  }
+  .hljs-tag,
+  .hljs-name {
+    color: var(--hljs-keyword);
+  }
+  .hljs-symbol,
+  .hljs-bullet {
+    color: var(--hljs-string);
+  }
+  .hljs-meta {
+    color: var(--hljs-comment);
+  }
+  .hljs-emphasis {
+    font-style: italic;
+  }
+  .hljs-strong {
+    font-weight: bold;
   }
 
   /* Task lists */

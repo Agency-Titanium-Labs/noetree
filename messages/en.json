@@ -388,6 +388,12 @@
       "aiAsk": "Ask AI",
       "more": "More formats"
     },
+    "codeBlock": {
+      "selectLanguage": "Select language",
+      "auto": "Auto",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
     "slashCommands": {
       "noResult": "No commands found",
       "heading": "Basic blocks",

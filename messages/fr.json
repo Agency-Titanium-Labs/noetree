@@ -388,6 +388,12 @@
       "aiAsk": "Demander à l'IA",
       "more": "Plus de formats"
     },
+    "codeBlock": {
+      "selectLanguage": "Sélectionner le langage",
+      "auto": "Auto",
+      "copy": "Copier",
+      "copied": "Copié !"
+    },
     "slashCommands": {
       "noResult": "Aucune commande trouvée",
       "heading": "Blocs de base",

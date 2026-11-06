@@ -46,7 +46,9 @@ vi.mock("@tiptap/react", () => ({
   useEditor: () => h.fake,
 }));
 vi.mock("@tiptap/core", () => ({}));
-vi.mock("@tiptap/starter-kit", () => ({ default: {} }));
+vi.mock("@tiptap/starter-kit", () => ({
+  default: { configure: () => ({}) },
+}));
 vi.mock("@tiptap/extension-placeholder", () => ({
   default: { configure: () => ({}) },
 }));
@@ -55,6 +57,9 @@ vi.mock("@tiptap/extension-image", () => ({ default: {} }));
 vi.mock("@tiptap/extension-task-list", () => ({ default: {} }));
 vi.mock("@tiptap/extension-task-item", () => ({
   default: { configure: () => ({}) },
+}));
+vi.mock("@/components/editor/CodeBlockExtension", () => ({
+  CustomCodeBlockLowlight: {},
 }));
 // Phase 21: the ghost-text extension and its Convex bridge have their own tests.
 vi.mock("@/lib/editor/ghostText", () => ({

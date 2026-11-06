@@ -10,6 +10,7 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
+import { CustomCodeBlockLowlight } from "./editor/CodeBlockExtension";
 import { ConvexError } from "convex/values";
 import { Eye, Pencil } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -94,7 +95,10 @@ function SharedNoteBody({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        codeBlock: false,
+      }),
+      CustomCodeBlockLowlight,
       Link,
       Image,
       TaskList,

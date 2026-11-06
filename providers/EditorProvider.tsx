@@ -5,6 +5,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
+import { CustomCodeBlockLowlight } from "@/components/editor/CodeBlockExtension";
 import {
   createContext,
   ReactNode,
@@ -345,7 +346,10 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     {
       content: initialContent,
       extensions: [
-        StarterKit,
+        StarterKit.configure({
+          codeBlock: false,
+        }),
+        CustomCodeBlockLowlight,
         ...(sync.extension ? [sync.extension] : []),
         CollaborativeCursors,
         Placeholder.configure({

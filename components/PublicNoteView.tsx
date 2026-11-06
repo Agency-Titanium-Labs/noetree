@@ -10,6 +10,7 @@ import TiptapLink from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
+import { CustomCodeBlockLowlight } from "./editor/CodeBlockExtension";
 import { FileText, Globe } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -92,7 +93,10 @@ function PublicNoteBody({ data }: Readonly<{ data: PublicNoteData }>) {
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        codeBlock: false,
+      }),
+      CustomCodeBlockLowlight,
       TiptapLink,
       Image,
       TaskList,
