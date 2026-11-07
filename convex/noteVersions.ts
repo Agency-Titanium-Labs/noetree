@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import {
   QueryCtx,
   internalMutation,
@@ -70,17 +70,31 @@ export const list = query({
       Math.max(1, Number.isFinite(requested) ? requested : DEFAULT_PAGE_SIZE),
     );
 
-    // Date.now() is frozen for the duration of a query run, so the window edge
-    // only advances on the next re-run; get/restore re-check authoritatively.
+    // Free-tier 24h cutoff. The index range is pinned to noteId only so the
+    // query fingerprint remains stable across pagination calls (Date.now()
+    // does not change index bounds, preventing InvalidCursor).
     const { cutoff, isFree } = await getOwnerWindow(ctx, access.note);
+
+    const rawCursor = args.cursor?.trim();
+    const cursor = rawCursor && rawCursor.length > 0 ? rawCursor : null;
 
     const page = await ctx.db
       .query("noteVersions")
-      .withIndex("by_noteId_and_createdAt", q =>
-        q.eq("noteId", args.noteId).gte("createdAt", cutoff),
-      )
+      .withIndex("by_noteId_and_createdAt", q => q.eq("noteId", args.noteId))
       .order("desc")
-      .paginate({ cursor: args.cursor ?? null, numItems });
+      .paginate({ cursor, numItems });
+
+    // Filter out rows older than cutoff for free tier.
+    let crossedCutoff = false;
+    const visibleRows: Doc<"noteVersions">[] = [];
+    for (const row of page.page) {
+      if (row.createdAt >= cutoff) {
+        visibleRows.push(row);
+      } else {
+        crossedCutoff = true;
+        break;
+      }
+    }
 
     // Boolean only: no counts, titles or timestamps for hidden rows (D-07).
     const hidden = isFree
@@ -92,20 +106,41 @@ export const list = query({
           .first()
       : null;
 
+    // If we crossed into hidden territory or page is done, there are no more visible versions.
+    let hasMore = !page.isDone && !crossedCutoff;
+    if (hasMore && isFree) {
+      // Check if the next row in line is already past cutoff to avoid returning an empty next page.
+      const nextRow = await ctx.db
+        .query("noteVersions")
+        .withIndex("by_noteId_and_createdAt", q =>
+          q
+            .eq("noteId", args.noteId)
+            .lt(
+              "createdAt",
+              visibleRows[visibleRows.length - 1]?.createdAt ?? cutoff,
+            ),
+        )
+        .order("desc")
+        .first();
+      if (!nextRow || nextRow.createdAt < cutoff) {
+        hasMore = false;
+      }
+    }
+
     const authorIds: Id<"users">[] = [];
-    for (const row of page.page) {
+    for (const row of visibleRows) {
       if (row.authorId) authorIds.push(row.authorId);
     }
     const authors = await loadAuthors(ctx, authorIds);
 
     return {
-      versions: page.page.map(row => ({
+      versions: visibleRows.map(row => ({
         _id: row._id,
         createdAt: row.createdAt,
         isPreRestore: row.isPreRestore === true,
         author: row.authorId ? (authors.get(row.authorId) ?? null) : null,
       })),
-      hasMore: !page.isDone,
+      hasMore,
       continueCursor: page.continueCursor,
       hasHidden: hidden !== null,
     };

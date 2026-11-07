@@ -15,9 +15,10 @@ vi.mock("next-intl", () => ({
 
 let editor: Editor | null = null;
 let previewVersion: number | null = null;
+const setPendingAnchor = vi.fn();
 
 vi.mock("@/providers/EditorProvider", () => ({
-  useEditorContext: () => ({ editor, previewVersion }),
+  useEditorContext: () => ({ editor, previewVersion, setPendingAnchor }),
 }));
 
 // Mock @tiptap/react/menus BubbleMenu to render children directly for unit tests
@@ -203,5 +204,23 @@ describe("EditorBubbleMenu", () => {
       .getByText("Editor.tooltips.heading-1")
       .closest('[role="menuitem"]');
     expect(h1Item).not.toHaveClass("bg-accent");
+  });
+
+  it("opens comments and captures selection into pendingAnchor when comment button is clicked", () => {
+    const onOpenComments = vi.fn();
+    render(<EditorBubbleMenu onOpenComments={onOpenComments} />);
+
+    const commentBtn = screen.getByRole("button", {
+      name: "Editor.bubbleMenu.comment",
+    });
+    expect(commentBtn).toBeInTheDocument();
+    fireEvent.click(commentBtn);
+
+    expect(setPendingAnchor).toHaveBeenCalledWith({
+      quote: "selected",
+      from: 13,
+      to: 21,
+    });
+    expect(onOpenComments).toHaveBeenCalledTimes(1);
   });
 });

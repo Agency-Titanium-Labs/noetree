@@ -46,6 +46,8 @@ export default function CommentComposer({
   parentId,
   compact = false,
   autoFocus = false,
+  pendingAnchor,
+  onAnchorConsumed,
   onPosted,
   onCancel,
 }: Readonly<{
@@ -53,6 +55,8 @@ export default function CommentComposer({
   parentId?: Id<"comments">;
   compact?: boolean;
   autoFocus?: boolean;
+  pendingAnchor?: { quote: string; from: number; to: number } | null;
+  onAnchorConsumed?: () => void;
   onPosted?: () => void;
   onCancel?: () => void;
 }>) {
@@ -76,8 +80,14 @@ export default function CommentComposer({
     if (!canSubmit) return;
     setPending(true);
     try {
-      await addComment({ target, body, ...(parentId ? { parentId } : {}) });
+      await addComment({
+        target,
+        body,
+        ...(parentId ? { parentId } : {}),
+        ...(!parentId && pendingAnchor ? { anchor: pendingAnchor } : {}),
+      });
       setBody("");
+      onAnchorConsumed?.();
       onPosted?.();
     } catch (err) {
       toast.error(commentErrorMessage(err, t));
@@ -88,11 +98,18 @@ export default function CommentComposer({
 
   return (
     <div className="flex flex-col gap-2">
+      {!parentId && pendingAnchor && (
+        <div className="flex items-start gap-1 rounded border-l-2 border-amber-400 bg-amber-50 px-2 py-1 dark:bg-amber-950/30">
+          <span className="line-clamp-2 text-xs italic text-muted-foreground">
+            &ldquo;{pendingAnchor.quote}&rdquo;
+          </span>
+        </div>
+      )}
       <Textarea
         ref={ref}
         value={body}
         rows={compact ? 2 : 3}
-        autoFocus={autoFocus}
+        autoFocus={autoFocus || Boolean(!parentId && pendingAnchor)}
         placeholder={t("placeholder")}
         aria-label={t("placeholder")}
         className="resize-none overflow-y-auto"

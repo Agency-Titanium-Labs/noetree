@@ -386,7 +386,8 @@
       "removeLink": "Supprimer le lien",
       "cancel": "Annuler",
       "aiAsk": "Demander à l'IA",
-      "more": "Plus de formats"
+      "more": "Plus de formats",
+      "comment": "Commenter la sélection"
     },
     "codeBlock": {
       "selectLanguage": "Sélectionner le langage",
@@ -769,7 +770,8 @@
     "errorTooLong": "Les commentaires sont limités à 2000 caractères. Raccourcissez le vôtre.",
     "errorRateLimited": "Vous commentez trop vite. Patientez une minute puis réessayez.",
     "errorLimit": "Cette note a atteint sa limite de commentaires.",
-    "errorNoAccess": "Vous n'avez plus accès à cette note."
+    "errorNoAccess": "Vous n'avez plus accès à cette note.",
+    "anchorGoTo": "Faire défiler jusqu'au texte surligné"
   },
   "History": {
     "title": "Historique",

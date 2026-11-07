@@ -6,6 +6,7 @@ import Image from "@tiptap/extension-image";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { CustomCodeBlockLowlight } from "@/components/editor/CodeBlockExtension";
+import { CommentHighlighter } from "@/lib/editor/commentHighlighter";
 import {
   createContext,
   ReactNode,
@@ -60,6 +61,12 @@ export type FollowedCollaborator = {
   color: string;
 };
 
+export type PendingCommentAnchor = {
+  quote: string;
+  from: number;
+  to: number;
+};
+
 interface EditorContextType {
   editor: Editor | null;
   saveStatus: saveStatusType;
@@ -76,6 +83,8 @@ interface EditorContextType {
   followedCollaborator: FollowedCollaborator | null;
   retrySave: () => void;
   isSyncLoading?: boolean;
+  pendingAnchor: PendingCommentAnchor | null;
+  setPendingAnchor: (anchor: PendingCommentAnchor | null) => void;
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -94,6 +103,8 @@ const EditorContext = createContext<EditorContextType>({
   followedCollaborator: null,
   retrySave: () => {},
   isSyncLoading: false,
+  pendingAnchor: null,
+  setPendingAnchor: () => {},
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -137,6 +148,8 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const [hoveredCollaborator, setHoveredCollaborator] =
     useState<HoveredCollaborator | null>(null);
   const [followedUserId, setFollowedUserId] = useState<string | null>(null);
+  const [pendingAnchor, setPendingAnchor] =
+    useState<PendingCommentAnchor | null>(null);
 
   const [previewVersion, setPreviewVersion] = useState<PreviewVersion | null>(
     null,
@@ -350,6 +363,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
           codeBlock: false,
         }),
         CustomCodeBlockLowlight,
+        CommentHighlighter,
         ...(sync.extension ? [sync.extension] : []),
         CollaborativeCursors,
         Placeholder.configure({
@@ -658,6 +672,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       // The editor is re-created on note switch, so just drop preview state.
       previewRef.current = null;
       setPreviewVersion(null);
+      setPendingAnchor(null);
       return;
     }
 
@@ -921,6 +936,8 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       followedCollaborator,
       retrySave,
       isSyncLoading,
+      pendingAnchor,
+      setPendingAnchor,
     }),
     [
       editor,
@@ -938,6 +955,8 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       followedCollaborator,
       retrySave,
       isSyncLoading,
+      pendingAnchor,
+      setPendingAnchor,
     ],
   );
 

@@ -421,10 +421,12 @@ describe("api access", () => {
     const id = await as(t, lk).mutation(api.comments.add, {
       target: { kind: "link", token: "tok" },
       body: "y",
+      anchor: { quote: "hello selection", from: 10, to: 25 },
     });
     const row = await t.run(async ctx => await ctx.db.get("comments", id));
     expect(row!.noteId).toBe(noteId);
     expect(row!.noteId).not.toBe(other);
+    expect(row!.anchor).toEqual({ quote: "hello selection", from: 10, to: 25 });
   });
 });
 

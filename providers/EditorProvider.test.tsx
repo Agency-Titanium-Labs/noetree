@@ -45,7 +45,9 @@ const h = vi.hoisted(() => {
 vi.mock("@tiptap/react", () => ({
   useEditor: () => h.fake,
 }));
-vi.mock("@tiptap/core", () => ({}));
+vi.mock("@tiptap/core", () => ({
+  Extension: { create: () => ({}) },
+}));
 vi.mock("@tiptap/starter-kit", () => ({
   default: { configure: () => ({}) },
 }));
@@ -70,6 +72,12 @@ vi.mock("@/components/editor/slashCommandExtension", () => ({
 }));
 vi.mock("@/lib/editor/useAutocompleteBridge", () => ({
   useAutocompleteBridge: () => ({ options: {}, enabled: false }),
+}));
+// Phase 23: CommentHighlighter is a TipTap extension, mocked to a plain object
+// so the EditorProvider tests do not need a full ProseMirror runtime.
+vi.mock("@/lib/editor/commentHighlighter", () => ({
+  CommentHighlighter: {},
+  commentHighlighterKey: { getState: () => null },
 }));
 vi.mock("@convex-dev/prosemirror-sync/tiptap", () => ({
   useTiptapSync: () => ({

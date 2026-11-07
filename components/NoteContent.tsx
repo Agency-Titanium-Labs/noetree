@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import EditorToolbar from "./editor/EditorToolbar";
@@ -82,6 +80,8 @@ export default function NoteContent() {
     previewVersion,
     exitPreview,
     isSyncLoading,
+    pendingAnchor,
+    setPendingAnchor,
   } = useEditorContext();
 
   const { isDisconnected } = useConnectionStatus();
@@ -250,6 +250,9 @@ export default function NoteContent() {
                   setLinksRequest(null);
                   setIsChatOpen(true);
                 }}
+                onOpenComments={
+                  commentsTarget ? () => setIsCommentsOpen(true) : undefined
+                }
               />
               <div
                 onKeyDown={event => {
@@ -282,6 +285,9 @@ export default function NoteContent() {
           open={isCommentsOpen}
           onOpenChange={handleCommentsOpenChange}
           focusCommentId={focusCommentId}
+          editor={editor}
+          pendingAnchor={pendingAnchor}
+          onAnchorConsumed={() => setPendingAnchor(null)}
         />
       )}
       {selectedNote && canViewHistory && (

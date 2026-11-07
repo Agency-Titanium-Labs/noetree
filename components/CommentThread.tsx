@@ -138,12 +138,14 @@ export default function CommentThread({
   canComment,
   showResolved,
   focusCommentId,
+  onScrollToAnchor,
 }: Readonly<{
   target: CommentTarget;
   thread: CommentThreadData;
   canComment: boolean;
   showResolved: boolean;
   focusCommentId?: string | null;
+  onScrollToAnchor?: () => void;
 }>) {
   const t = useTranslations("Comments");
   const locale = useLocale();
@@ -227,6 +229,23 @@ export default function CommentThread({
 
   return (
     <div ref={rootRef} className="flex flex-col gap-2">
+      {thread.anchor && (
+        <button
+          type="button"
+          onClick={onScrollToAnchor}
+          disabled={!onScrollToAnchor}
+          className={cn(
+            "flex items-start gap-1 rounded border-l-2 border-amber-400 bg-amber-50 px-2 py-1 text-left dark:bg-amber-950/30",
+            onScrollToAnchor &&
+              "cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/50",
+          )}
+          aria-label={onScrollToAnchor ? t("anchorGoTo") : undefined}
+        >
+          <span className="line-clamp-2 text-xs italic text-muted-foreground">
+            &ldquo;{thread.anchor.quote}&rdquo;
+          </span>
+        </button>
+      )}
       <CommentItem
         comment={root}
         isRoot

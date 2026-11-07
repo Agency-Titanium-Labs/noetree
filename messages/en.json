@@ -386,7 +386,8 @@
       "removeLink": "Remove link",
       "cancel": "Cancel",
       "aiAsk": "Ask AI",
-      "more": "More formats"
+      "more": "More formats",
+      "comment": "Comment on selection"
     },
     "codeBlock": {
       "selectLanguage": "Select language",
@@ -769,7 +770,8 @@
     "errorTooLong": "Comments can be up to 2000 characters. Shorten yours and try again.",
     "errorRateLimited": "You're commenting too fast. Wait a minute and try again.",
     "errorLimit": "This note has reached its comment limit.",
-    "errorNoAccess": "You no longer have access to this note."
+    "errorNoAccess": "You no longer have access to this note.",
+    "anchorGoTo": "Scroll to highlighted text"
   },
   "History": {
     "title": "History",

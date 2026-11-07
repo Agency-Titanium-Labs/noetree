@@ -317,7 +317,6 @@ export default defineSchema({
     .index("by_noteId", ["noteId"]),
 
   // Comments / notifications invariants (Phase 14):
-  // - Comments are note-level only (no block anchors).
   // - parentId is set only on replies and ALWAYS points at a root comment (D-07).
   // - Thread state (resolvedAt/resolvedBy) lives on the root row only (D-08).
   // - A root with replies is tombstoned via deletedAt with body "" (D-09).
@@ -325,6 +324,10 @@ export default defineSchema({
   //   restored by note snapshot/restore/duplicate/purchase logic, and no
   //   comment field may be added to notes (D-11, COMMENT-04, Phase 15 guardrail).
   // - notifications store kind, not display text (D-13).
+  // - anchor is set only on root comments (not replies) and stores the
+  //   text selection the thread was started from. It is display-only:
+  //   the doc is NEVER modified. Anchors survive note edits via quote
+  //   re-search (Phase 23 inline anchors).
   comments: defineTable({
     noteId: v.id("notes"),
     authorId: v.id("users"),
@@ -333,6 +336,13 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
     resolvedAt: v.optional(v.number()),
     resolvedBy: v.optional(v.id("users")),
+    anchor: v.optional(
+      v.object({
+        quote: v.string(),
+        from: v.number(),
+        to: v.number(),
+      }),
+    ),
   })
     .index("by_noteId", ["noteId"])
     .index("by_parentId", ["parentId"])

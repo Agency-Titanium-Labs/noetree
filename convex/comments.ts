@@ -36,11 +36,18 @@ const commentViewValidator = v.object({
   canDelete: v.boolean(),
 });
 
+const anchorValidator = v.object({
+  quote: v.string(),
+  from: v.number(),
+  to: v.number(),
+});
+
 const threadValidator = v.object({
   root: commentViewValidator,
   replies: v.array(commentViewValidator),
   resolvedAt: v.union(v.number(), v.null()),
   resolvedByName: v.union(v.string(), v.null()),
+  anchor: v.union(anchorValidator, v.null()),
 });
 
 async function loadAuthors(
@@ -114,6 +121,7 @@ export const list = query({
         resolvedByName: root.resolvedBy
           ? (authors.get(root.resolvedBy)?.name ?? null)
           : null,
+        anchor: root.anchor ?? null,
       }));
 
     return {
@@ -156,6 +164,13 @@ export const add = mutation({
     target: targetValidator,
     body: v.string(),
     parentId: v.optional(v.id("comments")),
+    anchor: v.optional(
+      v.object({
+        quote: v.string(),
+        from: v.number(),
+        to: v.number(),
+      }),
+    ),
   },
   returns: v.id("comments"),
   handler: async (ctx, args) => {
@@ -201,11 +216,21 @@ export const add = mutation({
       }
     }
 
+    const anchor =
+      !args.parentId && args.anchor
+        ? {
+            quote: args.anchor.quote.slice(0, 500),
+            from: args.anchor.from,
+            to: args.anchor.to,
+          }
+        : undefined;
+
     const commentId = await ctx.db.insert("comments", {
       noteId: access.noteId,
       authorId: user._id,
       parentId: parent ? parent._id : undefined,
       body,
+      ...(anchor ? { anchor } : {}),
     });
 
     // Fan-out (D-12, D-13): same transaction, deduped per person.

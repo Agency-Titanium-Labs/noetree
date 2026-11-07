@@ -24,6 +24,7 @@ import {
   MoreHorizontal,
   ChevronDown,
   Check,
+  MessageSquarePlus,
 } from "lucide-react";
 import { useEditorContext } from "@/providers/EditorProvider";
 import { Button } from "@/components/ui/button";
@@ -44,12 +45,14 @@ import { Input } from "@/components/ui/input";
 
 interface EditorBubbleMenuProps {
   onOpenChat?: (mode?: "chat" | "tree") => void;
+  onOpenComments?: () => void;
 }
 
 export default function EditorBubbleMenu({
   onOpenChat,
+  onOpenComments,
 }: Readonly<EditorBubbleMenuProps>) {
-  const { editor, previewVersion } = useEditorContext();
+  const { editor, previewVersion, setPendingAnchor } = useEditorContext();
   const t = useTranslations("Editor");
   const [isDismissed, setIsDismissed] = useState(false);
   const [headingsOpen, setHeadingsOpen] = useState(false);
@@ -111,6 +114,23 @@ export default function EditorBubbleMenu({
     isQuoteActive ||
     isCodeBlockActive;
 
+  const handleOpenComment = () => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, " ").trim();
+    if (selectedText) {
+      setPendingAnchor({
+        quote: selectedText.slice(0, 500),
+        from,
+        to,
+      });
+    } else {
+      setPendingAnchor(null);
+    }
+    setIsDismissed(true);
+    onOpenComments?.();
+  };
+
   return (
     <BubbleMenu
       editor={editor}
@@ -150,6 +170,20 @@ export default function EditorBubbleMenu({
           >
             <Sparkles />
             <span className="hidden sm:inline">{t("bubbleMenu.aiAsk")}</span>
+          </Button>
+        )}
+
+        {onOpenComments && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onPointerDown={e => e.preventDefault()}
+            onMouseDown={e => e.preventDefault()}
+            onClick={handleOpenComment}
+            aria-label={t("bubbleMenu.comment")}
+          >
+            <MessageSquarePlus />
           </Button>
         )}
 
