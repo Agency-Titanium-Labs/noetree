@@ -100,6 +100,7 @@ export default function FloatingCommentCard({
 
   const handleReplySubmit = async (e?: FormEvent) => {
     e?.preventDefault();
+    if (root.isDeleted) return;
     const trimmed = replyBody.trim();
     if (!trimmed || isSubmitting) return;
 
@@ -120,7 +121,9 @@ export default function FloatingCommentCard({
 
   const handleDelete = (commentId: typeof root._id) => {
     const isRoot = commentId === root._id;
-    if (isRoot) {
+    const shouldClose =
+      isRoot || (root.isDeleted && visibleReplies.length <= 1);
+    if (shouldClose) {
       onClose();
     } else {
       setHiddenCommentIds(prev => new Set(prev).add(commentId));
@@ -131,7 +134,7 @@ export default function FloatingCommentCard({
         await removeComment({ target, commentId });
       } catch (err) {
         toast.error(commentErrorMessage(err, t));
-        if (!isRoot) {
+        if (!shouldClose) {
           setHiddenCommentIds(prev => {
             const next = new Set(prev);
             next.delete(commentId);
@@ -160,7 +163,7 @@ export default function FloatingCommentCard({
         onClick: () => {
           isUndone = true;
           clearTimeout(timer);
-          if (!isRoot) {
+          if (!shouldClose) {
             setHiddenCommentIds(prev => {
               const next = new Set(prev);
               next.delete(commentId);
@@ -306,7 +309,7 @@ export default function FloatingCommentCard({
           </ItemGroup>
 
           {/* Footer: Quick reply form */}
-          {canComment && (
+          {canComment && !root.isDeleted && (
             <form onSubmit={handleReplySubmit} onKeyDown={handleKeyDown}>
               <ButtonGroup className="w-full">
                 <Input

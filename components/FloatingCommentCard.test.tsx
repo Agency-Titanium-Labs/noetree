@@ -304,5 +304,8 @@ describe("FloatingCommentCard", () => {
     expect(
       screen.queryByRole("button", { name: "deleteAction" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("replyPlaceholder"),
+    ).not.toBeInTheDocument();
   });
 });
