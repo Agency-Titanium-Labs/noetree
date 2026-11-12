@@ -376,8 +376,13 @@ div:has(> .tiptap) {
   display: flex;
 }
 
-.tiptap {
+.tiptap,
+.ProseMirror {
   accent-color: var(--primary);
+
+  @-moz-document url-prefix() {
+    outline: none;
+  }
 
   /* Placeholder */
   p.is-editor-empty:first-child::before {
