@@ -19,7 +19,7 @@ import {
   List,
   ListOrdered,
   ListTodo,
-  Quote,
+  Quote as QuoteIcon,
   TerminalSquare,
   MoreHorizontal,
   ChevronDown,
@@ -42,15 +42,27 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Field, FieldGroup } from "@/components/ui/field";
+import { Quote, QuoteContent } from "@/components/ui/custom/quote";
+import { useSafeConvexMutation } from "@/hooks/useSafeConvexMutation";
+import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
+import type { CommentTarget } from "@/components/CommentComposer";
+import { commentErrorMessage } from "@/components/CommentComposer";
 
 interface EditorBubbleMenuProps {
   onOpenChat?: (mode?: "chat" | "tree") => void;
   onOpenComments?: () => void;
+  commentsTarget?: CommentTarget | null;
+  canComment?: boolean;
 }
 
 export default function EditorBubbleMenu({
   onOpenChat,
   onOpenComments,
+  commentsTarget,
+  canComment = false,
 }: Readonly<EditorBubbleMenuProps>) {
   const { editor, previewVersion, setPendingAnchor } = useEditorContext();
   const t = useTranslations("Editor");
@@ -59,6 +71,15 @@ export default function EditorBubbleMenu({
   const [moreOpen, setMoreOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentQuote, setCommentQuote] = useState("");
+  const [selectionRange, setSelectionRange] = useState<{
+    from: number;
+    to: number;
+  }>({ from: 0, to: 0 });
+  const [commentBody, setCommentBody] = useState("");
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const addComment = useSafeConvexMutation(api.comments.add);
 
   useEffect(() => {
     if (!editor) return;
@@ -73,7 +94,43 @@ export default function EditorBubbleMenu({
 
   if (!editor || isDismissed) return null;
 
-  const isAnyMenuOpen = headingsOpen || moreOpen || linkOpen;
+  const isAnyMenuOpen = headingsOpen || moreOpen || linkOpen || commentOpen;
+
+  const handleOpenCommentPopover = (open: boolean) => {
+    setCommentOpen(open);
+    if (open && editor) {
+      const { from, to } = editor.state.selection;
+      const selectedText = editor.state.doc.textBetween(from, to, " ").trim();
+      setCommentQuote(selectedText.slice(0, 500));
+      setSelectionRange({ from, to });
+      setCommentBody("");
+    }
+  };
+
+  const handleCreateComment = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!commentsTarget || !commentBody.trim() || isSubmittingComment) return;
+
+    setIsSubmittingComment(true);
+    try {
+      await addComment({
+        target: commentsTarget,
+        body: commentBody.trim(),
+        anchor: {
+          quote: commentQuote,
+          from: selectionRange.from,
+          to: selectionRange.to,
+        },
+      });
+      setCommentOpen(false);
+      setCommentBody("");
+      setIsDismissed(true);
+    } catch (err) {
+      toast.error(commentErrorMessage(err, t));
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
 
   const handleApplyLink = (e: SubmitEvent) => {
     e.preventDefault();
@@ -173,7 +230,74 @@ export default function EditorBubbleMenu({
           </Button>
         )}
 
-        {onOpenComments && (
+        {commentsTarget && canComment ? (
+          <Popover
+            modal={false}
+            open={commentOpen}
+            onOpenChange={handleOpenCommentPopover}
+          >
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant={commentOpen ? "secondary" : "ghost"}
+                size="icon"
+                onMouseDown={e => e.preventDefault()}
+                aria-label={t("bubbleMenu.comment")}
+              >
+                <MessageSquarePlus />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-80"
+              align="start"
+              onCloseAutoFocus={e => e.preventDefault()}
+            >
+              <form
+                onSubmit={handleCreateComment}
+                onKeyDown={e => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.requestSubmit();
+                  }
+                }}
+              >
+                <FieldGroup className="gap-4">
+                  {commentQuote && (
+                    <Quote variant="amber" size="sm">
+                      <QuoteContent className="line-clamp-2">
+                        &ldquo;{commentQuote}&rdquo;
+                      </QuoteContent>
+                    </Quote>
+                  )}
+                  <Textarea
+                    value={commentBody}
+                    onChange={e => setCommentBody(e.target.value)}
+                    placeholder={t("bubbleMenu.commentPlaceholder")}
+                    rows={2}
+                    autoFocus
+                  />
+                  <Field orientation="horizontal" className="justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCommentOpen(false)}
+                    >
+                      {t("bubbleMenu.cancel")}
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={!commentBody.trim() || isSubmittingComment}
+                    >
+                      {t("bubbleMenu.commentPost")}
+                    </Button>
+                  </Field>
+                </FieldGroup>
+              </form>
+            </PopoverContent>
+          </Popover>
+        ) : onOpenComments ? (
           <Button
             type="button"
             variant="ghost"
@@ -185,7 +309,7 @@ export default function EditorBubbleMenu({
           >
             <MessageSquarePlus />
           </Button>
-        )}
+        ) : null}
 
         <DropdownMenu
           modal={false}
@@ -405,7 +529,7 @@ export default function EditorBubbleMenu({
               onSelect={() => editor.chain().focus().toggleBlockquote().run()}
               className={isQuoteActive ? "bg-accent font-medium" : ""}
             >
-              <Quote />
+              <QuoteIcon />
               <span>{t("tooltips.blockquote")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem

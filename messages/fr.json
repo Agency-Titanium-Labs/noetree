@@ -387,7 +387,9 @@
       "cancel": "Annuler",
       "aiAsk": "Demander à l'IA",
       "more": "Plus de formats",
-      "comment": "Commenter la sélection"
+      "comment": "Commenter la sélection",
+      "commentPlaceholder": "Ajouter un commentaire...",
+      "commentPost": "Commenter"
     },
     "codeBlock": {
       "selectLanguage": "Sélectionner le langage",
@@ -771,7 +773,10 @@
     "errorRateLimited": "Vous commentez trop vite. Patientez une minute puis réessayez.",
     "errorLimit": "Cette note a atteint sa limite de commentaires.",
     "errorNoAccess": "Vous n'avez plus accès à cette note.",
-    "anchorGoTo": "Faire défiler jusqu'au texte surligné"
+    "anchorGoTo": "Faire défiler jusqu'au texte surligné",
+    "replyPlaceholder": "Répondre...",
+    "close": "Fermer",
+    "deletedSuccess": "Commentaire supprimé"
   },
   "History": {
     "title": "Historique",

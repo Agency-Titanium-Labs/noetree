@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Quote, QuoteContent } from "@/components/ui/custom/quote";
 import { api } from "@/convex/_generated/api";
 import { getInitials } from "@/lib/initials";
 import { formatFullDate, formatRelativeTime } from "@/lib/relativeTime";
@@ -113,7 +114,7 @@ function CommentItem({
                     {t("resolve")}
                   </Button>
                 )}
-                {comment.canDelete && (
+                {comment.isMine && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -230,21 +231,27 @@ export default function CommentThread({
   return (
     <div ref={rootRef} className="flex flex-col gap-2">
       {thread.anchor && (
-        <button
-          type="button"
-          onClick={onScrollToAnchor}
-          disabled={!onScrollToAnchor}
+        <Quote
+          asChild
+          variant="amber"
+          size="sm"
           className={cn(
-            "flex items-start gap-1 rounded border-l-2 border-amber-400 bg-amber-50 px-2 py-1 text-left dark:bg-amber-950/30",
+            "text-left",
             onScrollToAnchor &&
               "cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/50",
           )}
-          aria-label={onScrollToAnchor ? t("anchorGoTo") : undefined}
         >
-          <span className="line-clamp-2 text-xs italic text-muted-foreground">
-            &ldquo;{thread.anchor.quote}&rdquo;
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={onScrollToAnchor}
+            disabled={!onScrollToAnchor}
+            aria-label={onScrollToAnchor ? t("anchorGoTo") : undefined}
+          >
+            <QuoteContent className="line-clamp-2">
+              &ldquo;{thread.anchor.quote}&rdquo;
+            </QuoteContent>
+          </button>
+        </Quote>
       )}
       <CommentItem
         comment={root}

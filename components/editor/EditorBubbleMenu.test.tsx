@@ -13,6 +13,11 @@ vi.mock("next-intl", () => ({
   useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
 }));
 
+const mockAddComment = vi.fn().mockResolvedValue(null);
+vi.mock("@convex-dev/react-query", () => ({
+  useConvexMutation: () => mockAddComment,
+}));
+
 let editor: Editor | null = null;
 let previewVersion: number | null = null;
 const setPendingAnchor = vi.fn();
@@ -222,5 +227,69 @@ describe("EditorBubbleMenu", () => {
       to: 21,
     });
     expect(onOpenComments).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens inline comment popover and posts comment with anchor when commentsTarget is provided", async () => {
+    const commentsTarget = { kind: "note" as const, noteId: "n1" as never };
+    render(
+      <EditorBubbleMenu commentsTarget={commentsTarget} canComment={true} />,
+    );
+
+    const commentBtn = screen.getByRole("button", {
+      name: "Editor.bubbleMenu.comment",
+    });
+    fireEvent.click(commentBtn);
+
+    const quoteSnippet = screen.getByText(/selected/);
+    expect(quoteSnippet).toBeInTheDocument();
+
+    const textarea = screen.getByPlaceholderText(
+      "Editor.bubbleMenu.commentPlaceholder",
+    );
+    fireEvent.change(textarea, { target: { value: "My inline thoughts" } });
+
+    const submitBtn = screen.getByRole("button", {
+      name: "Editor.bubbleMenu.commentPost",
+    });
+    fireEvent.click(submitBtn);
+
+    expect(mockAddComment).toHaveBeenCalledWith({
+      target: commentsTarget,
+      body: "My inline thoughts",
+      anchor: {
+        quote: "selected",
+        from: 13,
+        to: 21,
+      },
+    });
+  });
+
+  it("submits inline comment form on Cmd+Enter / Ctrl+Enter from textarea", async () => {
+    const commentsTarget = { kind: "note" as const, noteId: "n1" as never };
+    render(
+      <EditorBubbleMenu commentsTarget={commentsTarget} canComment={true} />,
+    );
+
+    const commentBtn = screen.getByRole("button", {
+      name: "Editor.bubbleMenu.comment",
+    });
+    fireEvent.click(commentBtn);
+
+    const textarea = screen.getByPlaceholderText(
+      "Editor.bubbleMenu.commentPlaceholder",
+    );
+    fireEvent.change(textarea, { target: { value: "Shortcut submit" } });
+
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
+
+    expect(mockAddComment).toHaveBeenCalledWith({
+      target: commentsTarget,
+      body: "Shortcut submit",
+      anchor: {
+        quote: "selected",
+        from: 13,
+        to: 21,
+      },
+    });
   });
 });

@@ -15,6 +15,7 @@ import ShareDialog from "./ShareDialog";
 import ListingFormDialog from "./ListingFormDialog";
 import CommentsButton from "./CommentsButton";
 import CommentsPanel from "./CommentsPanel";
+import FloatingCommentCard from "@/components/FloatingCommentCard";
 import HistoryButton from "./HistoryButton";
 import HistoryPanel from "./HistoryPanel";
 import LinkedNotesBlock from "./LinkedNotesBlock";
@@ -22,6 +23,8 @@ import VersionPreviewBanner from "./VersionPreviewBanner";
 import CollaboratorsPile from "./CollaboratorsPile";
 import SyncStatus from "./SyncStatus";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { useNoteCommentsQuery } from "@/hooks/useNoteCommentsQuery";
+import { useCommentAnchors } from "@/hooks/useCommentAnchors";
 import dynamic from "next/dynamic";
 import {
   ResizableHandle,
@@ -134,6 +137,57 @@ export default function NoteContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedNote?._id],
   );
+
+  const { data: commentsData } = useNoteCommentsQuery(commentsTarget);
+  const canComment = Boolean(commentsData?.canComment);
+
+  const [activeHighlightEl, setActiveHighlightEl] =
+    useState<HTMLElement | null>(null);
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveHighlightEl(null);
+    setActiveCommentId(null);
+  }, [selectedNote?._id]);
+
+  // Sync comment anchor decorations into the editor continuously.
+  useCommentAnchors(
+    editor,
+    commentsData?.threads,
+    focusCommentId ?? activeCommentId,
+  );
+
+  const activeThread = useMemo(() => {
+    if (!activeCommentId || !commentsData?.threads) return null;
+    return (
+      commentsData.threads.find(
+        th => th.root._id === activeCommentId && th.resolvedAt === null,
+      ) ?? null
+    );
+  }, [activeCommentId, commentsData?.threads]);
+
+  const virtualRef = useMemo(
+    () => ({
+      current: {
+        getBoundingClientRect: () =>
+          activeHighlightEl?.getBoundingClientRect() ?? new DOMRect(),
+      },
+    }),
+    [activeHighlightEl],
+  );
+
+  const handleEditorContainerClick = (e: React.MouseEvent) => {
+    const target = (e.target as HTMLElement).closest(
+      ".comment-highlight",
+    ) as HTMLElement | null;
+    if (target) {
+      const commentId = target.getAttribute("data-comment-id");
+      if (commentId) {
+        setActiveHighlightEl(target);
+        setActiveCommentId(commentId);
+      }
+    }
+  };
 
   const handleCommentsOpenChange = useCallback(
     (open: boolean) => {
@@ -253,11 +307,14 @@ export default function NoteContent() {
                 onOpenComments={
                   commentsTarget ? () => setIsCommentsOpen(true) : undefined
                 }
+                commentsTarget={commentsTarget}
+                canComment={canComment}
               />
               <div
                 onKeyDown={event => {
                   if (event.key === "Escape" && previewVersion) exitPreview();
                 }}
+                onClick={handleEditorContainerClick}
                 className="flex flex-1"
               >
                 <EditorContent editor={editor} />
@@ -277,6 +334,19 @@ export default function NoteContent() {
           noteId={selectedNote._id}
           open={isShareOpen}
           onOpenChange={setIsShareOpen}
+        />
+      )}
+      {activeThread && commentsTarget && (
+        <FloatingCommentCard
+          target={commentsTarget}
+          thread={activeThread}
+          canComment={canComment}
+          isOpen={Boolean(activeThread && activeHighlightEl)}
+          virtualRef={virtualRef}
+          onClose={() => {
+            setActiveHighlightEl(null);
+            setActiveCommentId(null);
+          }}
         />
       )}
       {commentsTarget && (

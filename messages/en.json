@@ -387,7 +387,9 @@
       "cancel": "Cancel",
       "aiAsk": "Ask AI",
       "more": "More formats",
-      "comment": "Comment on selection"
+      "comment": "Comment on selection",
+      "commentPlaceholder": "Add a comment...",
+      "commentPost": "Comment"
     },
     "codeBlock": {
       "selectLanguage": "Select language",
@@ -771,7 +773,10 @@
     "errorRateLimited": "You're commenting too fast. Wait a minute and try again.",
     "errorLimit": "This note has reached its comment limit.",
     "errorNoAccess": "You no longer have access to this note.",
-    "anchorGoTo": "Scroll to highlighted text"
+    "anchorGoTo": "Scroll to highlighted text",
+    "replyPlaceholder": "Reply...",
+    "close": "Close",
+    "deletedSuccess": "Comment deleted"
   },
   "History": {
     "title": "History",
