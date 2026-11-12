@@ -206,6 +206,12 @@ export default function NoteContent() {
     [tree, onSelectNote, getCurrentContent],
   );
 
+  const isEditable =
+    Boolean(selectedNote) &&
+    selectedNote?.role !== "view" &&
+    !previewVersion &&
+    !isSyncLoading;
+
   const content = (
     <div className="min-h-full flex flex-col gap-2">
       <div className="flex items-center gap-4">
@@ -260,28 +266,30 @@ export default function NoteContent() {
       </div>
       <div className="grow flex flex-col gap-4">
         <div className="flex flex-col gap-2 grow">
-          <EditorToolbar
-            onOpenChat={mode => {
-              setChatRequest(prev => ({
-                mode: mode ?? "chat",
-                seq: prev.seq + 1,
-              }));
-              setIsLinksOpen(false);
-              setLinksRequest(null);
-              setIsChatOpen(true);
-            }}
-            onOpenLinks={() => {
-              // The chat is NOT closed: it stays mounted (hidden) so an
-              // unapplied, already charged proposal survives (review M3).
-              if (selectedNote) {
-                setLinksRequest(prev => ({
-                  noteId: selectedNote._id,
-                  seq: (prev?.seq ?? 0) + 1,
+          <ConditionChecker condition={isEditable}>
+            <EditorToolbar
+              onOpenChat={mode => {
+                setChatRequest(prev => ({
+                  mode: mode ?? "chat",
+                  seq: prev.seq + 1,
                 }));
-              }
-              setIsLinksOpen(true);
-            }}
-          />
+                setIsLinksOpen(false);
+                setLinksRequest(null);
+                setIsChatOpen(true);
+              }}
+              onOpenLinks={() => {
+                // The chat is NOT closed: it stays mounted (hidden) so an
+                // unapplied, already charged proposal survives (review M3).
+                if (selectedNote) {
+                  setLinksRequest(prev => ({
+                    noteId: selectedNote._id,
+                    seq: (prev?.seq ?? 0) + 1,
+                  }));
+                }
+                setIsLinksOpen(true);
+              }}
+            />
+          </ConditionChecker>
           <ConditionChecker condition={!selectedNote || Boolean(isSyncLoading)}>
             <div className="flex-1 p-4 flex flex-col gap-4 border rounded-md">
               <Skeleton className="w-56 h-8 mt-4" />

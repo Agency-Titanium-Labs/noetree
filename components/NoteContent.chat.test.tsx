@@ -167,4 +167,10 @@ describe("NoteContent chat is bound to its note (M2)", () => {
     // remounted: the previous note's conversation state is gone
     expect(screen.getByTestId("chat-draft")).toHaveValue("");
   });
+
+  it("does not render the EditorToolbar when the note is read-only (role === 'view')", () => {
+    tree.selectedNote = { _id: "n2", title: "Read Only", role: "view" };
+    render(<NoteContent />);
+    expect(screen.queryByTestId("open-chat")).toBeNull();
+  });
 });

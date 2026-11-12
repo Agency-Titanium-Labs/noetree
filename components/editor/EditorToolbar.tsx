@@ -50,7 +50,7 @@ export default function EditorToolbar({
 }: EditorToolbarProps = {}) {
   const t = useTranslations("Editor");
   const tCredits = useTranslations("AiCredits");
-  const { editor } = useEditorContext();
+  const { editor, previewVersion } = useEditorContext();
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
@@ -103,7 +103,7 @@ export default function EditorToolbar({
     toast.info(tCredits("comingSoon"));
   };
 
-  if (!editor || !editor.isEditable) return null;
+  if (!editor || !editor.isEditable || Boolean(previewVersion)) return null;
 
   const openLinkDialog = () => {
     if (!editor) return;

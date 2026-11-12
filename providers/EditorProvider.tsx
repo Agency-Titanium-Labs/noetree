@@ -358,6 +358,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const editor = useEditor(
     {
       content: initialContent,
+      editable: selectedNote
+        ? selectedNote.role !== "view" && !previewVersion
+        : false,
       extensions: [
         StarterKit.configure({
           codeBlock: false,
