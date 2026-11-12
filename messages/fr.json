@@ -207,6 +207,7 @@
     "upgradeCta": "Passer à Premium",
     "dismiss": "Plus tard",
     "badgeTooltip": "{count, plural, =0 {0 crédit IA restant} one {# crédit IA restant} other {# crédits IA restants}}",
+    "badge": "{count, plural, =0 {0 crédit IA} one {# crédit IA} other {# crédits IA}}",
     "menuAria": "Actions IA",
     "actions": {
       "basic": "Générer une suggestion",

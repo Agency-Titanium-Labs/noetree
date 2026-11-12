@@ -2,8 +2,6 @@
 
 import { Button } from "../ui/button";
 import { Link as LinkIcon, Image as ImageIcon, Check } from "lucide-react";
-import { Badge } from "../ui/badge";
-import { Skeleton } from "../ui/skeleton";
 import AiActionsMenu from "./AiActionsMenu";
 import { toast } from "sonner";
 import { ACTIONS, type ActionKey } from "@/convex/helpers/creditCatalog";
@@ -208,7 +206,7 @@ export default function EditorToolbar({
         {/* Special elements dropdown */}
         <MoreDropdown />
 
-        {/* AI action + credits balance */}
+        {/* AI action */}
         <AiActionsMenu
           balance={total}
           pending={false}
@@ -216,16 +214,6 @@ export default function EditorToolbar({
           tier={tier}
           aiEnabled={aiEnabled}
         />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Badge variant="secondary">
-              {total === undefined ? <Skeleton className="h-5 w-6" /> : total}
-            </Badge>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {tCredits("badgeTooltip", { count: total ?? 0 })}
-          </TooltipContent>
-        </Tooltip>
 
         {/* Phase 21: Premium ghost-text autocomplete toggle */}
         <AutocompleteToggle />

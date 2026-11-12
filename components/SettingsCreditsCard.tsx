@@ -37,7 +37,7 @@ export default function SettingsCreditsCard() {
       : null;
 
   return (
-    <Card>
+    <Card id="credits">
       <CardHeader>
         <CardTitle className="text-xl font-semibold">
           {t("creditsCardTitle")}
