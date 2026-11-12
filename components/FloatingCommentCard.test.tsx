@@ -276,6 +276,152 @@ describe("FloatingCommentCard", () => {
     );
   });
 
+  it("deletes a reply, calls removeComment, and calls restoreComment with parentId on undo", async () => {
+    const thread: CommentThreadData = {
+      root: {
+        _id: "c-root" as never,
+        _creationTime: 100000,
+        body: "Root comment text",
+        isDeleted: false,
+        author: { name: "Alice", avatarUrl: null },
+        isMine: false,
+        canDelete: false,
+      },
+      replies: [
+        {
+          _id: "c-reply" as never,
+          _creationTime: 110000,
+          body: "Reply comment text",
+          isDeleted: false,
+          author: { name: "Bob", avatarUrl: null },
+          isMine: true,
+          canDelete: true,
+        },
+      ],
+      resolvedAt: null,
+      resolvedByName: null,
+      anchor: null,
+    };
+    const onClose = vi.fn();
+    render(
+      <FloatingCommentCard
+        target={target}
+        thread={thread}
+        canComment={true}
+        isOpen={true}
+        virtualRef={virtualRef}
+        onClose={onClose}
+      />,
+    );
+
+    const deleteBtn = screen.getByRole("button", { name: "deleteAction" });
+    fireEvent.click(deleteBtn);
+
+    expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockRemove).toHaveBeenCalledWith({
+        target,
+        commentId: "c-reply",
+      });
+      expect(toast).toHaveBeenCalledWith(
+        "deletedSuccess",
+        expect.objectContaining({
+          action: expect.objectContaining({
+            label: "undo",
+            onClick: expect.any(Function),
+          }),
+        }),
+      );
+    });
+
+    // Trigger the undo action callback directly
+    const toastCall = vi
+      .mocked(toast)
+      .mock.calls.find(c => c[0] === "deletedSuccess");
+    const undoAction = (
+      toastCall?.[1] as { action?: { onClick?: () => Promise<void> } }
+    )?.action;
+    await undoAction?.onClick?.();
+
+    // Ensure mockRestore is called with parentId
+    expect(mockRestore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target,
+        commentId: "c-reply",
+        body: "Reply comment text",
+        parentId: "c-root",
+      }),
+    );
+  });
+
+  it("deletes the last reply under a deleted root, closes card, and passes thread anchor to restoreComment on undo", async () => {
+    const thread: CommentThreadData = {
+      root: {
+        _id: "c-root" as never,
+        _creationTime: 100000,
+        body: "",
+        isDeleted: true,
+        author: null,
+        isMine: false,
+        canDelete: false,
+      },
+      replies: [
+        {
+          _id: "c-reply" as never,
+          _creationTime: 110000,
+          body: "Last reply text",
+          isDeleted: false,
+          author: { name: "Bob", avatarUrl: null },
+          isMine: true,
+          canDelete: true,
+        },
+      ],
+      resolvedAt: null,
+      resolvedByName: null,
+      anchor: { quote: "highlighted text", from: 0, to: 16 },
+    };
+    const onClose = vi.fn();
+    render(
+      <FloatingCommentCard
+        target={target}
+        thread={thread}
+        canComment={true}
+        isOpen={true}
+        virtualRef={virtualRef}
+        onClose={onClose}
+      />,
+    );
+
+    const deleteBtn = screen.getByRole("button", { name: "deleteAction" });
+    fireEvent.click(deleteBtn);
+
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockRemove).toHaveBeenCalledWith({
+        target,
+        commentId: "c-reply",
+      });
+    });
+
+    const toastCall = vi
+      .mocked(toast)
+      .mock.calls.find(c => c[0] === "deletedSuccess");
+    const undoAction = (
+      toastCall?.[1] as { action?: { onClick?: () => Promise<void> } }
+    )?.action;
+    await undoAction?.onClick?.();
+
+    expect(mockRestore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target,
+        commentId: "c-reply",
+        body: "Last reply text",
+        parentId: "c-root",
+        anchor: { quote: "highlighted text", from: 0, to: 16 },
+      }),
+    );
+  });
+
   it("does not show delete button on comments authored by others (isMine: false)", () => {
     const thread = makeThread({ canDeleteRoot: true });
     thread.root.isMine = false;

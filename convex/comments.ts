@@ -377,12 +377,29 @@ export const restore = mutation({
         return existing._id;
       }
     }
+
+    let parentId = args.parentId;
+    if (parentId) {
+      const parent = await ctx.db.get("comments", parentId);
+      if (!parent) {
+        // Parent root was a tombstone deleted when its last reply was removed.
+        // Re-create the tombstone root so the reply is attached to a valid thread.
+        parentId = await ctx.db.insert("comments", {
+          noteId: access.noteId,
+          authorId: access.user._id,
+          body: "",
+          deletedAt: Date.now(),
+          ...(args.anchor ? { anchor: args.anchor } : {}),
+        });
+      }
+    }
+
     return await ctx.db.insert("comments", {
       noteId: access.noteId,
       authorId: access.user._id,
-      parentId: args.parentId,
+      parentId,
       body: args.body,
-      ...(args.anchor ? { anchor: args.anchor } : {}),
+      ...(args.anchor && !parentId ? { anchor: args.anchor } : {}),
     });
   },
 });

@@ -158,14 +158,13 @@ export default function FloatingCommentCard({
               commentId,
               body: commentToDelete.body,
               parentId: isRoot ? undefined : root._id,
-              anchor:
-                isRoot && thread.anchor
-                  ? {
-                      quote: thread.anchor.quote,
-                      from: thread.anchor.from,
-                      to: thread.anchor.to,
-                    }
-                  : undefined,
+              anchor: thread.anchor
+                ? {
+                    quote: thread.anchor.quote,
+                    from: thread.anchor.from,
+                    to: thread.anchor.to,
+                  }
+                : undefined,
             });
             if (!shouldClose) {
               setHiddenCommentIds(prev => {
