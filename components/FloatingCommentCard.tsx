@@ -234,6 +234,21 @@ export default function FloatingCommentCard({
           {/* Body: Comments list (Root + Replies) */}
           <ItemGroup className="gap-2">
             {allComments.map((comment, index) => {
+              if (comment.isDeleted) {
+                return (
+                  <Item
+                    key={comment._id}
+                    className={cn("p-0", index > 0 ? "ml-4" : undefined)}
+                  >
+                    <ItemContent>
+                      <p className="text-xs italic text-muted-foreground">
+                        {t("deletedStub")}
+                      </p>
+                    </ItemContent>
+                  </Item>
+                );
+              }
+
               const name = comment.author?.name || t("unknownAuthor");
               return (
                 <Item

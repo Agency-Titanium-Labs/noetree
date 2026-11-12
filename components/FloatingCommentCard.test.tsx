@@ -282,4 +282,27 @@ describe("FloatingCommentCard", () => {
       screen.queryByRole("button", { name: "deleteAction" }),
     ).not.toBeInTheDocument();
   });
+
+  it("renders deleted comment stub and hides delete button when comment isDeleted", () => {
+    const thread = makeThread({ replies: true });
+    thread.root.isDeleted = true;
+    thread.root.body = "";
+    thread.root.author = null;
+    render(
+      <FloatingCommentCard
+        target={target}
+        thread={thread}
+        canComment={true}
+        isOpen={true}
+        virtualRef={virtualRef}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("deletedStub")).toBeInTheDocument();
+    expect(screen.getByText("Reply comment text")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "deleteAction" }),
+    ).not.toBeInTheDocument();
+  });
 });
