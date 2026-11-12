@@ -779,6 +779,60 @@ describe("delete", () => {
     await sc.mutation(api.comments.remove, { target, commentId: solo });
     expect(await commentCount(t, noteId)).toBe(0);
   });
+
+  test("restore brings back deleted comment or tombstone", async () => {
+    const t = convexTest(schema, modules);
+    const o = await seedUser(t, "o");
+    const s = await seedUser(t, "s");
+    const noteId = await seedNote(t, o.userId);
+    await seedShare(t, noteId, s.userId, "view");
+    const target = noteT(noteId);
+    const sc = as(t, s);
+
+    // Test restoring a root that had replies (tombstone)
+    const root = await sc.mutation(api.comments.add, { target, body: "hello" });
+    await as(t, o).mutation(api.comments.add, {
+      target,
+      body: "reply",
+      parentId: root,
+    });
+    await sc.mutation(api.comments.remove, { target, commentId: root });
+    let list = await sc.query(api.comments.list, { target });
+    expect(list!.threads[0].root.isDeleted).toBe(true);
+
+    // Restore tombstone
+    await sc.mutation(api.comments.restore, {
+      target,
+      commentId: root,
+      body: "hello",
+    });
+    list = await sc.query(api.comments.list, { target });
+    expect(list!.threads[0].root.isDeleted).toBe(false);
+    expect(list!.threads[0].root.body).toBe("hello");
+
+    // Test restoring a hard-deleted comment
+    const solo = await sc.mutation(api.comments.add, {
+      target,
+      body: "solo",
+      anchor: { quote: "q", from: 0, to: 1 },
+    });
+    await sc.mutation(api.comments.remove, { target, commentId: solo });
+    list = await sc.query(api.comments.list, { target });
+    expect(list!.threads).toHaveLength(1); // solo is gone
+
+    // Restore solo
+    const restoredId = await sc.mutation(api.comments.restore, {
+      target,
+      commentId: solo,
+      body: "solo",
+      anchor: { quote: "q", from: 0, to: 1 },
+    });
+    list = await sc.query(api.comments.list, { target });
+    expect(list!.threads).toHaveLength(2);
+    expect(
+      list!.threads.find(th => th.root._id === restoredId)?.root.body,
+    ).toBe("solo");
+  });
 });
 
 describe("cascade", () => {

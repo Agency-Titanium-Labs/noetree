@@ -356,6 +356,37 @@ export const remove = mutation({
   },
 });
 
+export const restore = mutation({
+  args: {
+    target: targetValidator,
+    commentId: v.id("comments"),
+    body: v.string(),
+    parentId: v.optional(v.id("comments")),
+    anchor: v.optional(anchorValidator),
+  },
+  returns: v.id("comments"),
+  handler: async (ctx, args) => {
+    const access = await requireCommentWriter(ctx, args.target);
+    const existing = await ctx.db.get("comments", args.commentId);
+    if (existing && existing.noteId === access.noteId) {
+      if (existing.deletedAt !== undefined) {
+        await ctx.db.patch("comments", existing._id, {
+          body: args.body,
+          deletedAt: undefined,
+        });
+        return existing._id;
+      }
+    }
+    return await ctx.db.insert("comments", {
+      noteId: access.noteId,
+      authorId: access.user._id,
+      parentId: args.parentId,
+      body: args.body,
+      ...(args.anchor ? { anchor: args.anchor } : {}),
+    });
+  },
+});
+
 export const purgeNote = internalMutation({
   args: { noteId: v.id("notes") },
   returns: v.null(),

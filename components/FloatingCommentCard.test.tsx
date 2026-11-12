@@ -15,12 +15,14 @@ import type { CommentThreadData } from "./CommentThread";
 const mockAdd = vi.fn().mockResolvedValue(null);
 const mockSetResolved = vi.fn().mockResolvedValue(null);
 const mockRemove = vi.fn().mockResolvedValue(null);
+const mockRestore = vi.fn().mockResolvedValue(null);
 
 vi.mock("@convex-dev/react-query", () => ({
   useConvexMutation: (fn: unknown) => {
     if (fn === "comments.add") return mockAdd;
     if (fn === "comments.setResolved") return mockSetResolved;
     if (fn === "comments.remove") return mockRemove;
+    if (fn === "comments.restore") return mockRestore;
     return vi.fn().mockResolvedValue(null);
   },
 }));
@@ -31,6 +33,7 @@ vi.mock("@/convex/_generated/api", () => ({
       add: "comments.add",
       setResolved: "comments.setResolved",
       remove: "comments.remove",
+      restore: "comments.restore",
     },
   },
 }));
@@ -220,7 +223,7 @@ describe("FloatingCommentCard", () => {
     });
   });
 
-  it("shows undo toast on delete, and cancels removeComment when undo is clicked", async () => {
+  it("shows undo toast on delete, immediately calls removeComment, and calls restoreComment when undo is clicked", async () => {
     const thread = makeThread({ canDeleteRoot: true });
     const onClose = vi.fn();
     render(
@@ -231,7 +234,6 @@ describe("FloatingCommentCard", () => {
         isOpen={true}
         virtualRef={virtualRef}
         onClose={onClose}
-        deleteDelayMs={1000}
       />,
     );
 
@@ -239,26 +241,39 @@ describe("FloatingCommentCard", () => {
     fireEvent.click(deleteBtn);
 
     expect(onClose).toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith(
-      "deletedSuccess",
-      expect.objectContaining({
-        action: expect.objectContaining({
-          label: "undo",
-          onClick: expect.any(Function),
+    await waitFor(() => {
+      expect(mockRemove).toHaveBeenCalledWith({
+        target,
+        commentId: "c-root",
+      });
+      expect(toast).toHaveBeenCalledWith(
+        "deletedSuccess",
+        expect.objectContaining({
+          action: expect.objectContaining({
+            label: "undo",
+            onClick: expect.any(Function),
+          }),
         }),
-      }),
-    );
+      );
+    });
 
     // Trigger the undo action callback directly
     const toastCall = vi
       .mocked(toast)
       .mock.calls.find(c => c[0] === "deletedSuccess");
-    const undoAction = (toastCall?.[1] as { action?: { onClick?: () => void } })
-      ?.action;
-    undoAction?.onClick?.();
+    const undoAction = (
+      toastCall?.[1] as { action?: { onClick?: () => Promise<void> } }
+    )?.action;
+    await undoAction?.onClick?.();
 
-    // Ensure mockRemove is never called
-    expect(mockRemove).not.toHaveBeenCalled();
+    // Ensure mockRestore is called
+    expect(mockRestore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target,
+        commentId: "c-root",
+        body: "Root comment text",
+      }),
+    );
   });
 
   it("does not show delete button on comments authored by others (isMine: false)", () => {

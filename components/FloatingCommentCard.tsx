@@ -60,6 +60,7 @@ export default function FloatingCommentCard({
   const setResolved = useSafeConvexMutation(api.comments.setResolved);
   const addComment = useSafeConvexMutation(api.comments.add);
   const removeComment = useSafeConvexMutation(api.comments.remove);
+  const restoreComment = useSafeConvexMutation(api.comments.restore);
 
   const [replyBody, setReplyBody] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,56 +120,62 @@ export default function FloatingCommentCard({
     }
   };
 
-  const handleDelete = (commentId: typeof root._id) => {
+  const handleDelete = async (commentId: typeof root._id) => {
     const isRoot = commentId === root._id;
     const shouldClose =
       isRoot || (root.isDeleted && visibleReplies.length <= 1);
+
+    const commentToDelete = allComments.find(c => c._id === commentId);
+    if (!commentToDelete) return;
+
     if (shouldClose) {
       onClose();
     } else {
       setHiddenCommentIds(prev => new Set(prev).add(commentId));
     }
 
-    const executeDelete = async () => {
-      try {
-        await removeComment({ target, commentId });
-      } catch (err) {
-        toast.error(commentErrorMessage(err, t));
-        if (!shouldClose) {
-          setHiddenCommentIds(prev => {
-            const next = new Set(prev);
-            next.delete(commentId);
-            return next;
-          });
-        }
+    try {
+      await removeComment({ target, commentId });
+    } catch (err) {
+      toast.error(commentErrorMessage(err, t));
+      if (!shouldClose) {
+        setHiddenCommentIds(prev => {
+          const next = new Set(prev);
+          next.delete(commentId);
+          return next;
+        });
       }
-    };
-
-    if (deleteDelayMs <= 0) {
-      void executeDelete();
-      toast(t("deletedSuccess"));
       return;
     }
-
-    let isUndone = false;
-    const timer = setTimeout(() => {
-      if (!isUndone) {
-        void executeDelete();
-      }
-    }, deleteDelayMs);
 
     toast(t("deletedSuccess"), {
       action: {
         label: t("undo"),
-        onClick: () => {
-          isUndone = true;
-          clearTimeout(timer);
-          if (!shouldClose) {
-            setHiddenCommentIds(prev => {
-              const next = new Set(prev);
-              next.delete(commentId);
-              return next;
+        onClick: async () => {
+          try {
+            await restoreComment({
+              target,
+              commentId,
+              body: commentToDelete.body,
+              parentId: isRoot ? undefined : root._id,
+              anchor:
+                isRoot && thread.anchor
+                  ? {
+                      quote: thread.anchor.quote,
+                      from: thread.anchor.from,
+                      to: thread.anchor.to,
+                    }
+                  : undefined,
             });
+            if (!shouldClose) {
+              setHiddenCommentIds(prev => {
+                const next = new Set(prev);
+                next.delete(commentId);
+                return next;
+              });
+            }
+          } catch (err) {
+            toast.error(commentErrorMessage(err, t));
           }
         },
       },
