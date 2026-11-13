@@ -93,9 +93,24 @@ describe("CollaboratorsPile", () => {
 
   it("renders visible collaborators with initials when other users are online", () => {
     mockContext.presenceList = [
-      { userId: "user_me", name: "Antoine F", online: true },
-      { userId: "user_2", name: "Jane Doe", online: true },
-      { userId: "user_3", name: "Bob Smith", online: true },
+      {
+        userId: "user_me",
+        name: "Antoine F",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
+      {
+        userId: "user_2",
+        name: "Jane Doe",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
+      {
+        userId: "user_3",
+        name: "Bob Smith",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
     ];
 
     render(<CollaboratorsPile noteId="note123" maxVisible={2} />);
@@ -109,10 +124,30 @@ describe("CollaboratorsPile", () => {
 
   it("renders +N overflow count when other online users exceed maxVisible", () => {
     mockContext.presenceList = [
-      { userId: "user_me", name: "Antoine F", online: true },
-      { userId: "user_2", name: "Jane Doe", online: true },
-      { userId: "user_3", name: "Bob Smith", online: true },
-      { userId: "user_4", name: "Alice Martin", online: true },
+      {
+        userId: "user_me",
+        name: "Antoine F",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
+      {
+        userId: "user_2",
+        name: "Jane Doe",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
+      {
+        userId: "user_3",
+        name: "Bob Smith",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
+      {
+        userId: "user_4",
+        name: "Alice Martin",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
     ];
 
     render(<CollaboratorsPile noteId="note123" maxVisible={1} />);
@@ -125,10 +160,30 @@ describe("CollaboratorsPile", () => {
 
   it("opens DropdownMenu with remaining users when +N count is clicked", () => {
     mockContext.presenceList = [
-      { userId: "user_me", name: "Antoine F", online: true },
-      { userId: "user_2", name: "Jane Doe", online: true },
-      { userId: "user_3", name: "Bob Smith", online: true },
-      { userId: "user_4", name: "Alice Martin", online: true },
+      {
+        userId: "user_me",
+        name: "Antoine F",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
+      {
+        userId: "user_2",
+        name: "Jane Doe",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
+      {
+        userId: "user_3",
+        name: "Bob Smith",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
+      {
+        userId: "user_4",
+        name: "Alice Martin",
+        online: true,
+        data: { activeNoteId: "note123" },
+      },
     ];
 
     render(<CollaboratorsPile noteId="note123" maxVisible={1} />);
@@ -141,6 +196,23 @@ describe("CollaboratorsPile", () => {
     // Overflow users should appear in the dropdown menu
     expect(screen.getByText("Bob Smith")).toBeInTheDocument();
     expect(screen.getByText("Alice Martin")).toBeInTheDocument();
+  });
+
+  it("does not render collaborators whose activeNoteId does not match noteId or is missing", () => {
+    mockContext.treePresenceList = [
+      { userId: "user_me", name: "Antoine F", online: true },
+      { userId: "user_connecting", name: "New User", online: true, data: null },
+      { userId: "user_empty_data", name: "Empty User", online: true, data: {} },
+      {
+        userId: "user_other_note",
+        name: "Other User",
+        online: true,
+        data: { activeNoteId: "other_note" },
+      },
+    ];
+
+    const { container } = render(<CollaboratorsPile noteId="note123" />);
+    expect(container.firstChild).toBeNull();
   });
 
   it("renders tree-level collaborators and selects note on click", () => {

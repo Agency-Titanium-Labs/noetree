@@ -87,7 +87,7 @@ export default function CollaboratorsPile({
       ) {
         return (p.data as { activeNoteId?: string }).activeNoteId === noteId;
       }
-      return true;
+      return false;
     }
     return true;
   });

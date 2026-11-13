@@ -379,9 +379,14 @@ describe("leaving preview does not autosave (GAP-1)", () => {
           online: true,
           data: { activeNoteId: "other_note", cursor: { from: 5, to: 10 } },
         },
+        {
+          userId: "user_connecting_without_active_note",
+          online: true,
+          data: null,
+        },
       ];
       mount();
-      expect(ctx.treePresenceList).toHaveLength(2);
+      expect(ctx.treePresenceList).toHaveLength(3);
       expect(ctx.presenceList).toHaveLength(1);
       expect(ctx.presenceList?.[0]?.userId).toBe("user_on_same_note");
     });

@@ -222,9 +222,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const presenceList = useMemo(() => {
     if (!selectedNote?._id) return [];
     return (treePresenceList ?? []).filter(p => {
-      if (!p.data || typeof p.data !== "object") return true;
+      if (!p.data || typeof p.data !== "object") return false;
       const data = p.data as { activeNoteId?: string };
-      return !data.activeNoteId || data.activeNoteId === selectedNote._id;
+      return data.activeNoteId === selectedNote._id;
     });
   }, [treePresenceList, selectedNote?._id]);
 
