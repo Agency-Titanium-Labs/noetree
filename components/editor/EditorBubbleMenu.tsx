@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type SubmitEvent } from "react";
+import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import { useTranslations } from "next-intl";
 import { BubbleMenu } from "@tiptap/react/menus";
 import {
@@ -81,9 +81,20 @@ export default function EditorBubbleMenu({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const addComment = useSafeConvexMutation(api.comments.add);
 
+  const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
+
   useEffect(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
+      const { from, to } = editor.state.selection;
+      if (
+        lastSelectionRef.current &&
+        lastSelectionRef.current.from === from &&
+        lastSelectionRef.current.to === to
+      ) {
+        return;
+      }
+      lastSelectionRef.current = { from, to };
       setIsDismissed(false);
     };
     editor.on("selectionUpdate", handleSelectionUpdate);
@@ -92,9 +103,33 @@ export default function EditorBubbleMenu({
     };
   }, [editor]);
 
-  if (!editor || isDismissed) return null;
-
   const isAnyMenuOpen = headingsOpen || moreOpen || linkOpen || commentOpen;
+
+  useEffect(() => {
+    if (!editor || isDismissed) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (isAnyMenuOpen) return;
+
+      if (!editor.state.selection.empty) {
+        setIsDismissed(true);
+        if (
+          document.activeElement &&
+          !editor.view.dom.contains(document.activeElement)
+        ) {
+          editor.commands.focus();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [editor, isDismissed, isAnyMenuOpen]);
+
+  if (!editor || isDismissed) return null;
 
   const handleOpenCommentPopover = (open: boolean) => {
     setCommentOpen(open);

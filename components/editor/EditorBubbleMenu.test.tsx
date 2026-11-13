@@ -292,4 +292,16 @@ describe("EditorBubbleMenu", () => {
       },
     });
   });
+
+  it("dismisses bubble menu when pressing Escape and re-shows on new selection", async () => {
+    render(<EditorBubbleMenu />);
+    expect(screen.getByTestId("bubble-menu")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("bubble-menu")).toBeNull();
+
+    // Changing the text selection re-shows it
+    editor?.commands.setTextSelection({ from: 1, to: 5 });
+    expect(await screen.findByTestId("bubble-menu")).toBeInTheDocument();
+  });
 });
