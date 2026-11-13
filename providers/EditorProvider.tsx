@@ -85,6 +85,9 @@ interface EditorContextType {
   isSyncLoading?: boolean;
   pendingAnchor: PendingCommentAnchor | null;
   setPendingAnchor: (anchor: PendingCommentAnchor | null) => void;
+  isFocusMode: boolean;
+  setIsFocusMode: (value: boolean | ((prev: boolean) => boolean)) => void;
+  toggleFocusMode: () => void;
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -105,6 +108,9 @@ const EditorContext = createContext<EditorContextType>({
   isSyncLoading: false,
   pendingAnchor: null,
   setPendingAnchor: () => {},
+  isFocusMode: false,
+  setIsFocusMode: () => {},
+  toggleFocusMode: () => {},
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -227,6 +233,11 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       return data.activeNoteId === selectedNote._id;
     });
   }, [treePresenceList, selectedNote?._id]);
+
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const toggleFocusMode = useCallback(() => {
+    setIsFocusMode(prev => !prev);
+  }, []);
 
   // Sync active note presence across the tree room
   const isTypingRef = useRef(false);
@@ -941,6 +952,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       isSyncLoading,
       pendingAnchor,
       setPendingAnchor,
+      isFocusMode,
+      setIsFocusMode,
+      toggleFocusMode,
     }),
     [
       editor,
@@ -960,6 +974,8 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       isSyncLoading,
       pendingAnchor,
       setPendingAnchor,
+      isFocusMode,
+      toggleFocusMode,
     ],
   );
 

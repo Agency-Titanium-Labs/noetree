@@ -343,6 +343,8 @@
   "Editor": {
     "readOnlyBadge": "Lecture seule",
     "readOnlyTooltip": "Vous ne disposez pas des droits d'édition sur cette note.",
+    "enterFocusMode": "Mode Focus",
+    "exitFocusMode": "Quitter le mode Focus",
     "placeholder": "Écrivez quelque chose...",
     "you": "Vous",
     "collaborator": "Collaborateur",

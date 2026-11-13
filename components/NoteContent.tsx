@@ -22,6 +22,7 @@ import LinkedNotesBlock from "./LinkedNotesBlock";
 import VersionPreviewBanner from "./VersionPreviewBanner";
 import CollaboratorsPile from "./CollaboratorsPile";
 import ReadOnlyBadge from "./ReadOnlyBadge";
+import FocusModeButton from "./FocusModeButton";
 import SyncStatus from "./SyncStatus";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { useNoteCommentsQuery } from "@/hooks/useNoteCommentsQuery";
@@ -215,13 +216,13 @@ export default function NoteContent() {
 
   const content = (
     <div className="min-h-full flex flex-col gap-2">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
         <ConditionChecker condition={!selectedNote}>
           <Skeleton className="w-56 h-8" />
         </ConditionChecker>
         <ConditionChecker condition={!!selectedNote}>
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
               <h2 className="text-2xl font-bold">{selectedNote?.title}</h2>
               {selectedNote?.role === "view" && <ReadOnlyBadge />}
               <Button
@@ -258,11 +259,14 @@ export default function NoteContent() {
               )}
               <CollaboratorsPile noteId={selectedNote?._id} />
             </div>
-            <SyncStatus
-              status={saveStatus}
-              onRetry={retrySave}
-              isOffline={isDisconnected}
-            />
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <SyncStatus
+                status={saveStatus}
+                onRetry={retrySave}
+                isOffline={isDisconnected}
+              />
+              <FocusModeButton className="hidden md:inline-flex" />
+            </div>
           </>
         </ConditionChecker>
       </div>

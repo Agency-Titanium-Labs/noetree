@@ -343,6 +343,8 @@
   "Editor": {
     "readOnlyBadge": "Read-only",
     "readOnlyTooltip": "You do not have edit permissions on this note.",
+    "enterFocusMode": "Focus mode",
+    "exitFocusMode": "Exit focus mode",
     "placeholder": "Write something...",
     "you": "You",
     "collaborator": "Collaborator",

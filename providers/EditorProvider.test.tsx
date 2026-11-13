@@ -456,4 +456,21 @@ describe("leaving preview does not autosave (GAP-1)", () => {
       );
     });
   });
+
+  describe("focus mode", () => {
+    it("initializes with isFocusMode false and toggles when toggleFocusMode is called", () => {
+      mount();
+      expect(ctx.isFocusMode).toBe(false);
+
+      act(() => {
+        ctx.toggleFocusMode();
+      });
+      expect(ctx.isFocusMode).toBe(true);
+
+      act(() => {
+        ctx.toggleFocusMode();
+      });
+      expect(ctx.isFocusMode).toBe(false);
+    });
+  });
 });

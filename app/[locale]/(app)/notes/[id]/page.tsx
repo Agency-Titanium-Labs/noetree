@@ -3,7 +3,7 @@
 import NoteTree from "@/components/NotesTree";
 import NoteContent from "@/components/NoteContent";
 import FollowBanner from "@/components/FollowBanner";
-import { EditorProvider } from "@/providers/EditorProvider";
+import { EditorProvider, useEditorContext } from "@/providers/EditorProvider";
 import { TreeProvider } from "@/providers/TreeProvider";
 import {
   ResizableHandle,
@@ -32,6 +32,32 @@ function MobileDrawer() {
   );
 }
 
+function DesktopPanels() {
+  const { isFocusMode } = useEditorContext();
+
+  if (isFocusMode) {
+    return (
+      <div className="h-full w-full overflow-hidden p-4 flex justify-center">
+        <div className="h-full w-full max-w-4xl flex flex-col">
+          <NoteContent />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ResizablePanelGroup orientation="horizontal">
+      <ResizablePanel defaultSize="60%" minSize="250px">
+        <NoteTree />
+      </ResizablePanel>
+      <ResizableHandle withHandle />
+      <ResizablePanel defaultSize="40%" minSize="400px" className="p-4">
+        <NoteContent />
+      </ResizablePanel>
+    </ResizablePanelGroup>
+  );
+}
+
 const NotePageContent = () => {
   const isMobile = useIsMobile();
 
@@ -51,15 +77,7 @@ const NotePageContent = () => {
 
   return (
     <EditorProvider>
-      <ResizablePanelGroup orientation="horizontal">
-        <ResizablePanel defaultSize="60%" minSize="250px">
-          <NoteTree />
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize="40%" minSize="400px" className="p-4">
-          <NoteContent />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+      <DesktopPanels />
       <FollowBanner />
     </EditorProvider>
   );
