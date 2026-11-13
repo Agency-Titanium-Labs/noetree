@@ -172,5 +172,12 @@ describe("NoteContent chat is bound to its note (M2)", () => {
     tree.selectedNote = { _id: "n2", title: "Read Only", role: "view" };
     render(<NoteContent />);
     expect(screen.queryByTestId("open-chat")).toBeNull();
+    expect(screen.getByText("readOnlyBadge")).toBeInTheDocument();
+  });
+
+  it("does not render ReadOnlyBadge when the note is editable", () => {
+    tree.selectedNote = { _id: "n1", title: "Editable", role: "owner" };
+    render(<NoteContent />);
+    expect(screen.queryByText("readOnlyBadge")).toBeNull();
   });
 });

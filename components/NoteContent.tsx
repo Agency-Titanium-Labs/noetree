@@ -21,6 +21,7 @@ import HistoryPanel from "./HistoryPanel";
 import LinkedNotesBlock from "./LinkedNotesBlock";
 import VersionPreviewBanner from "./VersionPreviewBanner";
 import CollaboratorsPile from "./CollaboratorsPile";
+import ReadOnlyBadge from "./ReadOnlyBadge";
 import SyncStatus from "./SyncStatus";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { useNoteCommentsQuery } from "@/hooks/useNoteCommentsQuery";
@@ -222,6 +223,7 @@ export default function NoteContent() {
           <>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-bold">{selectedNote?.title}</h2>
+              {selectedNote?.role === "view" && <ReadOnlyBadge />}
               <Button
                 variant="ghost"
                 size="icon"
