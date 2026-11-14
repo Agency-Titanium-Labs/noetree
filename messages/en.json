@@ -104,6 +104,7 @@
     }
   },
   "NoteCard": {
+    "someoneTyping": "Editing in progress...",
     "newNotePlaceholder": "New note title...",
     "tooltips": {
       "addChild": "Add child note",
@@ -123,13 +124,10 @@
       "listForSale": "List for sale"
     }
   },
-  "NoteContent": {
-    "status": {
-      "failed": "Save failed",
-      "saved": "Saved",
-      "saving": "Saving...",
-      "unsaved": "Unsaved changes"
-    }
+  "SyncStatus": {
+    "failedTooltip": "Unable to sync your changes. Check your connection.",
+    "retryTooltip": "Click to retry syncing.",
+    "offlineTooltip": "Connection lost. Local changes are not being broadcast."
   },
   "ShareDialog": {
     "title": "Share note",
@@ -209,6 +207,7 @@
     "upgradeCta": "Upgrade to Premium",
     "dismiss": "Maybe later",
     "badgeTooltip": "{count, plural, =0 {0 AI credits remaining} one {# AI credit remaining} other {# AI credits remaining}}",
+    "badge": "{count, plural, =0 {0 AI credits} one {# AI credit} other {# AI credits}}",
     "menuAria": "AI actions",
     "actions": {
       "basic": "Generate suggestion",
@@ -342,10 +341,27 @@
     "suggestionAnnounce": "Suggestion: {text}. Press Tab to accept or Escape to dismiss."
   },
   "Editor": {
+    "readOnlyBadge": "Read-only",
+    "readOnlyTooltip": "You do not have edit permissions on this note.",
+    "enterFocusMode": "Focus mode",
+    "exitFocusMode": "Exit focus mode",
     "placeholder": "Write something...",
+    "you": "You",
+    "collaborator": "Collaborator",
+    "collaborators": "Other collaborators",
+    "following": "Following {name}",
+    "stopFollowing": "Stop",
+    "escapeKey": "Esc",
+    "follow": "Follow",
+    "clickToFollow": "Click to follow",
+    "followingTooltip": "Following • Click to stop",
+    "isTyping": "{name} is typing...",
+    "typing": "typing...",
     "tooltips": {
       "undo": "Undo (Ctrl+Z)",
       "redo": "Redo (Ctrl+Shift+Z)",
+      "headings": "Headings",
+      "paragraph": "Normal text",
       "heading-1": "Heading 1",
       "heading-2": "Heading 2",
       "heading-3": "Heading 3",
@@ -356,15 +372,90 @@
       "italic": "Italic (Ctrl+I)",
       "strike": "Strikethrough",
       "code": "Inline Code (Ctrl+E)",
+      "lists": "Lists",
       "bulletList": "Bullet List",
       "orderedList": "Ordered List",
+      "taskList": "Task List",
       "blockquote": "Blockquote",
+      "insert": "More elements",
       "codeBlock": "Code Block",
       "hardBreak": "Hard Break",
       "horizontalRule": "Horizontal Rule",
       "link": "Insert Link (Ctrl+K)",
       "image": "Insert Image",
       "aiAction": "AI actions"
+    },
+    "bubbleMenu": {
+      "linkPlaceholder": "Paste or type a link...",
+      "applyLink": "Apply link",
+      "removeLink": "Remove link",
+      "cancel": "Cancel",
+      "aiAsk": "Ask AI",
+      "more": "More formats",
+      "comment": "Comment on selection",
+      "commentPlaceholder": "Add a comment...",
+      "commentPost": "Comment"
+    },
+    "codeBlock": {
+      "selectLanguage": "Select language",
+      "auto": "Auto",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "slashCommands": {
+      "noResult": "No commands found",
+      "heading": "Basic blocks",
+      "categories": {
+        "basic": "Basic blocks",
+        "headings": "Headings",
+        "formatting": "Formatting",
+        "media": "Media & Inserts",
+        "actions": "Actions"
+      },
+      "paragraph": "Text",
+      "paragraphDesc": "Just start writing with plain text.",
+      "heading1": "Heading 1",
+      "heading1Desc": "Big section heading.",
+      "heading2": "Heading 2",
+      "heading2Desc": "Medium section heading.",
+      "heading3": "Heading 3",
+      "heading3Desc": "Small section heading.",
+      "heading4": "Heading 4",
+      "heading4Desc": "Level 4 section heading.",
+      "heading5": "Heading 5",
+      "heading5Desc": "Level 5 section heading.",
+      "heading6": "Heading 6",
+      "heading6Desc": "Level 6 section heading.",
+      "bulletList": "Bullet List",
+      "bulletListDesc": "Create a simple bulleted list.",
+      "orderedList": "Numbered List",
+      "orderedListDesc": "Create a list with numbers.",
+      "taskList": "Task List",
+      "taskListDesc": "Create a task list with checkboxes.",
+      "blockquote": "Quote",
+      "blockquoteDesc": "Capture a quote or highlight.",
+      "bold": "Bold",
+      "boldDesc": "Make text bold.",
+      "italic": "Italic",
+      "italicDesc": "Make text italic.",
+      "strike": "Strikethrough",
+      "strikeDesc": "Strike through text.",
+      "code": "Inline Code",
+      "codeDesc": "Format inline code snippet.",
+      "codeBlock": "Code Block",
+      "codeBlockDesc": "Capture a code snippet.",
+      "link": "Link",
+      "linkDesc": "Insert a hyperlink.",
+      "image": "Image",
+      "imageDesc": "Insert an image from URL.",
+      "horizontalRule": "Divider",
+      "horizontalRuleDesc": "Visually separate sections.",
+      "hardBreak": "Line Break",
+      "hardBreakDesc": "Insert a forced line break.",
+      "undo": "Undo",
+      "undoDesc": "Undo last change.",
+      "redo": "Redo",
+      "redoDesc": "Redo last undone change."
     },
     "dialogs": {
       "linkTitle": "Insert Link",
@@ -646,9 +737,6 @@
     "badgePublic": "Public note",
     "signInBanner": "Sign in to edit this note.",
     "signInCta": "Sign in to edit",
-    "saving": "Saving...",
-    "saved": "Saved",
-    "saveError": "Couldn't save your changes. Check your connection.",
     "revokedEditError": "This link was turned off. You can no longer edit this note.",
     "childrenHeading": "Sub-notes",
     "untitled": "Untitled",
@@ -689,7 +777,11 @@
     "errorTooLong": "Comments can be up to 2000 characters. Shorten yours and try again.",
     "errorRateLimited": "You're commenting too fast. Wait a minute and try again.",
     "errorLimit": "This note has reached its comment limit.",
-    "errorNoAccess": "You no longer have access to this note."
+    "errorNoAccess": "You no longer have access to this note.",
+    "anchorGoTo": "Scroll to highlighted text",
+    "replyPlaceholder": "Reply...",
+    "close": "Close",
+    "deletedSuccess": "Comment deleted"
   },
   "History": {
     "title": "History",

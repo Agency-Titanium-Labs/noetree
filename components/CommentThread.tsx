@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Quote, QuoteContent } from "@/components/ui/custom/quote";
 import { api } from "@/convex/_generated/api";
 import { getInitials } from "@/lib/initials";
 import { formatFullDate, formatRelativeTime } from "@/lib/relativeTime";
@@ -113,7 +114,7 @@ function CommentItem({
                     {t("resolve")}
                   </Button>
                 )}
-                {comment.canDelete && (
+                {comment.isMine && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -138,12 +139,14 @@ export default function CommentThread({
   canComment,
   showResolved,
   focusCommentId,
+  onScrollToAnchor,
 }: Readonly<{
   target: CommentTarget;
   thread: CommentThreadData;
   canComment: boolean;
   showResolved: boolean;
   focusCommentId?: string | null;
+  onScrollToAnchor?: () => void;
 }>) {
   const t = useTranslations("Comments");
   const locale = useLocale();
@@ -227,6 +230,29 @@ export default function CommentThread({
 
   return (
     <div ref={rootRef} className="flex flex-col gap-2">
+      {thread.anchor && (
+        <Quote
+          asChild
+          variant="amber"
+          size="sm"
+          className={cn(
+            "text-left",
+            onScrollToAnchor &&
+              "cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/50",
+          )}
+        >
+          <button
+            type="button"
+            onClick={onScrollToAnchor}
+            disabled={!onScrollToAnchor}
+            aria-label={onScrollToAnchor ? t("anchorGoTo") : undefined}
+          >
+            <QuoteContent className="line-clamp-2">
+              &ldquo;{thread.anchor.quote}&rdquo;
+            </QuoteContent>
+          </button>
+        </Quote>
+      )}
       <CommentItem
         comment={root}
         isRoot

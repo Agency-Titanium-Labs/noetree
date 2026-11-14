@@ -21,13 +21,21 @@ const h = vi.hoisted(() => {
     on: vi.fn(),
     off: vi.fn(),
     commands: { setContent: vi.fn() },
+    state: {
+      tr: { setMeta: vi.fn(() => ({})), selection: { from: 0, to: 0 } },
+      selection: { from: 0, to: 0 },
+    },
+    view: { dispatch: vi.fn() },
   };
   return {
     fake,
     tree: {
+      rootNoteId: "tree_root_123" as string | null,
       selectedNote: null as null | Record<string, unknown>,
       onUpdateNoteContent: vi.fn(),
     },
+    presenceList: [] as unknown[],
+    usePresenceRoomId: null as string | null,
     debounced: vi.fn(),
     flush: vi.fn(),
     cancel: vi.fn(),
@@ -37,19 +45,66 @@ const h = vi.hoisted(() => {
 vi.mock("@tiptap/react", () => ({
   useEditor: () => h.fake,
 }));
-vi.mock("@tiptap/core", () => ({}));
-vi.mock("@tiptap/starter-kit", () => ({ default: {} }));
+vi.mock("@tiptap/core", () => ({
+  Extension: { create: () => ({}) },
+}));
+vi.mock("@tiptap/starter-kit", () => ({
+  default: { configure: () => ({}) },
+}));
 vi.mock("@tiptap/extension-placeholder", () => ({
   default: { configure: () => ({}) },
 }));
 vi.mock("@tiptap/extension-link", () => ({ default: {} }));
 vi.mock("@tiptap/extension-image", () => ({ default: {} }));
+vi.mock("@tiptap/extension-task-list", () => ({ default: {} }));
+vi.mock("@tiptap/extension-task-item", () => ({
+  default: { configure: () => ({}) },
+}));
+vi.mock("@/components/editor/CodeBlockExtension", () => ({
+  CustomCodeBlockLowlight: {},
+}));
 // Phase 21: the ghost-text extension and its Convex bridge have their own tests.
 vi.mock("@/lib/editor/ghostText", () => ({
   GhostText: { configure: () => ({}) },
 }));
+vi.mock("@/components/editor/slashCommandExtension", () => ({
+  SlashCommand: {},
+}));
 vi.mock("@/lib/editor/useAutocompleteBridge", () => ({
   useAutocompleteBridge: () => ({ options: {}, enabled: false }),
+}));
+// Phase 23: CommentHighlighter is a TipTap extension, mocked to a plain object
+// so the EditorProvider tests do not need a full ProseMirror runtime.
+vi.mock("@/lib/editor/commentHighlighter", () => ({
+  CommentHighlighter: {},
+  commentHighlighterKey: { getState: () => null },
+}));
+vi.mock("@convex-dev/prosemirror-sync/tiptap", () => ({
+  useTiptapSync: () => ({
+    isLoading: false,
+    initialContent: null,
+    extension: null,
+    create: vi.fn(),
+  }),
+}));
+vi.mock("@clerk/nextjs", () => ({
+  useUser: () => ({ user: { id: "user_test", imageUrl: "" } }),
+}));
+vi.mock("convex/react", () => ({
+  useQuery: () => null,
+  useMutation: () => vi.fn(),
+}));
+vi.mock("@convex-dev/presence/react", () => ({
+  default: (_presence: unknown, roomId: string) => {
+    h.usePresenceRoomId = roomId;
+    return h.presenceList;
+  },
+}));
+vi.mock("@/lib/editor/collaborativeCursors", () => ({
+  CollaborativeCursors: {},
+  collaborativeCursorsKey: { getState: () => null },
+  getUserColor: () => "#0284c7",
+  getContrastTextColor: () => "#ffffff",
 }));
 vi.mock("use-debounce", () => ({
   useDebouncedCallback: () => {
@@ -302,5 +357,120 @@ describe("leaving preview does not autosave (GAP-1)", () => {
     act(() => h.fake.listener?.({ editor: h.fake }));
     expect(ctx.saveStatus).toBe("unsaved");
     expect(h.debounced).toHaveBeenCalledTimes(1);
+  });
+
+  describe("tree-level presence", () => {
+    it("connects presence room to rootNoteId", () => {
+      h.tree.rootNoteId = "tree_root_xyz";
+      mount();
+      expect(h.usePresenceRoomId).toBe("tree_root_xyz");
+    });
+
+    it("filters presenceList to current note while keeping treePresenceList complete", () => {
+      h.tree.rootNoteId = "tree_root_xyz";
+      h.presenceList = [
+        {
+          userId: "user_on_same_note",
+          online: true,
+          data: { activeNoteId: "n1", cursor: { from: 1, to: 2 } },
+        },
+        {
+          userId: "user_on_other_note",
+          online: true,
+          data: { activeNoteId: "other_note", cursor: { from: 5, to: 10 } },
+        },
+        {
+          userId: "user_connecting_without_active_note",
+          online: true,
+          data: null,
+        },
+      ];
+      mount();
+      expect(ctx.treePresenceList).toHaveLength(3);
+      expect(ctx.presenceList).toHaveLength(1);
+      expect(ctx.presenceList?.[0]?.userId).toBe("user_on_same_note");
+    });
+  });
+
+  describe("closing or navigating away flushes pending edits", () => {
+    it("flushes pending edits when EditorProvider unmounts", () => {
+      const { unmount } = mount();
+      h.flush.mockClear();
+      unmount();
+      expect(h.flush).toHaveBeenCalledTimes(1);
+    });
+
+    it("flushes and prompts confirmation on beforeunload when unsaved", () => {
+      mount();
+      act(() => h.fake.listener?.({ editor: h.fake }));
+      expect(ctx.saveStatus).toBe("unsaved");
+
+      h.flush.mockClear();
+      const event = new Event("beforeunload", {
+        cancelable: true,
+      }) as BeforeUnloadEvent;
+      const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+
+      window.dispatchEvent(event);
+
+      expect(h.flush).toHaveBeenCalledTimes(1);
+      expect(preventDefaultSpy).toHaveBeenCalled();
+    });
+
+    it("does not flush or prompt on beforeunload when idle", () => {
+      mount();
+      expect(ctx.saveStatus).toBe("idle");
+
+      h.flush.mockClear();
+      const event = new Event("beforeunload", {
+        cancelable: true,
+      }) as BeforeUnloadEvent;
+      const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+
+      window.dispatchEvent(event);
+
+      expect(h.flush).not.toHaveBeenCalled();
+      expect(preventDefaultSpy).not.toHaveBeenCalled();
+    });
+
+    it("flushes on visibilitychange when hidden and unsaved", () => {
+      mount();
+      act(() => h.fake.listener?.({ editor: h.fake }));
+      expect(ctx.saveStatus).toBe("unsaved");
+
+      h.flush.mockClear();
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      document.dispatchEvent(new Event("visibilitychange"));
+
+      expect(h.flush).toHaveBeenCalledTimes(1);
+    });
+
+    it("applies incoming remote content changes when user is idle", () => {
+      const { rerender } = mount();
+      h.fake.commands.setContent.mockClear();
+      setNote({ content: doc("incoming remote changes") });
+      rerender(ui());
+      expect(h.fake.commands.setContent).toHaveBeenCalledWith(
+        JSON.parse(doc("incoming remote changes")),
+        { emitUpdate: false },
+      );
+    });
+  });
+
+  describe("focus mode", () => {
+    it("initializes with isFocusMode false and toggles when toggleFocusMode is called", () => {
+      mount();
+      expect(ctx.isFocusMode).toBe(false);
+
+      act(() => {
+        ctx.toggleFocusMode();
+      });
+      expect(ctx.isFocusMode).toBe(true);
+
+      act(() => {
+        ctx.toggleFocusMode();
+      });
+      expect(ctx.isFocusMode).toBe(false);
+    });
   });
 });

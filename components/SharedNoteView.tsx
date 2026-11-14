@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SignInButton } from "@clerk/nextjs";
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +8,9 @@ import { Content, Editor, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import { CustomCodeBlockLowlight } from "./editor/CodeBlockExtension";
 import { ConvexError } from "convex/values";
 import { Eye, Pencil } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -17,6 +20,7 @@ import CommentsButton from "@/components/CommentsButton";
 import CommentsPanel from "@/components/CommentsPanel";
 import SharedHeader from "@/components/SharedHeader";
 import SharedUnavailable from "@/components/SharedUnavailable";
+import SyncStatus from "@/components/SyncStatus";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
@@ -90,7 +94,16 @@ function SharedNoteBody({
   const editable = data.canEdit && !revoked;
 
   const editor = useEditor({
-    extensions: [StarterKit, Link, Image],
+    extensions: [
+      StarterKit.configure({
+        codeBlock: false,
+      }),
+      CustomCodeBlockLowlight,
+      Link,
+      Image,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+    ],
     content: safeParse(data.content),
     editable,
     immediatelyRender: false,
@@ -105,24 +118,73 @@ function SharedNoteBody({
     api.shareLinks.updateSharedNoteContent,
   );
 
+  const isMountedRef = useRef(true);
+  const saveStatusRef = useRef(saveStatus);
+  saveStatusRef.current = saveStatus;
+
   const saveContent = async (json: Content) => {
-    setSaveStatus("saving");
+    if (isMountedRef.current) setSaveStatus("saving");
     try {
       await saveMutation({ token, content: JSON.stringify(json) });
-      setSaveStatus("success");
+      if (isMountedRef.current) setSaveStatus("success");
     } catch (err) {
       if (
         err instanceof ConvexError &&
         (err.data === "LINK_INVALID" || err.data === "UNAUTHENTICATED")
       ) {
-        setRevoked(true);
-      } else {
-        setSaveStatus("error");
-      }
+        if (isMountedRef.current) setRevoked(true);
+      } else if (isMountedRef.current) setSaveStatus("error");
     }
   };
 
-  const debouncedSave = useDebouncedCallback(saveContent, 3000);
+  const debouncedSave = useDebouncedCallback(saveContent, 1000);
+  const debouncedSaveRef = useRef(debouncedSave);
+  debouncedSaveRef.current = debouncedSave;
+
+  // Handle unmount (navigating away): flush pending debounced save
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      void debouncedSaveRef.current.flush();
+    };
+  }, []);
+
+  // Handle browser close / reload / visibility change (minimize or background tab)
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (saveStatusRef.current === "unsaved") {
+        void debouncedSaveRef.current.flush();
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        saveStatusRef.current === "unsaved"
+      ) {
+        void debouncedSaveRef.current.flush();
+      }
+    };
+
+    const handlePageHide = () => {
+      if (saveStatusRef.current === "unsaved") {
+        void debouncedSaveRef.current.flush();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
 
   useEffect(() => {
     setHref(window.location.href);
@@ -157,7 +219,7 @@ function SharedNoteBody({
     const updateListener = ({ editor }: { editor: Editor }) => {
       if (!editor.isEditable) return;
       setSaveStatus("unsaved");
-      debouncedSave(editor.getJSON());
+      void debouncedSave(editor.getJSON());
     };
     editor.on("update", updateListener);
     return () => {
@@ -177,14 +239,12 @@ function SharedNoteBody({
     return <SharedUnavailable message={t("revokedEditError")} />;
   }
 
-  const status =
-    saveStatus === "saving"
-      ? t("saving")
-      : saveStatus === "success"
-        ? t("saved")
-        : saveStatus === "error"
-          ? t("saveError")
-          : undefined;
+  const retrySave =
+    editable && editor
+      ? () => {
+          void saveContent(editor.getJSON());
+        }
+      : undefined;
 
   return (
     <>
@@ -197,7 +257,7 @@ function SharedNoteBody({
             <Eye className="size-4" />
           )
         }
-        status={status}
+        status={<SyncStatus status={saveStatus} onRetry={retrySave} />}
         actions={
           <CommentsButton
             target={commentsTarget}

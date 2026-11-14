@@ -1,11 +1,10 @@
-"use client";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import EditorToolbar from "./editor/EditorToolbar";
+import EditorBubbleMenu from "./editor/EditorBubbleMenu";
 import { EditorContent } from "@tiptap/react";
 import ConditionChecker from "./helpers/ConditionChecker";
-import { AlertCircle, CheckCircle2, Store, UserPlus } from "lucide-react";
+import { Store, UserPlus } from "lucide-react";
 import { useEditorContext } from "@/providers/EditorProvider";
 import { useTreeContext, type NoteTree } from "@/providers/TreeProvider";
 import { usePathname, useRouter } from "@/i18n/routing";
@@ -16,10 +15,18 @@ import ShareDialog from "./ShareDialog";
 import ListingFormDialog from "./ListingFormDialog";
 import CommentsButton from "./CommentsButton";
 import CommentsPanel from "./CommentsPanel";
+import FloatingCommentCard from "@/components/FloatingCommentCard";
 import HistoryButton from "./HistoryButton";
 import HistoryPanel from "./HistoryPanel";
 import LinkedNotesBlock from "./LinkedNotesBlock";
 import VersionPreviewBanner from "./VersionPreviewBanner";
+import CollaboratorsPile from "./CollaboratorsPile";
+import ReadOnlyBadge from "./ReadOnlyBadge";
+import FocusModeButton from "./FocusModeButton";
+import SyncStatus from "./SyncStatus";
+import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { useNoteCommentsQuery } from "@/hooks/useNoteCommentsQuery";
+import { useCommentAnchors } from "@/hooks/useCommentAnchors";
 import dynamic from "next/dynamic";
 import {
   ResizableHandle,
@@ -46,7 +53,6 @@ function findInTree(id: string, note: NoteTree): NoteTree | null {
 }
 
 export default function NoteContent() {
-  const t = useTranslations("NoteContent");
   const tShare = useTranslations("ShareDialog");
   const { selectedNote, tree, onSelectNote } = useTreeContext();
   const tListing = useTranslations("ListingForm");
@@ -71,8 +77,19 @@ export default function NoteContent() {
   }>({ mode: "chat", seq: 0 });
   const [isListingOpen, setIsListingOpen] = useState(false);
 
-  const { editor, saveStatus, getCurrentContent, previewVersion, exitPreview } =
-    useEditorContext();
+  const {
+    editor,
+    saveStatus,
+    retrySave,
+    getCurrentContent,
+    previewVersion,
+    exitPreview,
+    isSyncLoading,
+    pendingAnchor,
+    setPendingAnchor,
+  } = useEditorContext();
+
+  const { isDisconnected } = useConnectionStatus();
 
   const searchParams = useSearchParams();
   const params = useParams();
@@ -123,6 +140,57 @@ export default function NoteContent() {
     [selectedNote?._id],
   );
 
+  const { data: commentsData } = useNoteCommentsQuery(commentsTarget);
+  const canComment = Boolean(commentsData?.canComment);
+
+  const [activeHighlightEl, setActiveHighlightEl] =
+    useState<HTMLElement | null>(null);
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveHighlightEl(null);
+    setActiveCommentId(null);
+  }, [selectedNote?._id]);
+
+  // Sync comment anchor decorations into the editor continuously.
+  useCommentAnchors(
+    editor,
+    commentsData?.threads,
+    focusCommentId ?? activeCommentId,
+  );
+
+  const activeThread = useMemo(() => {
+    if (!activeCommentId || !commentsData?.threads) return null;
+    return (
+      commentsData.threads.find(
+        th => th.root._id === activeCommentId && th.resolvedAt === null,
+      ) ?? null
+    );
+  }, [activeCommentId, commentsData?.threads]);
+
+  const virtualRef = useMemo(
+    () => ({
+      current: {
+        getBoundingClientRect: () =>
+          activeHighlightEl?.getBoundingClientRect() ?? new DOMRect(),
+      },
+    }),
+    [activeHighlightEl],
+  );
+
+  const handleEditorContainerClick = (e: React.MouseEvent) => {
+    const target = (e.target as HTMLElement).closest(
+      ".comment-highlight",
+    ) as HTMLElement | null;
+    if (target) {
+      const commentId = target.getAttribute("data-comment-id");
+      if (commentId) {
+        setActiveHighlightEl(target);
+        setActiveCommentId(commentId);
+      }
+    }
+  };
+
   const handleCommentsOpenChange = useCallback(
     (open: boolean) => {
       setIsCommentsOpen(open);
@@ -140,16 +208,23 @@ export default function NoteContent() {
     [tree, onSelectNote, getCurrentContent],
   );
 
+  const isEditable =
+    Boolean(selectedNote) &&
+    selectedNote?.role !== "view" &&
+    !previewVersion &&
+    !isSyncLoading;
+
   const content = (
     <div className="min-h-full flex flex-col gap-2">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
         <ConditionChecker condition={!selectedNote}>
           <Skeleton className="w-56 h-8" />
         </ConditionChecker>
         <ConditionChecker condition={!!selectedNote}>
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
               <h2 className="text-2xl font-bold">{selectedNote?.title}</h2>
+              {selectedNote?.role === "view" && <ReadOnlyBadge />}
               <Button
                 variant="ghost"
                 size="icon"
@@ -182,61 +257,46 @@ export default function NoteContent() {
                   {tListing("triggerLabel")}
                 </Button>
               )}
+              <CollaboratorsPile noteId={selectedNote?._id} />
             </div>
-            <div className="flex items-center gap-2">
-              <ConditionChecker condition={saveStatus === "error"}>
-                <div className="flex items-center text-destructive gap-1">
-                  <AlertCircle />
-                  <span className="text-sm">{t("status.failed")}</span>
-                </div>
-              </ConditionChecker>
-              <ConditionChecker condition={saveStatus === "success"}>
-                <div className="flex items-center text-green-600 gap-1">
-                  <CheckCircle2 />
-                  <span className="text-sm">{t("status.saved")}</span>
-                </div>
-              </ConditionChecker>
-              <ConditionChecker condition={saveStatus === "saving"}>
-                <span className="text-sm text-gray-500 animate-pulse">
-                  {t("status.saving")}
-                </span>
-              </ConditionChecker>
-              <ConditionChecker
-                condition={saveStatus === "unsaved" && !!selectedNote}
-              >
-                <span className="text-sm text-amber-500">
-                  {t("status.unsaved")}
-                </span>
-              </ConditionChecker>
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <SyncStatus
+                status={saveStatus}
+                onRetry={retrySave}
+                isOffline={isDisconnected}
+              />
+              <FocusModeButton className="hidden md:inline-flex" />
             </div>
           </>
         </ConditionChecker>
       </div>
       <div className="grow flex flex-col gap-4">
         <div className="flex flex-col gap-2 grow">
-          <EditorToolbar
-            onOpenChat={mode => {
-              setChatRequest(prev => ({
-                mode: mode ?? "chat",
-                seq: prev.seq + 1,
-              }));
-              setIsLinksOpen(false);
-              setLinksRequest(null);
-              setIsChatOpen(true);
-            }}
-            onOpenLinks={() => {
-              // The chat is NOT closed: it stays mounted (hidden) so an
-              // unapplied, already charged proposal survives (review M3).
-              if (selectedNote) {
-                setLinksRequest(prev => ({
-                  noteId: selectedNote._id,
-                  seq: (prev?.seq ?? 0) + 1,
+          <ConditionChecker condition={isEditable}>
+            <EditorToolbar
+              onOpenChat={mode => {
+                setChatRequest(prev => ({
+                  mode: mode ?? "chat",
+                  seq: prev.seq + 1,
                 }));
-              }
-              setIsLinksOpen(true);
-            }}
-          />
-          <ConditionChecker condition={!selectedNote}>
+                setIsLinksOpen(false);
+                setLinksRequest(null);
+                setIsChatOpen(true);
+              }}
+              onOpenLinks={() => {
+                // The chat is NOT closed: it stays mounted (hidden) so an
+                // unapplied, already charged proposal survives (review M3).
+                if (selectedNote) {
+                  setLinksRequest(prev => ({
+                    noteId: selectedNote._id,
+                    seq: (prev?.seq ?? 0) + 1,
+                  }));
+                }
+                setIsLinksOpen(true);
+              }}
+            />
+          </ConditionChecker>
+          <ConditionChecker condition={!selectedNote || Boolean(isSyncLoading)}>
             <div className="flex-1 p-4 flex flex-col gap-4 border rounded-md">
               <Skeleton className="w-56 h-8 mt-4" />
               <div className="flex flex-col gap-2">
@@ -245,13 +305,31 @@ export default function NoteContent() {
               </div>
             </div>
           </ConditionChecker>
-          <ConditionChecker condition={!!selectedNote}>
+          <ConditionChecker condition={Boolean(selectedNote) && !isSyncLoading}>
             <>
               <VersionPreviewBanner />
+              <EditorBubbleMenu
+                onOpenChat={mode => {
+                  setChatRequest(prev => ({
+                    mode: mode ?? "chat",
+                    seq: prev.seq + 1,
+                  }));
+                  setIsLinksOpen(false);
+                  setLinksRequest(null);
+                  setIsChatOpen(true);
+                }}
+                onOpenComments={
+                  commentsTarget ? () => setIsCommentsOpen(true) : undefined
+                }
+                commentsTarget={commentsTarget}
+                canComment={canComment}
+              />
               <div
                 onKeyDown={event => {
                   if (event.key === "Escape" && previewVersion) exitPreview();
                 }}
+                onClick={handleEditorContainerClick}
+                className="flex flex-1"
               >
                 <EditorContent editor={editor} />
               </div>
@@ -272,12 +350,28 @@ export default function NoteContent() {
           onOpenChange={setIsShareOpen}
         />
       )}
+      {activeThread && commentsTarget && (
+        <FloatingCommentCard
+          target={commentsTarget}
+          thread={activeThread}
+          canComment={canComment}
+          isOpen={Boolean(activeThread && activeHighlightEl)}
+          virtualRef={virtualRef}
+          onClose={() => {
+            setActiveHighlightEl(null);
+            setActiveCommentId(null);
+          }}
+        />
+      )}
       {commentsTarget && (
         <CommentsPanel
           target={commentsTarget}
           open={isCommentsOpen}
           onOpenChange={handleCommentsOpenChange}
           focusCommentId={focusCommentId}
+          editor={editor}
+          pendingAnchor={pendingAnchor}
+          onAnchorConsumed={() => setPendingAnchor(null)}
         />
       )}
       {selectedNote && canViewHistory && (
@@ -312,7 +406,7 @@ export default function NoteContent() {
   return (
     <ResizablePanelGroup
       orientation="vertical"
-      className="h-[calc(100dvh-7rem)] min-h-[480px]"
+      className="h-[calc(100dvh-7rem)] min-h-120"
     >
       <ResizablePanel
         id="note"

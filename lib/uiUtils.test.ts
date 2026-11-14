@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
-import en from "@/messages/en.json";
-import fr from "@/messages/fr.json";
+import en from "../messages/en.json";
+import fr from "../messages/fr.json";
 import { getInitials } from "./initials";
-import { formatFullDate, formatRelativeTime } from "./relativeTime";
+import {
+  formatCompactRelativeTime,
+  formatFullDate,
+  formatRelativeTime,
+} from "./relativeTime";
 
 describe("initials", () => {
   it("builds initials from names", () => {
@@ -36,13 +40,53 @@ describe("relative time", () => {
       "il y a 3 jours",
     );
   });
+  it("formats compact relative times cleanly", () => {
+    expect(formatCompactRelativeTime(now - 47 * 60_000, "fr", now)).toBe(
+      "47 min",
+    );
+    expect(formatCompactRelativeTime(now - 2 * 3_600_000, "fr", now)).toBe(
+      "2 h",
+    );
+    expect(formatCompactRelativeTime(now - 3 * 86_400_000, "fr", now)).toBe(
+      "3 j",
+    );
+    expect(formatCompactRelativeTime(now - 47 * 60_000, "en", now)).toBe(
+      "47 min",
+    );
+    expect(formatCompactRelativeTime(now - 2 * 3_600_000, "en", now)).toBe(
+      "2 hr",
+    );
+  });
+  it("formats narrow compact relative times cleanly", () => {
+    expect(
+      formatCompactRelativeTime(now - 47 * 60_000, "en", now, {
+        unitDisplay: "narrow",
+      }),
+    ).toBe("47m");
+    expect(
+      formatCompactRelativeTime(now - 2 * 3_600_000, "en", now, {
+        unitDisplay: "narrow",
+      }),
+    ).toBe("2h");
+    expect(
+      formatCompactRelativeTime(now - 3 * 86_400_000, "en", now, {
+        unitDisplay: "narrow",
+      }),
+    ).toBe("3d");
+  });
   it("formats full date with year", () => {
     expect(formatFullDate(now, "en")).toContain("2026");
   });
 });
 
 describe("i18n parity", () => {
-  for (const ns of ["Comments", "Notifications", "Sidebar", "Purchases", "Sales"] as const) {
+  for (const ns of [
+    "Comments",
+    "Notifications",
+    "Sidebar",
+    "Purchases",
+    "Sales",
+  ] as const) {
     it(`${ns} keys match between en and fr`, () => {
       expect(Object.keys(fr[ns])).toEqual(Object.keys(en[ns]));
       for (const m of [en, fr]) {

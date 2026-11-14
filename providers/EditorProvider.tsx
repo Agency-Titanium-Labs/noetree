@@ -1,15 +1,19 @@
-import { Editor } from "@tiptap/core";
+import { Editor, JSONContent } from "@tiptap/core";
 import { Content, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
-import React, {
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import { CustomCodeBlockLowlight } from "@/components/editor/CodeBlockExtension";
+import { CommentHighlighter } from "@/lib/editor/commentHighlighter";
+import {
   createContext,
   ReactNode,
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -18,6 +22,20 @@ import { useTreeContext } from "./TreeProvider";
 import { useTranslations } from "next-intl";
 import { GhostText } from "@/lib/editor/ghostText";
 import { useAutocompleteBridge } from "@/lib/editor/useAutocompleteBridge";
+import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap";
+import { api } from "@/convex/_generated/api";
+import { useMutation, useQuery } from "convex/react";
+import usePresence, { type PresenceState } from "@convex-dev/presence/react";
+import { useUser } from "@clerk/nextjs";
+import {
+  CollaborativeCursors,
+  collaborativeCursorsKey,
+  getUserColor,
+  type RemoteUserCursor,
+} from "@/lib/editor/collaborativeCursors";
+import { findNoteInTree } from "@/lib/treeUtils";
+import { Id } from "@/convex/_generated/dataModel";
+import { SlashCommand } from "@/components/editor/slashCommandExtension";
 
 type saveStatusType = "idle" | "unsaved" | "saving" | "success" | "error";
 
@@ -30,6 +48,25 @@ export type PreviewVersion = {
   author: { name: string | null; avatarUrl: string | null } | null;
 };
 
+export type HoveredCollaborator = {
+  userId: string;
+  activeNoteId: string;
+  color: string;
+};
+
+export type FollowedCollaborator = {
+  userId: string;
+  name: string;
+  activeNoteId?: string;
+  color: string;
+};
+
+export type PendingCommentAnchor = {
+  quote: string;
+  from: number;
+  to: number;
+};
+
 interface EditorContextType {
   editor: Editor | null;
   saveStatus: saveStatusType;
@@ -37,6 +74,20 @@ interface EditorContextType {
   previewVersion: PreviewVersion | null;
   enterPreview: (version: PreviewVersion) => void;
   exitPreview: (contentOverride?: string) => void;
+  presenceList?: PresenceState[];
+  treePresenceList?: PresenceState[];
+  hoveredCollaborator: HoveredCollaborator | null;
+  setHoveredCollaborator: (collab: HoveredCollaborator | null) => void;
+  followedUserId: string | null;
+  setFollowedUserId: (userId: string | null) => void;
+  followedCollaborator: FollowedCollaborator | null;
+  retrySave: () => void;
+  isSyncLoading?: boolean;
+  pendingAnchor: PendingCommentAnchor | null;
+  setPendingAnchor: (anchor: PendingCommentAnchor | null) => void;
+  isFocusMode: boolean;
+  setIsFocusMode: (value: boolean | ((prev: boolean) => boolean)) => void;
+  toggleFocusMode: () => void;
 }
 
 const EditorContext = createContext<EditorContextType>({
@@ -46,6 +97,20 @@ const EditorContext = createContext<EditorContextType>({
   previewVersion: null,
   enterPreview: () => {},
   exitPreview: () => {},
+  presenceList: undefined,
+  treePresenceList: undefined,
+  hoveredCollaborator: null,
+  setHoveredCollaborator: () => {},
+  followedUserId: null,
+  setFollowedUserId: () => {},
+  followedCollaborator: null,
+  retrySave: () => {},
+  isSyncLoading: false,
+  pendingAnchor: null,
+  setPendingAnchor: () => {},
+  isFocusMode: false,
+  setIsFocusMode: () => {},
+  toggleFocusMode: () => {},
 });
 
 function parseNoteContent(raw: unknown): Content {
@@ -80,46 +145,378 @@ interface EditorProviderProps {
 
 export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const t = useTranslations("Editor");
-  const { selectedNote, onUpdateNoteContent } = useTreeContext();
+  const { selectedNote, onUpdateNoteContent, rootNoteId, tree, onSelectNote } =
+    useTreeContext();
+  const treeRoomId = rootNoteId ?? selectedNote?._id ?? "";
 
   const [saveStatus, setSaveStatus] = useState<saveStatusType>("idle");
   const lastNoteIdRef = useRef<string | undefined>(undefined);
+  const [hoveredCollaborator, setHoveredCollaborator] =
+    useState<HoveredCollaborator | null>(null);
+  const [followedUserId, setFollowedUserId] = useState<string | null>(null);
+  const [pendingAnchor, setPendingAnchor] =
+    useState<PendingCommentAnchor | null>(null);
 
   const [previewVersion, setPreviewVersion] = useState<PreviewVersion | null>(
     null,
   );
   const previewRef = useRef<PreviewVersion | null>(null);
   const latestContentRef = useRef<string | undefined>(selectedNote?.content);
-
-  const initialContent: Content = parseNoteContent(selectedNote?.content);
+  const isRepairingRef = useRef(false);
 
   // Phase 21: premium ghost-text autocomplete (off unless the account turned
   // it on; a Free user never makes a request).
   const { options: autocomplete, enabled: autocompleteEnabled } =
     useAutocompleteBridge(selectedNote?._id);
 
+  const resyncDocumentMutation = useMutation(
+    api.prosemirrorSync.resyncDocument,
+  );
+
+  const sync = useTiptapSync(api.prosemirrorSync, selectedNote?._id ?? "", {
+    onSyncError: error => {
+      console.warn("Collaborative sync warning:", error);
+      if (
+        !isRepairingRef.current &&
+        selectedNote?._id &&
+        ((error as Error)?.message?.includes("out of range") ||
+          error instanceof RangeError)
+      ) {
+        isRepairingRef.current = true;
+        setTimeout(() => {
+          isRepairingRef.current = false;
+        }, 5000);
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem(`convex-sync-${selectedNote._id}`);
+          } catch {}
+        }
+        const content =
+          editorRef.current?.getJSON() ??
+          parseNoteContent(selectedNote.content);
+        void resyncDocumentMutation({
+          id: selectedNote._id,
+          content: JSON.stringify(content),
+        }).catch(err => {
+          console.error("Failed to repair document:", err);
+        });
+      }
+    },
+    snapshotDebounceMs: 100,
+  });
+
+  const initialContent: Content = sync.initialContent
+    ? (sync.initialContent as Content)
+    : sync.isLoading
+      ? { type: "doc", content: [] }
+      : parseNoteContent(selectedNote?.content);
+
+  const { user } = useUser();
+  const me = useQuery(api.users.me);
+  const currentUserId = me?._id ?? user?.id ?? "";
+
+  const treePresenceList = usePresence(
+    api.presence,
+    treeRoomId,
+    currentUserId,
+    10000,
+  );
+
+  const updateCursorMutation = useMutation(api.presence.updateCursor);
+
+  // Filter tree presence to get collaborators active on the currently selected note
+  const presenceList = useMemo(() => {
+    if (!selectedNote?._id) return [];
+    return (treePresenceList ?? []).filter(p => {
+      if (!p.data || typeof p.data !== "object") return false;
+      const data = p.data as { activeNoteId?: string };
+      return data.activeNoteId === selectedNote._id;
+    });
+  }, [treePresenceList, selectedNote?._id]);
+
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const toggleFocusMode = useCallback(() => {
+    setIsFocusMode(prev => !prev);
+  }, []);
+
+  // Sync active note presence across the tree room
+  const isTypingRef = useRef(false);
+  const editorRef = useRef<Editor | null>(null);
+  const lastSyncedCursorRef = useRef<{ from: number; to: number } | undefined>(
+    undefined,
+  );
+  const lastDocChangeTimeRef = useRef(0);
+
+  const debouncedStopTyping = useDebouncedCallback(() => {
+    if (!isTypingRef.current || !treeRoomId) return;
+    isTypingRef.current = false;
+    const currentCursor = editorRef.current?.isFocused
+      ? {
+          from: editorRef.current.state.selection.from,
+          to: editorRef.current.state.selection.to,
+        }
+      : undefined;
+    lastSyncedCursorRef.current = currentCursor;
+    void updateCursorMutation({
+      roomId: treeRoomId,
+      activeNoteId: selectedNote?._id,
+      cursor: currentCursor,
+      isTyping: false,
+    });
+  }, 1500);
+
+  const handleUserTyping = useCallback(() => {
+    if (!treeRoomId || previewRef.current) return;
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      // Send typing status with the stable pre-edit cursor position that remote peers already have in their doc.
+      // Remote peers will advance the cursor in sync with the incoming content steps to avoid premature line jumps!
+      void updateCursorMutation({
+        roomId: treeRoomId,
+        activeNoteId: selectedNote?._id,
+        cursor: lastSyncedCursorRef.current,
+        isTyping: true,
+      });
+    }
+    debouncedStopTyping();
+  }, [
+    treeRoomId,
+    selectedNote?._id,
+    updateCursorMutation,
+    debouncedStopTyping,
+  ]);
+
+  useEffect(() => {
+    if (!treeRoomId) return;
+    debouncedStopTyping.cancel();
+    isTypingRef.current = false;
+    lastSyncedCursorRef.current = undefined;
+    void updateCursorMutation({
+      roomId: treeRoomId,
+      activeNoteId: selectedNote?._id,
+      cursor: undefined,
+      isTyping: false,
+    });
+  }, [
+    treeRoomId,
+    selectedNote?._id,
+    updateCursorMutation,
+    debouncedStopTyping,
+  ]);
+
+  const debouncedSendCursor = useDebouncedCallback(
+    (from: number, to: number) => {
+      if (!treeRoomId || previewRef.current) return;
+      // Do not send intermediate cursor positions while actively typing:
+      // prosemirror-sync handles content synchronization, and remote editors map the cursor
+      // automatically as steps arrive to prevent cursor jumps!
+      if (isTypingRef.current) return;
+      // Guard against stale selections exceeding document bounds
+      const docSize = editorRef.current?.state.doc.content.size;
+      if (docSize !== undefined && (from > docSize || to > docSize)) {
+        return;
+      }
+      lastSyncedCursorRef.current = { from, to };
+      void updateCursorMutation({
+        roomId: treeRoomId,
+        activeNoteId: selectedNote?._id,
+        cursor: { from, to },
+        isTyping: false,
+      });
+    },
+    150,
+    { maxWait: 400 },
+  );
+
+  const clearCursor = useCallback(() => {
+    if (!treeRoomId) return;
+    debouncedStopTyping.cancel();
+    debouncedSendCursor.cancel();
+    isTypingRef.current = false;
+    lastSyncedCursorRef.current = undefined;
+    void updateCursorMutation({
+      roomId: treeRoomId,
+      activeNoteId: selectedNote?._id,
+      cursor: undefined,
+      isTyping: false,
+    });
+  }, [
+    treeRoomId,
+    selectedNote?._id,
+    updateCursorMutation,
+    debouncedStopTyping,
+    debouncedSendCursor,
+  ]);
+
+  // When a note is opened for the first time in prosemirrorSync, initialize it
+  useEffect(() => {
+    if (!sync.isLoading && sync.initialContent === null && selectedNote?._id) {
+      const parsed = parseNoteContent(selectedNote.content);
+      const doc =
+        parsed && typeof parsed === "object" && "type" in parsed
+          ? (parsed as JSONContent)
+          : { type: "doc", content: [] };
+      void sync.create(doc);
+    }
+  }, [
+    sync.isLoading,
+    sync.initialContent,
+    selectedNote?._id,
+    selectedNote?.content,
+    sync,
+  ]);
+
   const editor = useEditor(
     {
       content: initialContent,
+      editable: selectedNote
+        ? selectedNote.role !== "view" && !previewVersion
+        : false,
       extensions: [
-        StarterKit,
+        StarterKit.configure({
+          codeBlock: false,
+        }),
+        CustomCodeBlockLowlight,
+        CommentHighlighter,
+        ...(sync.extension ? [sync.extension] : []),
+        CollaborativeCursors,
         Placeholder.configure({
           placeholder: t("placeholder"),
         }),
-        Link,
         Image,
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+        }),
         GhostText.configure(autocomplete),
+        SlashCommand,
       ],
       editorProps: {
         attributes: {
           class: "flex-1 overflow-y-auto border rounded-md p-4",
         },
       },
+      onSelectionUpdate: ({ editor: ed }) => {
+        if (previewRef.current) return;
+        const { from, to } = ed.state.selection;
+        // Keep track of the selection so that if the user starts typing, we know the exact edit origin
+        if (!isTypingRef.current) {
+          lastSyncedCursorRef.current = { from, to };
+        }
+        // If selection update happened as part of a document change (typing), don't race presence ahead of sync steps
+        const isTypingEdit = Date.now() - lastDocChangeTimeRef.current < 50;
+        if (isTypingEdit) {
+          return;
+        }
+        // If selection changed without docChanged (arrow keys or mouse click), user moved cursor without typing
+        if (isTypingRef.current) {
+          debouncedStopTyping.cancel();
+          isTypingRef.current = false;
+        }
+        debouncedSendCursor(from, to);
+      },
+      onTransaction: ({ editor: ed, transaction }) => {
+        if (transaction.docChanged) {
+          lastDocChangeTimeRef.current = Date.now();
+          if (
+            ed.isFocused &&
+            !previewRef.current &&
+            selectedNote?.role !== "view"
+          ) {
+            handleUserTyping();
+          }
+        }
+      },
+      onBlur: () => {
+        clearCursor();
+      },
+      onCreate: ({ editor: ed }) => {
+        (ed as unknown as { _noteId?: string })._noteId = selectedNote?._id;
+      },
       immediatelyRender: false,
       shouldRerenderOnTransaction: true,
     },
-    [selectedNote?._id, t],
+    [
+      selectedNote?._id,
+      selectedNote?.role,
+      sync.isLoading,
+      sync.extension,
+      sync.initialContent,
+      t,
+      handleUserTyping,
+    ],
   );
+  editorRef.current = editor;
+
+  useEffect(() => {
+    if (editor && selectedNote?._id) {
+      (editor as unknown as { _noteId?: string })._noteId = selectedNote._id;
+    }
+  }, [editor, selectedNote?._id]);
+
+  // Sync remote collaborators' cursors into TipTap decorations
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    const remoteUsers: RemoteUserCursor[] = (presenceList ?? [])
+      .filter(
+        p =>
+          p.online &&
+          p.userId !== currentUserId &&
+          (!user?.id || p.userId !== user.id) &&
+          p.data &&
+          typeof p.data === "object" &&
+          "cursor" in (p.data as Record<string, unknown>),
+      )
+      .map((p): RemoteUserCursor => {
+        const data = p.data as {
+          cursor?: { from: number; to: number };
+          isTyping?: boolean;
+        };
+        return {
+          userId: p.userId,
+          name: p.name || t("collaborator"),
+          color: getUserColor(p.userId),
+          cursor: data.cursor,
+          isTyping: data.isTyping,
+        };
+      })
+      .filter(
+        (
+          u,
+        ): u is RemoteUserCursor & {
+          cursor: { from: number; to: number };
+        } => Boolean(u.cursor),
+      );
+
+    const tr = editor.state.tr.setMeta(collaborativeCursorsKey, remoteUsers);
+    editor.view.dispatch(tr);
+  }, [presenceList, currentUserId, user?.id, editor, t]);
+
+  // Clear cursor on note change or unmount
+  useEffect(() => {
+    isRepairingRef.current = false;
+    return () => {
+      clearCursor();
+      debouncedSendCursor.cancel();
+    };
+  }, [selectedNote?._id, clearCursor, debouncedSendCursor]);
+
+  // Clear cursor when tab/document is hidden, restore on focus
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearCursor();
+      } else if (editor && !editor.isDestroyed && editor.isFocused) {
+        const { from, to } = editor.state.selection;
+        debouncedSendCursor(from, to);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [editor, clearCursor, debouncedSendCursor]);
 
   // Switching autocomplete off (here or on another device) drops a shown
   // suggestion and any pending request immediately.
@@ -132,6 +529,10 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     )?.ghostText?.clear?.();
   }, [autocompleteEnabled, editor]);
 
+  const isMountedRef = useRef(true);
+  const saveStatusRef = useRef(saveStatus);
+  saveStatusRef.current = saveStatus;
+
   const saveContent = useCallback(
     async (content: Content) => {
       if (!selectedNote) return;
@@ -139,26 +540,89 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       if (previewRef.current) return; // Never save while previewing a version
 
       try {
-        setSaveStatus("saving");
+        if (isMountedRef.current) setSaveStatus("saving");
 
         onUpdateNoteContent(JSON.stringify(content));
 
-        setSaveStatus("success");
+        if (isMountedRef.current) {
+          setSaveStatus("success");
 
-        setTimeout(() => {
-          setSaveStatus(currentStatus =>
-            currentStatus === "success" ? "idle" : currentStatus,
-          );
-        }, 2000);
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              setSaveStatus(currentStatus =>
+                currentStatus === "success" ? "idle" : currentStatus,
+              );
+            }
+          }, 2000);
+        }
       } catch (error) {
         console.error("Failed to save note content", error);
-        setSaveStatus("error");
+        if (isMountedRef.current) setSaveStatus("error");
       }
     },
     [selectedNote, onUpdateNoteContent],
   );
 
-  const debouncedSave = useDebouncedCallback(saveContent, 3000);
+  const debouncedSave = useDebouncedCallback(saveContent, 1000);
+  const debouncedSaveRef = useRef(debouncedSave);
+  debouncedSaveRef.current = debouncedSave;
+
+  // Handle unmount (route change, page navigation): flush pending debounced save
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      void debouncedSaveRef.current.flush();
+    };
+  }, []);
+
+  // Handle browser close / reload / visibility change (minimize or background tab)
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (saveStatusRef.current === "unsaved") {
+        void debouncedSaveRef.current.flush();
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        saveStatusRef.current === "unsaved"
+      ) {
+        void debouncedSaveRef.current.flush();
+      }
+    };
+
+    const handlePageHide = () => {
+      if (saveStatusRef.current === "unsaved") {
+        void debouncedSaveRef.current.flush();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
+
+  const retrySave = useCallback(() => {
+    if (
+      editor &&
+      !editor.isDestroyed &&
+      !previewRef.current &&
+      selectedNote?.role !== "view"
+    ) {
+      debouncedSave.cancel();
+      void saveContent(editor.getJSON());
+    }
+  }, [editor, debouncedSave, saveContent, selectedNote?.role]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -188,16 +652,42 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
 
-    debouncedSave.cancel();
-
-    const isNoteChanged = lastNoteIdRef.current !== selectedNote?._id;
+    const previousNoteId = lastNoteIdRef.current;
+    const isNoteChanged = previousNoteId !== selectedNote?._id;
     lastNoteIdRef.current = selectedNote?._id;
 
     if (isNoteChanged) {
+      if (
+        previousNoteId &&
+        editorRef.current &&
+        !editorRef.current.isDestroyed &&
+        !previewRef.current
+      ) {
+        try {
+          const json = editorRef.current.getJSON();
+          const collabPlugin = editorRef.current.state?.plugins?.find(
+            p => (p as unknown as { key: string })?.key === "collab$",
+          );
+          const version = collabPlugin
+            ? (collabPlugin.getState(editorRef.current.state)?.version ?? 1)
+            : 1;
+          sessionStorage.setItem(
+            `convex-sync-${previousNoteId}`,
+            JSON.stringify({
+              content: json,
+              version,
+              steps: [],
+            }),
+          );
+        } catch {}
+      }
+      debouncedSave.cancel();
       setSaveStatus("idle");
       // The editor is re-created on note switch, so just drop preview state.
       previewRef.current = null;
       setPreviewVersion(null);
+      setPendingAnchor(null);
+      return;
     }
 
     if (!selectedNote) {
@@ -208,7 +698,12 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     }
 
     // While previewing, remote changes must not touch the editor.
-    if (previewRef.current && !isNoteChanged) return;
+    if (previewRef.current) return;
+
+    // When sync.extension is active, remote changes on the same note are
+    // merged cleanly in real time via ProseMirror collab. Calling setContent
+    // would clobber the user's cursor and local unsynced edits.
+    if (sync.extension) return;
 
     const content = parseNoteContent(latestContentRef.current);
 
@@ -237,7 +732,27 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       if (previewRef.current) return; // Never save while previewing a version
       if (!editor.isEditable || selectedNote.role === "view") return; // Do not save if view-only
       setSaveStatus("unsaved");
-      debouncedSave(editor.getJSON());
+      const json = editor.getJSON();
+      debouncedSave(json);
+
+      if (typeof window !== "undefined" && selectedNote?._id) {
+        try {
+          const collabPlugin = editor.state?.plugins?.find(
+            p => (p as unknown as { key: string })?.key === "collab$",
+          );
+          const version = collabPlugin
+            ? (collabPlugin.getState(editor.state)?.version ?? 1)
+            : 1;
+          sessionStorage.setItem(
+            `convex-sync-${selectedNote._id}`,
+            JSON.stringify({
+              content: json,
+              version,
+              steps: [],
+            }),
+          );
+        } catch {}
+      }
     };
 
     editor.on("update", updateListener);
@@ -293,20 +808,176 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     [editor],
   );
 
-  const getCurrentContent = () => {
+  const getCurrentContent = useCallback(() => {
     if (previewRef.current) return null;
     if (!editor || editor.isDestroyed) return null;
     return JSON.stringify(editor.getJSON());
-  };
+  }, [editor]);
 
-  const contextValue = {
-    editor,
-    saveStatus,
+  const followedUser = useMemo(() => {
+    if (!followedUserId || !treePresenceList) return null;
+    return (
+      treePresenceList.find(p => p.userId === followedUserId && p.online) ??
+      null
+    );
+  }, [followedUserId, treePresenceList]);
+
+  const followedCollaborator = useMemo<FollowedCollaborator | null>(() => {
+    if (!followedUser) return null;
+    const activeNoteId =
+      followedUser.data &&
+      typeof followedUser.data === "object" &&
+      "activeNoteId" in (followedUser.data as Record<string, unknown>)
+        ? (followedUser.data as { activeNoteId?: string }).activeNoteId
+        : undefined;
+
+    return {
+      userId: followedUser.userId,
+      name: followedUser.name ?? t("collaborator"),
+      activeNoteId,
+      color: getUserColor(followedUser.userId),
+    };
+  }, [followedUser, t]);
+
+  // If followed user leaves or goes offline, stop following
+  useEffect(() => {
+    if (followedUserId && !followedUser) {
+      setFollowedUserId(null);
+    }
+  }, [followedUserId, followedUser]);
+
+  // Follow note navigation across the tree
+  useEffect(() => {
+    if (!followedCollaborator?.activeNoteId || !tree) return;
+    if (selectedNote?._id === followedCollaborator.activeNoteId) return;
+
+    const target = findNoteInTree(
+      tree,
+      followedCollaborator.activeNoteId as Id<"notes">,
+    );
+    if (target) {
+      onSelectNote(target, getCurrentContent);
+    }
+  }, [
+    followedCollaborator?.activeNoteId,
+    tree,
+    selectedNote?._id,
+    onSelectNote,
     getCurrentContent,
-    previewVersion,
-    enterPreview,
-    exitPreview,
-  };
+  ]);
+
+  const followedCursor = useMemo(() => {
+    if (
+      !followedUser?.data ||
+      typeof followedUser.data !== "object" ||
+      !("cursor" in (followedUser.data as Record<string, unknown>))
+    ) {
+      return undefined;
+    }
+    return (followedUser.data as { cursor?: { from: number; to: number } })
+      .cursor;
+  }, [followedUser?.data]);
+
+  // Follow cursor scroll in editor
+  useEffect(() => {
+    if (!followedUserId || !followedCursor || !editor || editor.isDestroyed)
+      return;
+    const timer = setTimeout(() => {
+      const cursorEl = document.querySelector<HTMLElement>(
+        `[data-cursor-user-id="${followedUserId}"]`,
+      );
+      if (cursorEl) {
+        cursorEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [followedUserId, followedCursor, editor]);
+
+  // Disengage follow on Escape key
+  useEffect(() => {
+    if (!followedUserId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setFollowedUserId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [followedUserId]);
+
+  // Disengage follow when local user edits document
+  useEffect(() => {
+    if (!editor || !followedUserId) return;
+    const handleTransaction = ({
+      transaction,
+    }: {
+      transaction: { docChanged: boolean };
+    }) => {
+      if (transaction.docChanged) {
+        setFollowedUserId(null);
+      }
+    };
+    editor.on("transaction", handleTransaction);
+    return () => {
+      editor.off("transaction", handleTransaction);
+    };
+  }, [editor, followedUserId]);
+
+  const isNoteChanging = Boolean(
+    selectedNote &&
+    editor &&
+    (editor as unknown as { _noteId?: string })._noteId !== undefined &&
+    (editor as unknown as { _noteId?: string })._noteId !== selectedNote._id,
+  );
+  const isSyncLoading = Boolean(
+    selectedNote && (sync.isLoading || isNoteChanging),
+  );
+
+  const contextValue = useMemo(
+    () => ({
+      editor,
+      saveStatus,
+      getCurrentContent,
+      previewVersion,
+      enterPreview,
+      exitPreview,
+      presenceList,
+      treePresenceList,
+      hoveredCollaborator,
+      setHoveredCollaborator,
+      followedUserId,
+      setFollowedUserId,
+      followedCollaborator,
+      retrySave,
+      isSyncLoading,
+      pendingAnchor,
+      setPendingAnchor,
+      isFocusMode,
+      setIsFocusMode,
+      toggleFocusMode,
+    }),
+    [
+      editor,
+      saveStatus,
+      getCurrentContent,
+      previewVersion,
+      enterPreview,
+      exitPreview,
+      presenceList,
+      treePresenceList,
+      hoveredCollaborator,
+      setHoveredCollaborator,
+      followedUserId,
+      setFollowedUserId,
+      followedCollaborator,
+      retrySave,
+      isSyncLoading,
+      pendingAnchor,
+      setPendingAnchor,
+      isFocusMode,
+      toggleFocusMode,
+    ],
+  );
 
   return (
     <EditorContext.Provider value={contextValue}>

@@ -4,7 +4,7 @@ import { Link } from "@/i18n/routing";
 interface SharedHeaderProps {
   badgeLabel: string;
   badgeIcon: React.ReactNode;
-  status?: string;
+  status?: React.ReactNode;
   actions?: React.ReactNode;
 }
 
@@ -22,11 +22,17 @@ export default function SharedHeader({
         </Link>
         <div className="flex items-center gap-3">
           {actions}
-          {status && (
-            <span className="text-sm text-muted-foreground" aria-live="polite">
-              {status}
-            </span>
-          )}
+          {status &&
+            (typeof status === "string" ? (
+              <span
+                className="text-sm text-muted-foreground"
+                aria-live="polite"
+              >
+                {status}
+              </span>
+            ) : (
+              status
+            ))}
           <Badge variant="secondary" aria-label={badgeLabel} title={badgeLabel}>
             {badgeIcon}
             <span className="hidden sm:inline">{badgeLabel}</span>

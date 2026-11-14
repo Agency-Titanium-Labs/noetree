@@ -5,6 +5,7 @@ import ConditionChecker from "@/components/helpers/ConditionChecker";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import NotificationBell from "@/components/NotificationBell";
+import AiCreditsBadge from "@/components/AiCreditsBadge";
 import { useHeader } from "@/providers/HeaderProvider";
 
 export default function Header() {
@@ -27,9 +28,10 @@ export default function Header() {
 
       {search && <div className="flex-1 max-w-xs mx-2 sm:mx-4">{search}</div>}
 
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {action}
         <ConditionChecker condition={!isLoading && isAuthenticated}>
+          <AiCreditsBadge />
           <NotificationBell />
         </ConditionChecker>
         <ConditionChecker condition={!isLoading}>

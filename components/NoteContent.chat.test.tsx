@@ -77,6 +77,7 @@ vi.mock("./HistoryButton", () => ({ default: () => null }));
 vi.mock("./HistoryPanel", () => ({ default: () => null }));
 vi.mock("./LinkedNotesBlock", () => ({ default: () => null }));
 vi.mock("./VersionPreviewBanner", () => ({ default: () => null }));
+vi.mock("./CollaboratorsPile", () => ({ default: () => null }));
 
 // next/dynamic: resolve to a small stateful chat so M2 is observable.
 vi.mock("next/dynamic", () => ({
@@ -165,5 +166,18 @@ describe("NoteContent chat is bound to its note (M2)", () => {
     expect(chat).toHaveAttribute("data-note", "n2");
     // remounted: the previous note's conversation state is gone
     expect(screen.getByTestId("chat-draft")).toHaveValue("");
+  });
+
+  it("does not render the EditorToolbar when the note is read-only (role === 'view')", () => {
+    tree.selectedNote = { _id: "n2", title: "Read Only", role: "view" };
+    render(<NoteContent />);
+    expect(screen.queryByTestId("open-chat")).toBeNull();
+    expect(screen.getByText("readOnlyBadge")).toBeInTheDocument();
+  });
+
+  it("does not render ReadOnlyBadge when the note is editable", () => {
+    tree.selectedNote = { _id: "n1", title: "Editable", role: "owner" };
+    render(<NoteContent />);
+    expect(screen.queryByText("readOnlyBadge")).toBeNull();
   });
 });

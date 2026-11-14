@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { SignInButton } from "@clerk/nextjs";
@@ -25,6 +25,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
 import { useStoreUserEffect } from "@/hooks/useStoreUserEffect";
+import { useCommentAnchors } from "@/hooks/useCommentAnchors";
+import type { Editor } from "@tiptap/core";
 
 function SkeletonRow() {
   return (
@@ -43,11 +45,17 @@ export default function CommentsPanel({
   open,
   onOpenChange,
   focusCommentId,
+  editor,
+  pendingAnchor,
+  onAnchorConsumed,
 }: Readonly<{
   target: CommentTarget;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   focusCommentId?: string | null;
+  editor?: Editor | null;
+  pendingAnchor?: { quote: string; from: number; to: number } | null;
+  onAnchorConsumed?: () => void;
 }>) {
   const t = useTranslations("Comments");
   const { isAuthenticated } = useStoreUserEffect();
@@ -61,6 +69,20 @@ export default function CommentsPanel({
   useEffect(() => {
     setHref(window.location.href);
   }, []);
+
+  useCommentAnchors(editor ?? null, data?.threads, focusCommentId);
+
+  const handleScrollToAnchor = useCallback(
+    (from: number, to: number) => {
+      if (!editor || editor.isDestroyed) return;
+      const docSize = editor.state.doc.content.size;
+      const safeFrom = Math.min(from, docSize);
+      const safeTo = Math.min(to, docSize);
+      editor.commands.setTextSelection({ from: safeFrom, to: safeTo });
+      editor.commands.scrollIntoView();
+    },
+    [editor],
+  );
 
   const canComment = isAuthenticated && !!data && data.canComment;
   const openCount = data
@@ -106,6 +128,12 @@ export default function CommentsPanel({
             canComment={canComment}
             showResolved={showResolved}
             focusCommentId={focusCommentId}
+            onScrollToAnchor={
+              thread.anchor
+                ? () =>
+                    handleScrollToAnchor(thread.anchor!.from, thread.anchor!.to)
+                : undefined
+            }
           />
         ))}
       </>
@@ -115,7 +143,13 @@ export default function CommentsPanel({
   let footer = null;
   if (data !== null) {
     if (isAuthenticated && data?.canComment) {
-      footer = <CommentComposer target={target} />;
+      footer = (
+        <CommentComposer
+          target={target}
+          pendingAnchor={pendingAnchor}
+          onAnchorConsumed={onAnchorConsumed}
+        />
+      );
     } else if (!isAuthenticated) {
       footer = (
         <Card className="items-center gap-2 bg-muted p-4 text-center">

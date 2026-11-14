@@ -104,6 +104,7 @@
     }
   },
   "NoteCard": {
+    "someoneTyping": "Écriture en cours...",
     "newNotePlaceholder": "Titre de la nouvelle note...",
     "tooltips": {
       "addChild": "Ajouter une note enfant",
@@ -123,13 +124,10 @@
       "listForSale": "Mettre en vente"
     }
   },
-  "NoteContent": {
-    "status": {
-      "failed": "Échec de la sauvegarde",
-      "saved": "Enregistré",
-      "saving": "Sauvegarde...",
-      "unsaved": "Modifications non enregistrées"
-    }
+  "SyncStatus": {
+    "failedTooltip": "Impossible de synchroniser vos modifications. Vérifiez votre connexion.",
+    "retryTooltip": "Cliquez pour réessayer la synchronisation.",
+    "offlineTooltip": "Connexion perdue. Les modifications locales ne sont plus diffusées."
   },
   "ShareDialog": {
     "title": "Partager la note",
@@ -209,6 +207,7 @@
     "upgradeCta": "Passer à Premium",
     "dismiss": "Plus tard",
     "badgeTooltip": "{count, plural, =0 {0 crédit IA restant} one {# crédit IA restant} other {# crédits IA restants}}",
+    "badge": "{count, plural, =0 {0 crédit IA} one {# crédit IA} other {# crédits IA}}",
     "menuAria": "Actions IA",
     "actions": {
       "basic": "Générer une suggestion",
@@ -342,10 +341,27 @@
     "suggestionAnnounce": "Suggestion : {text}. Appuyez sur Tab pour l'accepter ou sur Échap pour l'ignorer."
   },
   "Editor": {
+    "readOnlyBadge": "Lecture seule",
+    "readOnlyTooltip": "Vous ne disposez pas des droits d'édition sur cette note.",
+    "enterFocusMode": "Mode Focus",
+    "exitFocusMode": "Quitter le mode Focus",
     "placeholder": "Écrivez quelque chose...",
+    "you": "Vous",
+    "collaborator": "Collaborateur",
+    "collaborators": "Autres collaborateurs",
+    "following": "Vous suivez {name}",
+    "stopFollowing": "Arrêter",
+    "escapeKey": "Échap",
+    "follow": "Suivre",
+    "clickToFollow": "Cliquer pour suivre",
+    "followingTooltip": "Suivi en cours • Cliquer pour arrêter",
+    "isTyping": "{name} est en train d'écrire...",
+    "typing": "écrit...",
     "tooltips": {
       "undo": "Annuler (Ctrl+Z)",
       "redo": "Rétablir (Ctrl+Shift+Z)",
+      "headings": "Titres",
+      "paragraph": "Texte normal",
       "heading-1": "Titre 1",
       "heading-2": "Titre 2",
       "heading-3": "Titre 3",
@@ -356,15 +372,90 @@
       "italic": "Italique (Ctrl+I)",
       "strike": "Barré",
       "code": "Code en ligne (Ctrl+E)",
+      "lists": "Listes",
       "bulletList": "Liste à puces",
       "orderedList": "Liste ordonnée",
+      "taskList": "Liste de tâches",
       "blockquote": "Citation",
+      "insert": "Plus d'éléments",
       "codeBlock": "Bloc de code",
       "hardBreak": "Saut de ligne",
       "horizontalRule": "Règle horizontale",
       "link": "Insérer un lien (Ctrl+K)",
       "image": "Insérer une image",
       "aiAction": "Actions IA"
+    },
+    "bubbleMenu": {
+      "linkPlaceholder": "Coller ou saisir un lien...",
+      "applyLink": "Appliquer le lien",
+      "removeLink": "Supprimer le lien",
+      "cancel": "Annuler",
+      "aiAsk": "Demander à l'IA",
+      "more": "Plus de formats",
+      "comment": "Commenter la sélection",
+      "commentPlaceholder": "Ajouter un commentaire...",
+      "commentPost": "Commenter"
+    },
+    "codeBlock": {
+      "selectLanguage": "Sélectionner le langage",
+      "auto": "Auto",
+      "copy": "Copier",
+      "copied": "Copié !"
+    },
+    "slashCommands": {
+      "noResult": "Aucune commande trouvée",
+      "heading": "Blocs de base",
+      "categories": {
+        "basic": "Blocs de base",
+        "headings": "Titres",
+        "formatting": "Mise en forme",
+        "media": "Médias & Insertion",
+        "actions": "Actions"
+      },
+      "paragraph": "Texte",
+      "paragraphDesc": "Écrire simplement du texte brut.",
+      "heading1": "Titre 1",
+      "heading1Desc": "Grand titre de section.",
+      "heading2": "Titre 2",
+      "heading2Desc": "Titre de section moyen.",
+      "heading3": "Titre 3",
+      "heading3Desc": "Petit titre de sous-section.",
+      "heading4": "Titre 4",
+      "heading4Desc": "Titre de niveau 4.",
+      "heading5": "Titre 5",
+      "heading5Desc": "Titre de niveau 5.",
+      "heading6": "Titre 6",
+      "heading6Desc": "Titre de niveau 6.",
+      "bulletList": "Liste à puces",
+      "bulletListDesc": "Créer une liste à puces simple.",
+      "orderedList": "Liste numérotée",
+      "orderedListDesc": "Créer une liste ordonnée.",
+      "taskList": "Liste de tâches",
+      "taskListDesc": "Créer une liste de tâches avec cases à cocher.",
+      "blockquote": "Citation",
+      "blockquoteDesc": "Insérer une citation mise en valeur.",
+      "bold": "Gras",
+      "boldDesc": "Mettre le texte en gras.",
+      "italic": "Italique",
+      "italicDesc": "Mettre le texte en italique.",
+      "strike": "Barré",
+      "strikeDesc": "Barrer le texte.",
+      "code": "Code en ligne",
+      "codeDesc": "Formater du code en ligne.",
+      "codeBlock": "Bloc de code",
+      "codeBlockDesc": "Insérer un bloc de code informatique.",
+      "link": "Lien",
+      "linkDesc": "Insérer un lien hypertexte.",
+      "image": "Image",
+      "imageDesc": "Insérer une image à partir d'une URL.",
+      "horizontalRule": "Séparateur",
+      "horizontalRuleDesc": "Séparer visuellement deux sections.",
+      "hardBreak": "Saut de ligne",
+      "hardBreakDesc": "Insérer un retour à la ligne forcé.",
+      "undo": "Annuler",
+      "undoDesc": "Annuler la dernière action.",
+      "redo": "Rétablir",
+      "redoDesc": "Rétablir la dernière action annulée."
     },
     "dialogs": {
       "linkTitle": "Insérer un lien",
@@ -646,9 +737,6 @@
     "badgePublic": "Note publique",
     "signInBanner": "Connectez-vous pour modifier cette note.",
     "signInCta": "Se connecter pour modifier",
-    "saving": "Enregistrement...",
-    "saved": "Enregistré",
-    "saveError": "Impossible d'enregistrer vos modifications. Vérifiez votre connexion.",
     "revokedEditError": "Ce lien a été désactivé. Vous ne pouvez plus modifier cette note.",
     "childrenHeading": "Sous-notes",
     "untitled": "Sans titre",
@@ -689,7 +777,11 @@
     "errorTooLong": "Les commentaires sont limités à 2000 caractères. Raccourcissez le vôtre.",
     "errorRateLimited": "Vous commentez trop vite. Patientez une minute puis réessayez.",
     "errorLimit": "Cette note a atteint sa limite de commentaires.",
-    "errorNoAccess": "Vous n'avez plus accès à cette note."
+    "errorNoAccess": "Vous n'avez plus accès à cette note.",
+    "anchorGoTo": "Faire défiler jusqu'au texte surligné",
+    "replyPlaceholder": "Répondre...",
+    "close": "Fermer",
+    "deletedSuccess": "Commentaire supprimé"
   },
   "History": {
     "title": "Historique",

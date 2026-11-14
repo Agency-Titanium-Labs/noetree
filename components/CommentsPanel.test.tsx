@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 
 const state: { value: { data: unknown; isPending: boolean } } = {
@@ -13,9 +19,11 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => state.value,
 }));
 
+const mockMutation = vi.fn().mockResolvedValue(null);
+
 vi.mock("@convex-dev/react-query", () => ({
   convexQuery: vi.fn((fn: unknown, args: unknown) => ({ fn, args })),
-  useConvexMutation: () => vi.fn().mockResolvedValue(null),
+  useConvexMutation: () => mockMutation,
 }));
 
 vi.mock("@/convex/_generated/api", () => ({
@@ -81,12 +89,14 @@ function thread(
   root: ReturnType<typeof view>,
   replies: unknown[] = [],
   r?: number,
+  anchor?: { quote: string; from: number; to: number } | null,
 ) {
   return {
     root,
     replies,
     resolvedAt: r ?? null,
     resolvedByName: r ? "Bob" : null,
+    anchor: anchor ?? null,
   };
 }
 
@@ -94,8 +104,12 @@ function setData(data: unknown) {
   state.value = { data, isPending: false };
 }
 
-function renderPanel() {
-  return render(<CommentsPanel target={target} open onOpenChange={() => {}} />);
+function renderPanel(
+  props: Partial<React.ComponentProps<typeof CommentsPanel>> = {},
+) {
+  return render(
+    <CommentsPanel target={target} open onOpenChange={() => {}} {...props} />,
+  );
 }
 
 describe("CommentsPanel", () => {
@@ -187,10 +201,76 @@ describe("CommentsPanel", () => {
     expect(screen.getByText("<b>x</b>")).toBeInTheDocument();
   });
 
-  it("null data renders SharedUnavailable", () => {
-    setData(null);
-    renderPanel();
-    expect(screen.getByText("unavailable")).toBeInTheDocument();
+  it("renders thread anchor quote and triggers onScrollToAnchor on click", () => {
+    auth.isAuthenticated = true;
+    const mockScroll = vi.fn();
+    const mockEditor = {
+      isDestroyed: false,
+      state: { doc: { content: { size: 500 } } },
+      commands: {
+        setTextSelection: vi.fn(),
+        scrollIntoView: mockScroll,
+      },
+    } as unknown as import("@tiptap/core").Editor;
+
+    setData({
+      canComment: true,
+      canModerate: false,
+      threads: [
+        thread(view("note comment"), [], undefined, {
+          quote: "highlighted snippet",
+          from: 10,
+          to: 28,
+        }),
+      ],
+    });
+    renderPanel({ editor: mockEditor });
+
+    expect(screen.getByText(/highlighted snippet/)).toBeInTheDocument();
+    const anchorBtn = screen.getByRole("button", {
+      name: /anchorGoTo/,
+    });
+    fireEvent.click(anchorBtn);
+
+    expect(mockEditor.commands.setTextSelection).toHaveBeenCalledWith({
+      from: 10,
+      to: 28,
+    });
+    expect(mockScroll).toHaveBeenCalled();
+  });
+
+  it("pendingAnchor shows quote preview in composer and submits anchor", async () => {
+    auth.isAuthenticated = true;
+    const onAnchorConsumed = vi.fn();
+    const pendingAnchor = {
+      quote: "selected text in note",
+      from: 5,
+      to: 25,
+    };
+
+    setData({
+      canComment: true,
+      canModerate: false,
+      threads: [],
+    });
+    renderPanel({ pendingAnchor, onAnchorConsumed });
+
+    expect(screen.getByText(/selected text in note/)).toBeInTheDocument();
+
+    const textarea = screen.getByPlaceholderText("placeholder");
+    fireEvent.change(textarea, { target: { value: "My inline feedback" } });
+
+    const submitBtn = screen.getByRole("button", { name: "postCta" });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockMutation).toHaveBeenCalledWith({
+        target,
+        body: "My inline feedback",
+        anchor: pendingAnchor,
+      });
+      expect(onAnchorConsumed).toHaveBeenCalled();
+    });
   });
 });
 

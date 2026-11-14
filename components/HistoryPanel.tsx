@@ -75,11 +75,17 @@ export default function HistoryPanel({
   }>({ noteId, cursors: [null] });
   const cursors = cursorState.noteId === noteId ? cursorState.cursors : [null];
 
+  useEffect(() => {
+    if (!open || cursorState.noteId !== noteId) {
+      setCursorState({ noteId, cursors: [null] });
+    }
+  }, [open, noteId, cursorState.noteId]);
+
   const pages = useQueries({
     queries: cursors.map(cursor => ({
       ...convexQuery(api.noteVersions.list, {
         noteId,
-        cursor,
+        cursor: cursor && cursor.trim().length > 0 ? cursor.trim() : null,
         numItems: PAGE_SIZE,
       }),
       enabled: open,
@@ -168,10 +174,12 @@ export default function HistoryPanel({
   };
 
   const onShowMore = () => {
-    if (!lastData) return;
+    if (!lastData || !lastData.hasMore || !lastData.continueCursor) return;
+    const nextCursor = lastData.continueCursor.trim();
+    if (!nextCursor) return;
     setCursorState({
       noteId,
-      cursors: [...cursors, lastData.continueCursor],
+      cursors: [...cursors, nextCursor],
     });
   };
 

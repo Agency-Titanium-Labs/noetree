@@ -421,10 +421,12 @@ describe("api access", () => {
     const id = await as(t, lk).mutation(api.comments.add, {
       target: { kind: "link", token: "tok" },
       body: "y",
+      anchor: { quote: "hello selection", from: 10, to: 25 },
     });
     const row = await t.run(async ctx => await ctx.db.get("comments", id));
     expect(row!.noteId).toBe(noteId);
     expect(row!.noteId).not.toBe(other);
+    expect(row!.anchor).toEqual({ quote: "hello selection", from: 10, to: 25 });
   });
 });
 
@@ -776,6 +778,139 @@ describe("delete", () => {
     const solo = await sc.mutation(api.comments.add, { target, body: "s" });
     await sc.mutation(api.comments.remove, { target, commentId: solo });
     expect(await commentCount(t, noteId)).toBe(0);
+  });
+
+  test("restore brings back deleted comment or tombstone", async () => {
+    const t = convexTest(schema, modules);
+    const o = await seedUser(t, "o");
+    const s = await seedUser(t, "s");
+    const noteId = await seedNote(t, o.userId);
+    await seedShare(t, noteId, s.userId, "view");
+    const target = noteT(noteId);
+    const sc = as(t, s);
+
+    // Test restoring a root that had replies (tombstone)
+    const root = await sc.mutation(api.comments.add, { target, body: "hello" });
+    await as(t, o).mutation(api.comments.add, {
+      target,
+      body: "reply",
+      parentId: root,
+    });
+    await sc.mutation(api.comments.remove, { target, commentId: root });
+    let list = await sc.query(api.comments.list, { target });
+    expect(list!.threads[0].root.isDeleted).toBe(true);
+
+    // Restore tombstone
+    await sc.mutation(api.comments.restore, {
+      target,
+      commentId: root,
+      body: "hello",
+    });
+    list = await sc.query(api.comments.list, { target });
+    expect(list!.threads[0].root.isDeleted).toBe(false);
+    expect(list!.threads[0].root.body).toBe("hello");
+
+    // Test restoring a hard-deleted comment
+    const solo = await sc.mutation(api.comments.add, {
+      target,
+      body: "solo",
+      anchor: { quote: "q", from: 0, to: 1 },
+    });
+    await sc.mutation(api.comments.remove, { target, commentId: solo });
+    list = await sc.query(api.comments.list, { target });
+    expect(list!.threads).toHaveLength(1); // solo is gone
+
+    // Restore solo
+    const restoredId = await sc.mutation(api.comments.restore, {
+      target,
+      commentId: solo,
+      body: "solo",
+      anchor: { quote: "q", from: 0, to: 1 },
+    });
+    list = await sc.query(api.comments.list, { target });
+    expect(list!.threads).toHaveLength(2);
+    expect(
+      list!.threads.find(th => th.root._id === restoredId)?.root.body,
+    ).toBe("solo");
+
+    // Test restoring a reply on an active root
+    const root2 = await sc.mutation(api.comments.add, {
+      target,
+      body: "root2",
+      anchor: { quote: "q2", from: 2, to: 5 },
+    });
+    const reply1 = await sc.mutation(api.comments.add, {
+      target,
+      body: "reply-one",
+      parentId: root2,
+    });
+    list = await sc.query(api.comments.list, { target });
+    expect(
+      list!.threads.find(th => th.root._id === root2)?.replies,
+    ).toHaveLength(1);
+
+    await sc.mutation(api.comments.remove, { target, commentId: reply1 });
+    list = await sc.query(api.comments.list, { target });
+    expect(
+      list!.threads.find(th => th.root._id === root2)?.replies,
+    ).toHaveLength(0);
+
+    const restoredReplyId = await sc.mutation(api.comments.restore, {
+      target,
+      commentId: reply1,
+      body: "reply-one",
+      parentId: root2,
+    });
+    list = await sc.query(api.comments.list, { target });
+    const restoredReplies = list!.threads.find(
+      th => th.root._id === root2,
+    )?.replies;
+    expect(restoredReplies).toHaveLength(1);
+    expect(restoredReplies![0]._id).toBe(restoredReplyId);
+    expect(restoredReplies![0].body).toBe("reply-one");
+
+    // Test restoring a reply when the root was a tombstone
+    const root3 = await sc.mutation(api.comments.add, {
+      target,
+      body: "root3",
+      anchor: { quote: "q3", from: 6, to: 10 },
+    });
+    const replyOnTombstone = await sc.mutation(api.comments.add, {
+      target,
+      body: "reply-on-tombstone",
+      parentId: root3,
+    });
+    // Delete root3 -> becomes tombstone
+    await sc.mutation(api.comments.remove, { target, commentId: root3 });
+    list = await sc.query(api.comments.list, { target });
+    expect(
+      list!.threads.find(th => th.root._id === root3)?.root.isDeleted,
+    ).toBe(true);
+
+    // Now delete the reply -> root3 and reply are cleaned up
+    await sc.mutation(api.comments.remove, {
+      target,
+      commentId: replyOnTombstone,
+    });
+    list = await sc.query(api.comments.list, { target });
+    expect(list!.threads.find(th => th.root._id === root3)).toBeUndefined();
+
+    // Now restore the reply!
+    const restoredTombstoneReplyId = await sc.mutation(api.comments.restore, {
+      target,
+      commentId: replyOnTombstone,
+      body: "reply-on-tombstone",
+      parentId: root3,
+      anchor: { quote: "q3", from: 6, to: 10 },
+    });
+    list = await sc.query(api.comments.list, { target });
+    // Root was recreated as a tombstone, and the reply is attached to it!
+    const restoredThread = list!.threads.find(th =>
+      th.replies.some(r => r._id === restoredTombstoneReplyId),
+    );
+    expect(restoredThread).toBeDefined();
+    expect(restoredThread!.root.isDeleted).toBe(true);
+    expect(restoredThread!.replies[0].body).toBe("reply-on-tombstone");
   });
 });
 
