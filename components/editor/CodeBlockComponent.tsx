@@ -6,7 +6,7 @@ import {
   NodeViewWrapper,
   type NodeViewProps,
 } from "@tiptap/react";
-import { Code2, WrapText } from "lucide-react";
+import { Code2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CODE_LANGUAGES } from "@/lib/editor/lowlight";
 import {
@@ -17,7 +17,6 @@ import {
   CodeBlockHeader,
   CodeBlockTitle,
 } from "@/components/ui/code-block";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -25,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 
 const AUTO_LANG = "auto";
 

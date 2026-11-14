@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
-import { Check, Send, ShieldIcon, Trash2, X } from "lucide-react";
+import { Check, Send, Trash2, X } from "lucide-react";
 import { useFormatter, useLocale, useNow, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
