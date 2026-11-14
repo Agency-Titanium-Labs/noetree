@@ -346,9 +346,41 @@ export function TreeProvider({ children }: Readonly<TreeProviderProps>) {
         index?: number,
       ) => {
         const currentTree = tree as unknown as NoteTree;
-        const parentNote = currentTree
-          ? findNoteById(fromParentId, currentTree)
-          : null;
+        if (!currentTree) return;
+
+        // Safeguard 1: Cannot move note into itself
+        if (noteId === toParentId) return;
+
+        // Safeguard 2: Root note cannot be moved
+        if (currentTree._id === noteId) return;
+
+        // Safeguard 3: Both moving node and target parent must exist
+        const movingNode = findNoteById(noteId, currentTree);
+        const targetParent = findNoteById(toParentId, currentTree);
+        if (!movingNode || !targetParent) return;
+
+        // Safeguard 4: Target parent cannot be a descendant of the moving note
+        const isDescendant = (
+          node: NoteTree,
+          targetId: Id<"notes">,
+        ): boolean => {
+          if (node._id === targetId) return true;
+          if (node.childNotes) {
+            for (const child of node.childNotes) {
+              if (isDescendant(child, targetId)) return true;
+            }
+          }
+          return false;
+        };
+
+        if (isDescendant(movingNode, toParentId)) {
+          console.warn(
+            "[TreeProvider] Prevented moving note into its own descendant",
+          );
+          return;
+        }
+
+        const parentNote = findNoteById(fromParentId, currentTree);
         const originalIndex =
           parentNote?.childNotes?.findIndex(c => c._id === noteId) ?? 0;
 

@@ -30,6 +30,8 @@ export type SaleRow = {
   commissionRateBps: number;
   commissionCents: number;
   sellerNetCents: number;
+  vatRateBps?: number;
+  vatCents?: number;
 };
 
 type Status = "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted";
@@ -93,6 +95,20 @@ export function SalesTableView({
   const formatDate = (ts?: number) => (ts ? dateFmt.format(ts) : "");
   const formatRate = (bps: number) => rateFmt.format(bps / 10000);
 
+  // Legacy (pre-VAT) rows carry no VAT data: show "-", never a fake 0.
+  const vatCell = (r: SaleRow) =>
+    r.vatCents === undefined ? (
+      <span
+        className="text-muted-foreground"
+        aria-label={t("vatNotRecorded")}
+        title={t("vatNotRecorded")}
+      >
+        -
+      </span>
+    ) : (
+      <PriceLabel cents={r.vatCents} />
+    );
+
   const payoutLabel = (
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <Check className="size-3" />
@@ -112,6 +128,9 @@ export function SalesTableView({
                 {t("colGross")}
               </TableHead>
               <TableHead scope="col" className="text-right">
+                {t("colVat")}
+              </TableHead>
+              <TableHead scope="col" className="text-right">
                 {t("colCommission")}
               </TableHead>
               <TableHead scope="col" className="text-right">
@@ -127,6 +146,9 @@ export function SalesTableView({
                 <TableCell>{r.title}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   <PriceLabel cents={r.priceCents} />
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {vatCell(r)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   <PriceLabel cents={r.commissionCents} />{" "}
@@ -159,6 +181,8 @@ export function SalesTableView({
                 <dd className="text-right tabular-nums">
                   <PriceLabel cents={r.priceCents} />
                 </dd>
+                <dt className="text-muted-foreground">{t("colVat")}</dt>
+                <dd className="text-right tabular-nums">{vatCell(r)}</dd>
                 <dt className="text-muted-foreground">{t("colCommission")}</dt>
                 <dd className="text-right tabular-nums">
                   <PriceLabel cents={r.commissionCents} />{" "}

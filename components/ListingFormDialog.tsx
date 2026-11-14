@@ -12,6 +12,7 @@ import { AlertCircle, Loader2, X } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { LISTING_LIMITS } from "@/convex/helpers/listings";
 import { Link } from "@/i18n/routing";
 import {
   centsToPriceInput,
@@ -21,6 +22,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import SellerPriceBreakdown from "@/components/SellerPriceBreakdown";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -44,10 +46,10 @@ interface ListingFormDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const MIN_PRICE_CENTS = 100;
-const MAX_PRICE_CENTS = 50000;
-const MAX_TAGS = 5;
-const MAX_TAG_LENGTH = 24;
+const MIN_PRICE_CENTS = LISTING_LIMITS.PRICE_MIN_CENTS;
+const MAX_PRICE_CENTS = LISTING_LIMITS.PRICE_MAX_CENTS;
+const MAX_TAGS = LISTING_LIMITS.TAGS_MAX;
+const MAX_TAG_LENGTH = LISTING_LIMITS.TAG_MAX_LENGTH;
 
 type FormValues = {
   title: string;
@@ -189,6 +191,8 @@ export default function ListingFormDialog({
   const scope = watch("scope");
   const tags = watch("tags");
   const description = watch("description");
+  const priceInput = watch("price");
+  const previewPriceCents = parsePriceToCents(priceInput ?? "");
 
   const previewQuery = useQuery(
     convexQuery(
@@ -402,6 +406,12 @@ export default function ListingFormDialog({
                 />
               </div>
               {errors.price && <FieldError>{errors.price.message}</FieldError>}
+              {!errors.price &&
+                previewPriceCents !== null &&
+                previewPriceCents >= MIN_PRICE_CENTS &&
+                previewPriceCents <= MAX_PRICE_CENTS && (
+                  <SellerPriceBreakdown priceCents={previewPriceCents} />
+                )}
             </Field>
 
             <Field data-invalid={errors.scope ? "true" : undefined}>

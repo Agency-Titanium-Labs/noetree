@@ -18,9 +18,13 @@ import {
 } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
-import { getUser } from "./helpers/helper";
-import { countSubtree, syncListingTags } from "./helpers/listings";
-import { computeCommission } from "./helpers/commission";
+import { getUser, tierFromClerkUserId } from "./helpers/helper";
+import {
+  countSubtree,
+  LISTING_LIMITS,
+  syncListingTags,
+} from "./helpers/listings";
+import { computeSplit, parseVatRateBps } from "./helpers/commission";
 import { deliverPurchase } from "./helpers/delivery";
 import { addSaleToEarnings } from "./helpers/earnings";
 import { resolveDelivery } from "./helpers/purchaseAccess";
@@ -43,15 +47,12 @@ async function assertSellerActive(ctx: MutationCtx, clerkUserId: string) {
 }
 
 // D-11: tier is derived from the SELLER's subscription row, not the caller.
+// AIF-05: delegates to the single shared tier rule.
 async function sellerTierFor(
   ctx: MutationCtx,
   sellerClerkUserId: string,
 ): Promise<"free" | "premium"> {
-  const sub = await ctx.db
-    .query("subscriptions")
-    .withIndex("by_clerkUserId", q => q.eq("clerkUserId", sellerClerkUserId))
-    .unique();
-  return sub?.status === "active" ? "premium" : "free";
+  return await tierFromClerkUserId(ctx, sellerClerkUserId);
 }
 
 const prepareResultValidator = v.object({
@@ -64,6 +65,10 @@ const prepareResultValidator = v.object({
   priceCents: v.number(),
   currency: v.literal("eur"),
   commissionCents: v.number(),
+  vatCents: v.number(),
+  // Phase 23: what Stripe must keep on the destination charge (commission + VAT).
+  // Pass THIS to application_fee_amount, never commissionCents alone.
+  applicationFeeCents: v.number(),
   destinationAccountId: v.string(),
 });
 
@@ -137,15 +142,35 @@ export const preparePurchase = mutation({
         priceCents: existing.priceCents,
         currency: existing.currency,
         commissionCents: existing.commissionCents,
+        vatCents: existing.vatCents ?? 0,
+        applicationFeeCents:
+          existing.commissionCents + (existing.vatCents ?? 0),
         destinationAccountId: existing.destinationAccountId,
       };
     }
 
+    // IN-02: legacy listings priced below the floor get a specific code
+    // instead of the generic "unavailable" (also keeps net > 0 and the Stripe
+    // card minimum respected).
+    if (listing.priceCents < LISTING_LIMITS.PRICE_MIN_CENTS) {
+      throw new ConvexError("PURCHASE_PRICE_BELOW_MINIMUM");
+    }
+
     const sellerTier = await sellerTierFor(ctx, listing.sellerClerkUserId);
-    const { rateBps, commissionCents, sellerNetCents } = computeCommission(
+    const {
+      commissionRateBps: rateBps,
+      vatRateBps,
+      vatCents,
+      commissionCents,
+      sellerNetCents,
+      applicationFeeCents,
+    } = computeSplit(
       listing.priceCents,
       sellerTier,
+      parseVatRateBps(process.env.MARKETPLACE_VAT_RATE_BPS),
     );
+    if (sellerNetCents <= 0)
+      throw new ConvexError("PURCHASE_LISTING_UNAVAILABLE");
     const snapshotAt = Date.now();
     const snapshot = {
       noteId: listing.noteId,
@@ -158,6 +183,8 @@ export const preparePurchase = mutation({
       commissionRateBps: rateBps,
       commissionCents,
       sellerNetCents,
+      vatRateBps,
+      vatCents,
       scope: listing.scope,
       accessMode: listing.accessMode,
       noteCount,
@@ -197,6 +224,8 @@ export const preparePurchase = mutation({
       priceCents: snapshot.priceCents,
       currency: snapshot.currency,
       commissionCents,
+      vatCents,
+      applicationFeeCents,
       destinationAccountId: snapshot.destinationAccountId,
     };
   },

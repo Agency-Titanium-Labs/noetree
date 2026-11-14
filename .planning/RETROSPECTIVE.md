@@ -53,36 +53,63 @@ _A living document updated after each milestone. Lessons feed forward into futur
 **Phases:** 5 (7-11) | **Plans:** 36
 
 ### What Was Built
+
 - Stripe Connect Express onboarding + server-side payout-readiness gate
 - Listings, public marketplace (search/tags/sort/preview)
 - Checkout with commission split at source, idempotent webhook, exactly-once fulfilment (copy / read-only)
 - Buyer purchases and seller earnings pages (EN/FR) with a replay-safe `sellerEarnings` counter
 
 ### What Worked
+
 - Isolating risky pieces in their own plan/wave (the earnings counter) kept the blast radius small
 - Snapshotting purchase data on the `purchases` row made history UI trivially derivative of fulfilment
 - Live UAT against a real Stripe test deployment caught environment gaps that unit tests cannot (missing Connect data on a fresh Convex deployment)
 
 ### What Was Inefficient
+
 - Parallel sessions shared one checkout: a Phase 15 session and Phase 11 execution collided (commits landed on the wrong branch, a dev-deployment push removed another phase's indexes)
 - execute-phase's verifier step was skipped for Phase 11 and only caught by the milestone audit
 - Lint could not run for the whole milestone (eslint-plugin-react-hooks missing), and SUMMARY frontmatter never recorded requirements-completed
 
 ### Patterns Established
+
 - Per-phase git worktrees with a node_modules junction (remove the junction with rmdir before removing a worktree)
 - Narrow-viewport UAT via a same-origin iframe when the browser window cannot be resized
 
 ### Key Lessons
+
 1. Give each concurrent phase its own worktree and its own Convex dev deployment before starting execution
 2. Run the phase verifier before merging, not at milestone audit time
 3. Protect every new authenticated route in proxy.ts in the same plan that adds the page
 
 ### Cost Observations
+
 - Model mix: opus (planning), sonnet (research, pattern mapping, execution, verification)
 - Sessions: several (Phase 11 planned, executed, UAT'd and audited in one long session)
 - Notable: Phase 11 ran 7 plans in 4 waves sequentially because worktree isolation was off for the workstream
 
 ---
+
+## Milestone: v1.3 — IA et TVA marketplace
+
+**Completed:** 2026-10-20 (go-live pending). 7 phases, 34 requirements, 1576 tests.
+
+### What Worked
+
+- Orchestrated waves with parallel builders, then audit and fix agents per phase, merged on one integration branch.
+- Real browser tests found what unit tests missed: a Related notes panel auto-started a paid analysis on note switch (fixed, regression-tested).
+- Full-integration audit at the end caught an inconsistent purchased-content exclusion in link embeddings (fixed).
+
+### What Was Inefficient
+
+- Phases 17-22 produced no SUMMARY.md and ROADMAP/STATE progress drifted; close-out had to repair docs.
+- Two copies of prosemirror-model after a tiptap upgrade broke types and a Tab test until deduplicated with overrides.
+
+### Key Lessons
+
+1. A paid action must only fire from an explicit user action, never from an effect or state change.
+2. Test the failure path for real (refund, undo blocked by edits), not only the happy path.
+3. After a dependency upgrade, check for duplicate transitive versions, not only audit output.
 
 ## Cross-Milestone Trends
 
@@ -91,7 +118,7 @@ _A living document updated after each milestone. Lessons feed forward into futur
 | Milestone | Sessions | Phases                        | Key Change                                                                                                                                                             |
 | --------- | -------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | v1.0      | —        | 7 (6 planned + 1 gap-closure) | First milestone — established webhook-single-writer, atomic-idempotency, and anomaly-not-throw conventions that all later phases (including the 06.1 gap fix) built on |
-| v1.1      | —        | 5 (7-11)                      | Marketplace: isolated risky plans (earnings counter); audit caught a skipped verifier run and an unprotected-route gap |
+| v1.1      | —        | 5 (7-11)                      | Marketplace: isolated risky plans (earnings counter); audit caught a skipped verifier run and an unprotected-route gap                                                 |
 
 ### Cumulative Quality
 

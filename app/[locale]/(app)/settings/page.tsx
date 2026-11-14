@@ -5,6 +5,7 @@ import { useHeaderConfig } from "@/providers/HeaderProvider";
 import SettingsPlanCard from "@/components/SettingsPlanCard";
 import SettingsCreditsCard from "@/components/SettingsCreditsCard";
 import SettingsSellerCard from "@/components/SettingsSellerCard";
+import SettingsAiContextCard from "@/components/SettingsAiContextCard";
 
 export default function SettingsPage() {
   const t = useTranslations("Settings");
@@ -17,6 +18,7 @@ export default function SettingsPage() {
       <div className="space-y-8">
         <SettingsPlanCard />
         <SettingsCreditsCard />
+        <SettingsAiContextCard />
         <SettingsSellerCard />
       </div>
     </div>

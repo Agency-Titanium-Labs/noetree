@@ -11,6 +11,9 @@ const modules = (
   }
 ).glob("./**/*.ts");
 
+let reqSeq = 0;
+const nextReq = () => `req-${++reqSeq}`;
+
 const prevMonthMs = () => {
   const d = new Date();
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 15);
@@ -437,7 +440,7 @@ const IDENTITY = {
   tokenIdentifier: "https://clerk.dev|user_x",
 };
 
-describe("aiCredits.runAiAction", () => {
+describe("aiRuns.beginRun (debit path)", () => {
   it("deducts 1 credit from the authenticated identity's balance and records one deduction transaction", async () => {
     const t = convexTest(schema, modules);
     await t.run(async ctx => {
@@ -450,8 +453,11 @@ describe("aiCredits.runAiAction", () => {
 
     const result = await t
       .withIdentity(IDENTITY)
-      .mutation(api.aiCredits.runAiAction, { actionKey: "basic" });
-    expect(result).toEqual({ success: true, cost: 1 });
+      .mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      });
+    expect(result).toMatchObject({ cost: 1, status: "reserved" });
 
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
@@ -480,9 +486,10 @@ describe("aiCredits.runAiAction", () => {
     });
 
     await expect(
-      t
-        .withIdentity(IDENTITY)
-        .mutation(api.aiCredits.runAiAction, { actionKey: "basic" }),
+      t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      }),
     ).rejects.toThrow("INSUFFICIENT_CREDITS");
 
     const credits = await t.query(internal.aiCredits.getCredits, {
@@ -506,9 +513,10 @@ describe("aiCredits.runAiAction", () => {
     });
 
     await expect(
-      t
-        .withIdentity(IDENTITY)
-        .mutation(api.aiCredits.runAiAction, { actionKey: "basic" }),
+      t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      }),
     ).rejects.toThrow("INSUFFICIENT_CREDITS");
   });
 
@@ -523,7 +531,10 @@ describe("aiCredits.runAiAction", () => {
     });
 
     await expect(
-      t.mutation(api.aiCredits.runAiAction, { actionKey: "basic" }),
+      t.mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      }),
     ).rejects.toThrow();
   });
 });
@@ -697,7 +708,10 @@ describe("aiCredits.getMyCredits", () => {
     const as = t.withIdentity(IDENTITY);
     const before = await as.query(api.aiCredits.getMyCredits, {});
     expect(before).toMatchObject({ monthly: 30, purchased: 100, total: 130 });
-    await as.mutation(api.aiCredits.runAiAction, { actionKey: "basic" });
+    await as.mutation(api.aiRuns.beginRun, {
+      actionKey: "basic",
+      requestId: nextReq(),
+    });
     const after = await as.query(api.aiCredits.getMyCredits, {});
     expect(after?.total).toBe(129);
   });
@@ -833,7 +847,7 @@ describe("aiCredits.listMyTopups", () => {
   });
 });
 
-describe("aiCredits.runAiAction per-action cost and unknown keys", () => {
+describe("aiRuns.beginRun (debit path) per-action cost and unknown keys", () => {
   it.each([
     ["basic", 1],
     ["semantic", 3],
@@ -846,11 +860,18 @@ describe("aiCredits.runAiAction per-action cost and unknown keys", () => {
         balance: 10,
         lastResetAt: Date.now(),
       });
+      // linking is a Premium action (AIF-04); the others are Free.
+      if (actionKey === "linking") {
+        await ctx.db.insert("subscriptions", {
+          ...SUBSCRIPTION_SEED,
+          clerkUserId: "user_x",
+        });
+      }
     });
     const result = await t
       .withIdentity(IDENTITY)
-      .mutation(api.aiCredits.runAiAction, { actionKey });
-    expect(result).toEqual({ success: true, cost });
+      .mutation(api.aiRuns.beginRun, { actionKey, requestId: nextReq() });
+    expect(result).toMatchObject({ cost, status: "reserved" });
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
     });
@@ -871,7 +892,7 @@ describe("aiCredits.runAiAction per-action cost and unknown keys", () => {
       await expect(
         t
           .withIdentity(IDENTITY)
-          .mutation(api.aiCredits.runAiAction, { actionKey }),
+          .mutation(api.aiRuns.beginRun, { actionKey, requestId: nextReq() }),
       ).rejects.toThrow("UNKNOWN_ACTION");
       const rows = await t.run(async ctx =>
         ctx.db.query("creditTransactions").collect(),
@@ -905,9 +926,10 @@ describe("aiCredits.runAiAction per-action cost and unknown keys", () => {
       });
     });
     await expect(
-      t
-        .withIdentity(IDENTITY)
-        .mutation(api.aiCredits.runAiAction, { actionKey: "semantic" }),
+      t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+        actionKey: "semantic",
+        requestId: nextReq(),
+      }),
     ).rejects.toThrow("INSUFFICIENT_CREDITS");
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
@@ -931,9 +953,10 @@ describe("aiCredits bucket spill", () => {
         lastResetAt: 0,
       });
     });
-    await t
-      .withIdentity(IDENTITY)
-      .mutation(api.aiCredits.runAiAction, { actionKey: "linking" });
+    await t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+      actionKey: "linking",
+      requestId: nextReq(),
+    });
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
     });
@@ -955,9 +978,10 @@ describe("aiCredits bucket spill", () => {
 describe("aiCredits lazy Free reset", () => {
   it("no row: first access grants 30, deducts 1, writes reset then deduction", async () => {
     const t = convexTest(schema, modules);
-    await t
-      .withIdentity(IDENTITY)
-      .mutation(api.aiCredits.runAiAction, { actionKey: "basic" });
+    await t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+      actionKey: "basic",
+      requestId: nextReq(),
+    });
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
     });
@@ -979,9 +1003,10 @@ describe("aiCredits lazy Free reset", () => {
         lastResetAt: prevMonthMs(),
       });
     });
-    await t
-      .withIdentity(IDENTITY)
-      .mutation(api.aiCredits.runAiAction, { actionKey: "basic" });
+    await t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+      actionKey: "basic",
+      requestId: nextReq(),
+    });
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
     });
@@ -997,9 +1022,10 @@ describe("aiCredits lazy Free reset", () => {
         lastResetAt: Date.now(),
       });
     });
-    await t
-      .withIdentity(IDENTITY)
-      .mutation(api.aiCredits.runAiAction, { actionKey: "semantic" });
+    await t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+      actionKey: "semantic",
+      requestId: nextReq(),
+    });
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
     });
@@ -1023,13 +1049,19 @@ describe("aiCredits lazy Free reset", () => {
       });
       const as = t.withIdentity(IDENTITY);
       vi.setSystemTime(Date.UTC(2026, 11, 31, 23, 59, 59, 999));
-      await as.mutation(api.aiCredits.runAiAction, { actionKey: "basic" });
+      await as.mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      });
       const mid = await t.query(internal.aiCredits.getCredits, {
         clerkUserId: "user_x",
       });
       expect(mid?.balance).toBe(3);
       vi.setSystemTime(Date.UTC(2027, 0, 1, 0, 0));
-      await as.mutation(api.aiCredits.runAiAction, { actionKey: "basic" });
+      await as.mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      });
       const after = await t.query(internal.aiCredits.getCredits, {
         clerkUserId: "user_x",
       });
@@ -1039,9 +1071,15 @@ describe("aiCredits lazy Free reset", () => {
     }
   });
 
-  it.each(["active", "past_due"] as const)(
-    "%s subscription with stale lastResetAt is not lazily reset",
-    async status => {
+  // AIF-05 / W1: only "active" is Premium. past_due is Free everywhere, so it
+  // follows the Free lazy reset at month rollover (no longer Premium for
+  // credits only).
+  it.each([
+    ["active", 3],
+    ["past_due", 29],
+  ] as const)(
+    "%s subscription with stale lastResetAt ends at balance %i",
+    async (status, expected) => {
       const t = convexTest(schema, modules);
       await t.run(async ctx => {
         await ctx.db.insert("subscriptions", {
@@ -1055,13 +1093,14 @@ describe("aiCredits lazy Free reset", () => {
           lastResetAt: prevMonthMs(),
         });
       });
-      await t
-        .withIdentity(IDENTITY)
-        .mutation(api.aiCredits.runAiAction, { actionKey: "basic" });
+      await t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      });
       const credits = await t.query(internal.aiCredits.getCredits, {
         clerkUserId: "user_x",
       });
-      expect(credits?.balance).toBe(3);
+      expect(credits?.balance).toBe(expected);
     },
   );
 
@@ -1076,10 +1115,22 @@ describe("aiCredits lazy Free reset", () => {
     });
     const as = t.withIdentity(IDENTITY);
     await Promise.allSettled([
-      as.mutation(api.aiCredits.runAiAction, { actionKey: "basic" }),
-      as.mutation(api.aiCredits.runAiAction, { actionKey: "basic" }),
-      as.mutation(api.aiCredits.runAiAction, { actionKey: "basic" }),
-      as.mutation(api.aiCredits.runAiAction, { actionKey: "semantic" }),
+      as.mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      }),
+      as.mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      }),
+      as.mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      }),
+      as.mutation(api.aiRuns.beginRun, {
+        actionKey: "semantic",
+        requestId: nextReq(),
+      }),
     ]);
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
@@ -1099,8 +1150,14 @@ describe("aiCredits lazy Free reset", () => {
     const t = convexTest(schema, modules);
     const as = t.withIdentity(IDENTITY);
     await Promise.allSettled([
-      as.mutation(api.aiCredits.runAiAction, { actionKey: "basic" }),
-      as.mutation(api.aiCredits.runAiAction, { actionKey: "basic" }),
+      as.mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      }),
+      as.mutation(api.aiRuns.beginRun, {
+        actionKey: "basic",
+        requestId: nextReq(),
+      }),
     ]);
     const rows = await t.run(async ctx =>
       ctx.db.query("creditTransactions").collect(),
@@ -1214,9 +1271,10 @@ describe("aiCredits Premium 500 and purchased bucket", () => {
       stripeEventId: "evt_boost",
       eventType: "checkout.session.completed",
     });
-    await t
-      .withIdentity(IDENTITY)
-      .mutation(api.aiCredits.runAiAction, { actionKey: "basic" });
+    await t.withIdentity(IDENTITY).mutation(api.aiRuns.beginRun, {
+      actionKey: "basic",
+      requestId: nextReq(),
+    });
     const credits = await t.query(internal.aiCredits.getCredits, {
       clerkUserId: "user_x",
     });

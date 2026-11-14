@@ -107,7 +107,7 @@ describe("note scope isolation", () => {
       id: rootId,
       deep: 3,
     });
-    expect(one.childNotes).toEqual([]);
+    expect(one!.childNotes).toEqual([]);
     const oneJson = JSON.stringify(one);
     expect(oneJson).not.toContain("CHILD_A_SECRET");
     expect(oneJson).not.toContain("ChildB");
@@ -155,8 +155,8 @@ describe("subtree live", () => {
       id: rootId,
       deep: 2,
     });
-    expect(one.isPurchased).toBe(true);
-    expect(one.childNotes).toHaveLength(2);
+    expect(one!.isPurchased).toBe(true);
+    expect(one!.childNotes).toHaveLength(2);
   });
 });
 
