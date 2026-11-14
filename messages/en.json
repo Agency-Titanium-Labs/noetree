@@ -10,7 +10,6 @@
   },
   "Sidebar": {
     "title": "NoeTree",
-    "dashboard": "Dashboard",
     "notes": "Notes",
     "pinned": "Pinned",
     "listings": "My listings",
@@ -26,11 +25,6 @@
     "themeDark": "Dark",
     "themeSystem": "System",
     "logout": "Log out"
-  },
-  "Dashboard": {
-    "title": "Dashboard",
-    "notesLink": "Notes",
-    "welcomeText": "Welcome to your dashboard. Access your note trees to start writing."
   },
   "Pricing": {
     "heading": "Simple, transparent pricing",

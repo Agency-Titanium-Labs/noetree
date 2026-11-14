@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Home, FileText, Pin, Store, ShoppingBag, Wallet } from "lucide-react";
+import { FileText, Pin, Store, ShoppingBag, Wallet } from "lucide-react";
 import { NavUser } from "@/components/nav-user";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
@@ -21,11 +21,6 @@ import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@/convex/_generated/api";
 
 const items = [
-  {
-    title: "dashboard",
-    url: "/",
-    icon: Home,
-  },
   {
     title: "notes",
     url: "/notes",
