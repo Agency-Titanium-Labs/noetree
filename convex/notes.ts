@@ -18,8 +18,11 @@ import {
 import { planCopy, writeCopy } from "./helpers/delivery";
 import { writeNoteContent } from "./helpers/noteVersions";
 import {
+  canCreateUnder,
+  canEditNote,
   getInheritedPermission,
   getUserPermission,
+  ShareRole,
 } from "./helpers/permissions";
 
 type Notes = Doc<"notes">;
@@ -40,7 +43,8 @@ interface NotesToSend extends Omit<Notes, "childNotes"> {
   shareId?: Id<"shares">;
   isShared?: boolean;
   isPurchased?: boolean;
-  role?: "owner" | "admin" | "edit" | "view";
+  role?: "owner" | ShareRole;
+  canEdit?: boolean;
 }
 
 type SharedNote = Doc<"notes"> & {
@@ -75,8 +79,12 @@ async function requireEditAccess(
   noteId: Id<"notes">,
   userId: Id<"users">,
 ): Promise<void> {
+  const note = await ctx.db.get("notes", noteId);
+  if (!note) {
+    throw new Error("Note not found");
+  }
   const role = await getUserPermission(ctx, noteId, userId);
-  if (role !== "owner" && role !== "admin" && role !== "edit") {
+  if (!canEditNote(note, userId, role)) {
     throw new Error("Unauthorized: Edit access required");
   }
 }
@@ -169,6 +177,7 @@ export const getTreeById = query({
       isShared,
       isPurchased: shareInfo.isPurchased,
       role: role || undefined,
+      canEdit: canEditNote(note, user._id, role),
     };
     const hiddenChildren = new Set<Id<"notes">>();
     if (!topSeesChildren) hiddenChildren.add(noteToSend._id);
@@ -242,6 +251,7 @@ export const getTreeById = query({
                   isShared: childIsShared,
                   isPurchased: childIsPurchased,
                   role: resolvedRole,
+                  canEdit: canEditNote(childNote, user._id, resolvedRole),
                 };
                 return sendable;
               }),
@@ -475,6 +485,7 @@ export const getTreesByMe = query({
           isShared,
           isPurchased,
           role: role || undefined,
+          canEdit: canEditNote(note, user._id, role),
         };
       }),
     );
@@ -539,6 +550,7 @@ export const getTreesByMe = query({
                   isShared: childIsShared,
                   isPurchased: childIsPurchased,
                   role: resolvedRole,
+                  canEdit: canEditNote(childNote, user._id, resolvedRole),
                 };
                 return sendable;
               }),
@@ -595,7 +607,14 @@ export const createNote = mutation({
     }
 
     if (args.parentNote) {
-      await requireEditAccess(ctx, args.parentNote, user._id);
+      const parentRole = await getUserPermission(
+        ctx,
+        args.parentNote,
+        user._id,
+      );
+      if (!canCreateUnder(parentRole)) {
+        throw new Error("Unauthorized: Edit access required");
+      }
     }
 
     const note = await ctx.db.insert("notes", {
@@ -837,7 +856,14 @@ export const duplicateNote = mutation({
     }
     await requireEditAccess(ctx, args.id, user._id);
     if (sourceNote.parentNote) {
-      await requireEditAccess(ctx, sourceNote.parentNote, user._id);
+      const parentRole = await getUserPermission(
+        ctx,
+        sourceNote.parentNote,
+        user._id,
+      );
+      if (!canCreateUnder(parentRole)) {
+        throw new Error("Unauthorized: Edit access required");
+      }
     }
 
     const baseTitle = `${sourceNote.title} - Copy`;
@@ -1190,7 +1216,12 @@ export const inviteUser = mutation({
   args: {
     noteId: v.id("notes"),
     email: v.string(),
-    role: v.union(v.literal("view"), v.literal("edit"), v.literal("admin")),
+    role: v.union(
+      v.literal("view"),
+      v.literal("contributor"),
+      v.literal("edit"),
+      v.literal("admin"),
+    ),
   },
   handler: async (ctx, args) => {
     const user = await getUser(ctx);
@@ -1381,7 +1412,12 @@ export const removeShare = mutation({
 export const updateShareRole = mutation({
   args: {
     shareId: v.id("shares"),
-    role: v.union(v.literal("view"), v.literal("edit"), v.literal("admin")),
+    role: v.union(
+      v.literal("view"),
+      v.literal("contributor"),
+      v.literal("edit"),
+      v.literal("admin"),
+    ),
   },
   handler: async (ctx, args) => {
     const user = await getUser(ctx);

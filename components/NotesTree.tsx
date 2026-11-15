@@ -505,7 +505,11 @@ export default function NotesTree() {
                 id={childNote._id}
                 index={idx}
                 parentId={note._id}
-                disabled={childNote.role === "view"}
+                disabled={
+                  childNote.canEdit !== undefined
+                    ? !childNote.canEdit
+                    : childNote.role === "view"
+                }
                 hasChildren={
                   !!(childNote.childNotes && childNote.childNotes.length > 0)
                 }

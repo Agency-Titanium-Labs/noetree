@@ -210,9 +210,17 @@ export default function NoteContent() {
 
   const isEditable =
     Boolean(selectedNote) &&
-    selectedNote?.role !== "view" &&
+    (selectedNote?.canEdit !== undefined
+      ? selectedNote.canEdit
+      : selectedNote?.role !== "view") &&
     !previewVersion &&
     !isSyncLoading;
+
+  const isReadOnly =
+    Boolean(selectedNote) &&
+    (selectedNote?.canEdit !== undefined
+      ? !selectedNote.canEdit
+      : selectedNote?.role === "view");
 
   const content = (
     <div className="min-h-full flex flex-col gap-2">
@@ -224,7 +232,7 @@ export default function NoteContent() {
           <>
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <h2 className="text-2xl font-bold">{selectedNote?.title}</h2>
-              {selectedNote?.role === "view" && <ReadOnlyBadge />}
+              {isReadOnly && <ReadOnlyBadge />}
               <Button
                 variant="ghost"
                 size="icon"

@@ -147,6 +147,8 @@
     "buttonTooltip": "Partager cette note",
     "pending": "Invitation en attente",
     "roleView": "Lecture seule",
+    "roleContributor": "Contributeur",
+    "roleContributorDesc": "Peut ajouter et modifier ses propres notes",
     "roleEdit": "Modification",
     "roleAdmin": "Administrateur",
     "roleOwner": "Propriétaire",

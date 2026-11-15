@@ -134,7 +134,8 @@ interface DashboardSortableItemProps {
     shareId?: Id<"shares">;
     isShared?: boolean;
     isPurchased?: boolean;
-    role?: "owner" | "admin" | "edit" | "view";
+    role?: "owner" | "admin" | "edit" | "contributor" | "view";
+    canEdit?: boolean;
   };
   index: number;
   duplicateNote: (args: { id: Id<"notes"> }) => void;
@@ -167,6 +168,8 @@ function DashboardSortableItem({
 
   const isTemp = typeof tree._id === "string" && tree._id.startsWith("temp-");
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const canEditTree =
+    tree.canEdit !== undefined ? tree.canEdit : tree.role !== "view";
 
   return (
     <div
@@ -208,7 +211,7 @@ function DashboardSortableItem({
                     ? "text-blue-500 hover:text-blue-600 scale-110"
                     : "md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 text-muted-foreground hover:text-blue-500",
                 )}
-                disabled={tree.role === "view"}
+                disabled={!canEditTree}
                 onClick={e => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -237,7 +240,7 @@ function DashboardSortableItem({
                   align="end"
                   onClick={e => e.stopPropagation()}
                 >
-                  {tree.role !== "view" && (
+                  {canEditTree && (
                     <DropdownMenuItem
                       onClick={() => {
                         setNoteToRename({
@@ -253,7 +256,7 @@ function DashboardSortableItem({
                       {t("actions.edit")}
                     </DropdownMenuItem>
                   )}
-                  {tree.role !== "view" && (
+                  {canEditTree && (
                     <DropdownMenuItem
                       onClick={() => {
                         duplicateNote({ id: tree._id });
@@ -263,7 +266,7 @@ function DashboardSortableItem({
                       {t("actions.duplicate")}
                     </DropdownMenuItem>
                   )}
-                  {tree.role !== "view" && (
+                  {canEditTree && (
                     <DropdownMenuItem
                       onClick={() => {
                         togglePinNote({ id: tree._id });
@@ -288,7 +291,7 @@ function DashboardSortableItem({
                       {t("actions.share")}
                     </DropdownMenuItem>
                   )}
-                  {tree.role !== "view" && <DropdownMenuSeparator />}
+                  {(canEditTree || tree.isShared) && <DropdownMenuSeparator />}
                   {tree.isShared ? (
                     <LeaveShareMenuItem
                       note={tree}
@@ -301,7 +304,7 @@ function DashboardSortableItem({
                       }}
                     />
                   ) : (
-                    tree.role !== "view" && (
+                    canEditTree && (
                       <DropdownMenuItem
                         variant="destructive"
                         onClick={() => {
@@ -320,7 +323,7 @@ function DashboardSortableItem({
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          {tree.role !== "view" && (
+          {canEditTree && (
             <ContextMenuItem
               onClick={() => {
                 setNoteToRename({ id: tree._id, title: tree.title });
@@ -333,7 +336,7 @@ function DashboardSortableItem({
               {t("actions.edit")}
             </ContextMenuItem>
           )}
-          {tree.role !== "view" && (
+          {canEditTree && (
             <ContextMenuItem
               onClick={() => {
                 duplicateNote({ id: tree._id });
@@ -343,7 +346,7 @@ function DashboardSortableItem({
               {t("actions.duplicate")}
             </ContextMenuItem>
           )}
-          {tree.role !== "view" && (
+          {canEditTree && (
             <ContextMenuItem
               onClick={() => {
                 togglePinNote({ id: tree._id });
@@ -367,7 +370,7 @@ function DashboardSortableItem({
               {t("actions.share")}
             </ContextMenuItem>
           )}
-          {tree.role !== "view" && <ContextMenuSeparator />}
+          {(canEditTree || tree.isShared) && <ContextMenuSeparator />}
           {tree.isShared ? (
             <LeaveShareMenuItem
               note={tree}
@@ -380,7 +383,7 @@ function DashboardSortableItem({
               }}
             />
           ) : (
-            tree.role !== "view" && (
+            canEditTree && (
               <ContextMenuItem
                 variant="destructive"
                 onClick={() => {

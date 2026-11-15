@@ -370,7 +370,9 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     {
       content: initialContent,
       editable: selectedNote
-        ? selectedNote.role !== "view" && !previewVersion
+        ? (selectedNote.canEdit !== undefined
+            ? selectedNote.canEdit
+            : selectedNote.role !== "view") && !previewVersion
         : false,
       extensions: [
         StarterKit.configure({
@@ -418,11 +420,11 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       onTransaction: ({ editor: ed, transaction }) => {
         if (transaction.docChanged) {
           lastDocChangeTimeRef.current = Date.now();
-          if (
-            ed.isFocused &&
-            !previewRef.current &&
-            selectedNote?.role !== "view"
-          ) {
+          const canEdit =
+            selectedNote?.canEdit !== undefined
+              ? selectedNote.canEdit
+              : selectedNote?.role !== "view";
+          if (ed.isFocused && !previewRef.current && canEdit) {
             handleUserTyping();
           }
         }
@@ -536,7 +538,11 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const saveContent = useCallback(
     async (content: Content) => {
       if (!selectedNote) return;
-      if (selectedNote.role === "view") return; // Do not save if view-only
+      const isReadOnly =
+        selectedNote.canEdit !== undefined
+          ? !selectedNote.canEdit
+          : selectedNote.role === "view";
+      if (isReadOnly) return; // Do not save if view-only
       if (previewRef.current) return; // Never save while previewing a version
 
       try {
@@ -613,22 +619,31 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   }, []);
 
   const retrySave = useCallback(() => {
-    if (
-      editor &&
-      !editor.isDestroyed &&
-      !previewRef.current &&
-      selectedNote?.role !== "view"
-    ) {
+    const canEdit =
+      selectedNote?.canEdit !== undefined
+        ? selectedNote.canEdit
+        : selectedNote?.role !== "view";
+    if (editor && !editor.isDestroyed && !previewRef.current && canEdit) {
       debouncedSave.cancel();
       void saveContent(editor.getJSON());
     }
-  }, [editor, debouncedSave, saveContent, selectedNote?.role]);
+  }, [
+    editor,
+    debouncedSave,
+    saveContent,
+    selectedNote?.role,
+    selectedNote?.canEdit,
+  ]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === "s") {
         event.preventDefault();
-        if (selectedNote?.role === "view") return; // Do not save if view-only
+        const isReadOnly =
+          selectedNote?.canEdit !== undefined
+            ? !selectedNote.canEdit
+            : selectedNote?.role === "view";
+        if (isReadOnly) return; // Do not save if view-only
         if (previewRef.current) return; // Never save while previewing a version
         if (editor && !editor.isDestroyed && saveStatus === "unsaved") {
           debouncedSave.cancel();
@@ -641,7 +656,14 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [editor, saveStatus, debouncedSave, saveContent, selectedNote?.role]);
+  }, [
+    editor,
+    saveStatus,
+    debouncedSave,
+    saveContent,
+    selectedNote?.role,
+    selectedNote?.canEdit,
+  ]);
 
   // Track the newest stored content (also while previewing) so exitPreview
   // can show it. Declared before the sync effect so it runs first.
@@ -730,7 +752,11 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
 
     const updateListener = ({ editor }: { editor: Editor }) => {
       if (previewRef.current) return; // Never save while previewing a version
-      if (!editor.isEditable || selectedNote.role === "view") return; // Do not save if view-only
+      const isReadOnly =
+        selectedNote.canEdit !== undefined
+          ? !selectedNote.canEdit
+          : selectedNote.role === "view";
+      if (!editor.isEditable || isReadOnly) return; // Do not save if view-only
       setSaveStatus("unsaved");
       const json = editor.getJSON();
       debouncedSave(json);
@@ -768,14 +794,22 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     const isEditable = selectedNote
-      ? selectedNote.role !== "view" && !previewVersion // view and previewing are read-only
+      ? (selectedNote.canEdit !== undefined
+          ? selectedNote.canEdit
+          : selectedNote.role !== "view") && !previewVersion // view and previewing are read-only
       : false;
     if (editor.isEditable !== isEditable) {
       // Tiptap emits "update" by default, which would mark the note unsaved
       // and autosave right after leaving preview / restoring. Suppress it.
       editor.setEditable(isEditable, false);
     }
-  }, [editor, selectedNote, selectedNote?.role, previewVersion]);
+  }, [
+    editor,
+    selectedNote,
+    selectedNote?.role,
+    selectedNote?.canEdit,
+    previewVersion,
+  ]);
 
   const enterPreview = useCallback(
     (version: PreviewVersion) => {

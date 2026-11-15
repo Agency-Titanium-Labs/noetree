@@ -285,7 +285,12 @@ export default defineSchema({
     userId: v.optional(v.id("users")),
     email: v.string(),
     role: v.optional(
-      v.union(v.literal("view"), v.literal("edit"), v.literal("admin")),
+      v.union(
+        v.literal("view"),
+        v.literal("contributor"),
+        v.literal("edit"),
+        v.literal("admin"),
+      ),
     ),
     // D-01: purchase-granted shares carry the purchase and its scope.
     // undefined purchaseId = manual share (existing rows stay valid).
