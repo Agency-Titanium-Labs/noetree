@@ -5,7 +5,8 @@ export interface NoteTree extends Omit<Doc<"notes">, "childNotes"> {
   shareId?: Id<"shares">;
   isShared?: boolean;
   isPurchased?: boolean;
-  role?: "owner" | "admin" | "edit" | "view";
+  role?: "owner" | "admin" | "edit" | "contributor" | "view";
+  canEdit?: boolean;
 }
 
 export interface DashboardTreeItem {
@@ -20,7 +21,8 @@ export interface DashboardTreeItem {
   shareId?: Id<"shares">;
   isShared?: boolean;
   isPurchased?: boolean;
-  role?: "owner" | "admin" | "edit" | "view";
+  role?: "owner" | "admin" | "edit" | "contributor" | "view";
+  canEdit?: boolean;
 }
 
 /**

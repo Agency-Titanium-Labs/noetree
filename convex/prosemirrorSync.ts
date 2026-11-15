@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { ProsemirrorSync } from "@convex-dev/prosemirror-sync";
 import { DataModel, Id } from "./_generated/dataModel";
 import { getUser } from "./helpers/helper";
-import { getUserPermission } from "./helpers/permissions";
+import { canEditNote, getUserPermission } from "./helpers/permissions";
 import { writeNoteContent } from "./helpers/noteVersions";
 
 const prosemirrorSync = new ProsemirrorSync(components.prosemirrorSync);
@@ -35,8 +35,10 @@ export const {
     if (!id || id === "") return;
     const user = await getUser(ctx);
     if (!user) throw new Error("UNAUTHENTICATED");
+    const note = await ctx.db.get("notes", id as Id<"notes">);
+    if (!note) throw new Error("NOT_FOUND");
     const role = await getUserPermission(ctx, id as Id<"notes">, user._id);
-    if (role !== "owner" && role !== "admin" && role !== "edit") {
+    if (!canEditNote(note, user._id, role)) {
       throw new Error("UNAUTHORIZED");
     }
   },
@@ -58,8 +60,10 @@ export const resyncDocument = mutation({
   handler: async (ctx, args) => {
     const user = await getUser(ctx);
     if (!user) throw new Error("UNAUTHENTICATED");
+    const note = await ctx.db.get("notes", args.id as Id<"notes">);
+    if (!note) throw new Error("NOT_FOUND");
     const role = await getUserPermission(ctx, args.id as Id<"notes">, user._id);
-    if (role !== "owner" && role !== "admin" && role !== "edit") {
+    if (!canEditNote(note, user._id, role)) {
       throw new Error("UNAUTHORIZED");
     }
 

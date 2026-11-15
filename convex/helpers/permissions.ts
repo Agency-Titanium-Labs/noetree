@@ -1,9 +1,41 @@
 import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 
-type ShareRole = "admin" | "edit" | "view";
+export type ShareRole = "admin" | "edit" | "contributor" | "view";
 
-const ROLE_RANK: Record<ShareRole, number> = { view: 1, edit: 2, admin: 3 };
+export const ROLE_RANK: Record<ShareRole, number> = {
+  view: 1,
+  contributor: 2,
+  edit: 3,
+  admin: 4,
+};
+
+export function canEditNote(
+  note: { owner: Id<"users"> },
+  userOrId: Id<"users"> | { _id: Id<"users"> },
+  role: "owner" | ShareRole | null | undefined,
+): boolean {
+  if (!role) return false;
+  if (role === "owner" || role === "admin" || role === "edit") {
+    return true;
+  }
+  if (role === "contributor") {
+    const userId = typeof userOrId === "object" ? userOrId._id : userOrId;
+    return note.owner === userId;
+  }
+  return false;
+}
+
+export function canCreateUnder(
+  role: "owner" | ShareRole | null | undefined,
+): boolean {
+  return (
+    role === "owner" ||
+    role === "admin" ||
+    role === "edit" ||
+    role === "contributor"
+  );
+}
 
 export async function isOwnerOrAncestorOwner(
   ctx: QueryCtx | MutationCtx,
@@ -21,11 +53,18 @@ export async function isOwnerOrAncestorOwner(
   visited.add(noteId);
   const note = await ctx.db.get("notes", noteId);
   if (!note) return false;
-  if (note.owner === userId) return true;
   if (note.parentNote) {
-    return await isOwnerOrAncestorOwner(ctx, note.parentNote, userId, visited);
+    const parent = await ctx.db.get("notes", note.parentNote);
+    if (parent) {
+      return await isOwnerOrAncestorOwner(
+        ctx,
+        note.parentNote,
+        userId,
+        visited,
+      );
+    }
   }
-  return false;
+  return note.owner === userId;
 }
 
 // Shared bottom-up walk. Rows with scope "note" only apply at the starting
@@ -88,7 +127,7 @@ export async function getUserPermission(
   ctx: QueryCtx | MutationCtx,
   noteId: Id<"notes">,
   userId: Id<"users">,
-): Promise<"owner" | "admin" | "edit" | "view" | null> {
+): Promise<"owner" | ShareRole | null> {
   const note = await ctx.db.get("notes", noteId);
   if (!note) return null;
 
@@ -103,7 +142,7 @@ export async function getInheritedPermission(
   ctx: QueryCtx | MutationCtx,
   noteId: Id<"notes">,
   userId: Id<"users">,
-): Promise<"owner" | "admin" | "edit" | "view" | null> {
+): Promise<"owner" | ShareRole | null> {
   const note = await ctx.db.get("notes", noteId);
   if (!note) return null;
 

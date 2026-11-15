@@ -131,7 +131,7 @@ export function NoteCard({
           e.stopPropagation();
           setIsRenaming(true);
         },
-        show: note.role !== "view",
+        show: note.canEdit !== undefined ? note.canEdit : note.role !== "view",
       },
       {
         id: "share",
@@ -161,7 +161,9 @@ export function NoteCard({
           e.stopPropagation();
           onDuplicateNote(note._id);
         },
-        show: !isRoot && note.role !== "view",
+        show:
+          !isRoot &&
+          (note.canEdit !== undefined ? note.canEdit : note.role !== "view"),
       },
       {
         id: "leave",
@@ -188,11 +190,14 @@ export function NoteCard({
           onDelete();
         },
         variant: "destructive" as const,
-        show: !isRoot && note.role !== "view",
+        show:
+          !isRoot &&
+          (note.canEdit !== undefined ? note.canEdit : note.role !== "view"),
       },
     ].filter(action => action.show);
   }, [
     note.role,
+    note.canEdit,
     note._id,
     isRoot,
     note.isShared,
@@ -308,7 +313,11 @@ export function NoteCard({
               onSelectNote(note, getCurrentContent);
             }}
             onDoubleClick={() =>
-              !isTemp && note.role !== "view" && setIsRenaming(true)
+              !isTemp &&
+              (note.canEdit !== undefined
+                ? note.canEdit
+                : note.role !== "view") &&
+              setIsRenaming(true)
             }
           >
             <div className="flex flex-col items-center p-3">

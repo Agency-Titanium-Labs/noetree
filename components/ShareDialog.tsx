@@ -57,9 +57,9 @@ export default function ShareDialog({
   const queryClient = useQueryClient();
   const { user: clerkUser } = useUser();
   const [email, setEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"view" | "edit" | "admin">(
-    "view",
-  );
+  const [inviteRole, setInviteRole] = useState<
+    "view" | "contributor" | "edit" | "admin"
+  >("view");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,7 +133,7 @@ export default function ShareDialog({
 
   const handleRoleChange = async (
     shareId: Id<"shares">,
-    newRole: "view" | "edit" | "admin",
+    newRole: "view" | "contributor" | "edit" | "admin",
   ) => {
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -163,7 +163,9 @@ export default function ShareDialog({
               <Select
                 value={inviteRole}
                 onValueChange={val =>
-                  setInviteRole(val as "view" | "edit" | "admin")
+                  setInviteRole(
+                    val as "view" | "contributor" | "edit" | "admin",
+                  )
                 }
                 disabled={isSubmitting}
               >
@@ -172,6 +174,9 @@ export default function ShareDialog({
                 </SelectTrigger>
                 <SelectContent position="popper">
                   <SelectItem value="view">{t("roleView")}</SelectItem>
+                  <SelectItem value="contributor">
+                    {t("roleContributor")}
+                  </SelectItem>
                   <SelectItem value="edit">{t("roleEdit")}</SelectItem>
                   <SelectItem value="admin">{t("roleAdmin")}</SelectItem>
                 </SelectContent>
@@ -248,7 +253,7 @@ export default function ShareDialog({
                           onValueChange={val =>
                             handleRoleChange(
                               shareUser.shareId!,
-                              val as "view" | "edit" | "admin",
+                              val as "view" | "contributor" | "edit" | "admin",
                             )
                           }
                         >
@@ -258,6 +263,9 @@ export default function ShareDialog({
                           <SelectContent position="popper">
                             <SelectItem value="view">
                               {t("roleView")}
+                            </SelectItem>
+                            <SelectItem value="contributor">
+                              {t("roleContributor")}
                             </SelectItem>
                             <SelectItem value="edit">
                               {t("roleEdit")}
@@ -275,7 +283,9 @@ export default function ShareDialog({
                               ? t("roleAdmin")
                               : shareUser.role === "edit"
                                 ? t("roleEdit")
-                                : t("roleView")}
+                                : shareUser.role === "contributor"
+                                  ? t("roleContributor")
+                                  : t("roleView")}
                         </span>
                       )}
 

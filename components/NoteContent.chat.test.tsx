@@ -175,6 +175,30 @@ describe("NoteContent chat is bound to its note (M2)", () => {
     expect(screen.getByText("readOnlyBadge")).toBeInTheDocument();
   });
 
+  it("renders ReadOnlyBadge and hides toolbar when contributor on someone else's note (canEdit === false)", () => {
+    tree.selectedNote = {
+      _id: "n2",
+      title: "Other's Note",
+      role: "contributor",
+      canEdit: false,
+    } as any;
+    render(<NoteContent />);
+    expect(screen.queryByTestId("open-chat")).toBeNull();
+    expect(screen.getByText("readOnlyBadge")).toBeInTheDocument();
+  });
+
+  it("does not render ReadOnlyBadge when contributor on own note (canEdit === true)", () => {
+    tree.selectedNote = {
+      _id: "n1",
+      title: "My Contrib Note",
+      role: "contributor",
+      canEdit: true,
+    } as any;
+    render(<NoteContent />);
+    expect(screen.queryByText("readOnlyBadge")).toBeNull();
+    expect(screen.getByTestId("open-chat")).toBeInTheDocument();
+  });
+
   it("does not render ReadOnlyBadge when the note is editable", () => {
     tree.selectedNote = { _id: "n1", title: "Editable", role: "owner" };
     render(<NoteContent />);

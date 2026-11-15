@@ -215,11 +215,13 @@ export function TreeProvider({ children }: Readonly<TreeProviderProps>) {
         setIsDrawerOpen(true);
         if (selectedNoteId === note._id) return;
 
-        if (
+        const canSaveSelected =
           selectedNote &&
-          selectedNote.role !== "view" &&
-          getCurrentEditorContent
-        ) {
+          (selectedNote.canEdit !== undefined
+            ? selectedNote.canEdit
+            : selectedNote.role !== "view");
+
+        if (canSaveSelected && getCurrentEditorContent) {
           const currentContent = getCurrentEditorContent();
           if (currentContent) {
             const oldContent =
@@ -241,6 +243,11 @@ export function TreeProvider({ children }: Readonly<TreeProviderProps>) {
         if (!selectedNote) return;
         const currentTree = tree as unknown as NoteTree;
         const note = currentTree ? findNoteById(noteId, currentTree) : null;
+        if (!note) return;
+        const canEdit =
+          note.canEdit !== undefined ? note.canEdit : note.role !== "view";
+        if (!canEdit) return;
+
         const originalTitle = note?.title || "";
         if (originalTitle === newTitle) return;
 
@@ -256,6 +263,11 @@ export function TreeProvider({ children }: Readonly<TreeProviderProps>) {
       },
       onUpdateNoteContent: (newContent: string) => {
         if (!selectedNote) return;
+        const canSave =
+          selectedNote.canEdit !== undefined
+            ? selectedNote.canEdit
+            : selectedNote.role !== "view";
+        if (!canSave) return;
         updateNoteContent({
           id: selectedNote._id,
           content: newContent,
@@ -266,7 +278,13 @@ export function TreeProvider({ children }: Readonly<TreeProviderProps>) {
         newNoteTitle: string,
         getCurrentEditorContent?: () => string | null,
       ) => {
-        if (selectedNote && getCurrentEditorContent) {
+        const canSaveSelected =
+          selectedNote &&
+          (selectedNote.canEdit !== undefined
+            ? selectedNote.canEdit
+            : selectedNote.role !== "view");
+
+        if (canSaveSelected && getCurrentEditorContent) {
           const currentContent = getCurrentEditorContent();
           if (currentContent) {
             updateNoteContent({
@@ -292,6 +310,12 @@ export function TreeProvider({ children }: Readonly<TreeProviderProps>) {
           : null;
 
         if (noteToDelete) {
+          const canDelete =
+            noteToDelete.canEdit !== undefined
+              ? noteToDelete.canEdit
+              : noteToDelete.role !== "view";
+          if (!canDelete) return;
+
           // If the selected note is the one being deleted OR one of its descendants
           const isSelectedInBranch = !!findNoteById(
             selectedNoteId,
@@ -315,6 +339,18 @@ export function TreeProvider({ children }: Readonly<TreeProviderProps>) {
         });
       },
       onDuplicateNote: (noteId: Id<"notes">) => {
+        const currentTree = tree as unknown as NoteTree;
+        const noteToDuplicate = currentTree
+          ? findNoteById(noteId, currentTree)
+          : null;
+        if (noteToDuplicate) {
+          const canDuplicate =
+            noteToDuplicate.canEdit !== undefined
+              ? noteToDuplicate.canEdit
+              : noteToDuplicate.role !== "view";
+          if (!canDuplicate) return;
+        }
+
         setHistory({ undoStack: [], redoStack: [] });
         duplicateNote({
           id: noteId,
