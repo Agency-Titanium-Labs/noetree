@@ -10,7 +10,6 @@
   },
   "Sidebar": {
     "title": "NoeTree",
-    "dashboard": "Tableau de bord",
     "notes": "Notes",
     "pinned": "Épinglées",
     "listings": "Mes annonces",
@@ -26,11 +25,6 @@
     "themeDark": "Sombre",
     "themeSystem": "Système",
     "logout": "Se déconnecter"
-  },
-  "Dashboard": {
-    "title": "Tableau de bord",
-    "notesLink": "Notes",
-    "welcomeText": "Bienvenue sur votre tableau de bord. Accédez à vos arborescences de notes pour commencer à rédiger."
   },
   "Pricing": {
     "heading": "Des tarifs simples et transparents",
