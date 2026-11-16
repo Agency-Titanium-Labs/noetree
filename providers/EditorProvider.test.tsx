@@ -455,6 +455,16 @@ describe("leaving preview does not autosave (GAP-1)", () => {
         { emitUpdate: false },
       );
     });
+
+    it("does not call setContent when editor is empty and incoming content is empty or {}", () => {
+      (h.fake as unknown as { isEmpty: boolean }).isEmpty = true;
+      const { rerender } = mount();
+      h.fake.commands.setContent.mockClear();
+      setNote({ content: "{}" });
+      rerender(ui());
+      expect(h.fake.commands.setContent).not.toHaveBeenCalled();
+      (h.fake as unknown as { isEmpty: boolean }).isEmpty = false;
+    });
   });
 
   describe("focus mode", () => {
