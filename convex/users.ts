@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { getUser } from "./helpers/helper";
 
@@ -67,6 +67,9 @@ export const store = mutation({
         }
       }
 
+      // Auto-share any default shared trees (e.g. Feedbacks Beta)
+      await syncDefaultShares(ctx, user._id, email, user.dismissedDefaultTrees);
+
       return user._id;
     }
     // The original dev deployment seeded this roles row; a fresh deployment has
@@ -132,9 +135,45 @@ export const store = mutation({
       }
     }
 
+    // Auto-share any default shared trees (e.g. Feedbacks Beta)
+    await syncDefaultShares(ctx, newUserId, email, undefined);
+
     return newUserId;
   },
 });
+
+async function syncDefaultShares(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  email: string | undefined,
+  dismissedTrees?: Id<"notes">[],
+) {
+  const defaultTrees = await ctx.db
+    .query("notes")
+    .withIndex("by_default_shared", q => q.eq("isDefaultShared", true))
+    .collect();
+
+  for (const tree of defaultTrees) {
+    if (tree.owner === userId) continue;
+    if (dismissedTrees?.includes(tree._id)) continue;
+
+    const existingShare = await ctx.db
+      .query("shares")
+      .withIndex("by_user_note", q =>
+        q.eq("userId", userId).eq("noteId", tree._id),
+      )
+      .first();
+
+    if (!existingShare) {
+      await ctx.db.insert("shares", {
+        noteId: tree._id,
+        userId,
+        email: email ?? "",
+        role: "contributor",
+      });
+    }
+  }
+}
 
 export const me = query({
   args: {},

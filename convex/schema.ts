@@ -15,6 +15,8 @@ export default defineSchema({
     email_verified: v.optional(v.boolean()),
     phone_number_verified: v.optional(v.boolean()),
     role: v.id("roles"),
+    // Note IDs of default shared trees that the user explicitly chose to leave
+    dismissedDefaultTrees: v.optional(v.array(v.id("notes"))),
   })
     .index("by_token", ["tokenIdentifier"])
     .index("by_email", ["email"]),
@@ -50,10 +52,13 @@ export default defineSchema({
     // Optional so no migration is needed.
     aiBatchId: v.optional(v.string()),
     aiBatchAt: v.optional(v.number()),
+    // Flag on a root note: when true, this tree is automatically shared with all users as contributor
+    isDefaultShared: v.optional(v.boolean()),
   })
     .index("by_owner", ["owner", "parentNote"])
     .index("by_parent", ["parentNote"])
-    .index("by_purchaseId", ["purchaseId"]),
+    .index("by_purchaseId", ["purchaseId"])
+    .index("by_default_shared", ["isDefaultShared"]),
 
   subscriptions: defineTable({
     clerkUserId: v.string(),
