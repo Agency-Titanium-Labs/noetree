@@ -339,6 +339,7 @@
   "Editor": {
     "readOnlyBadge": "Lecture seule",
     "readOnlyTooltip": "Vous ne disposez pas des droits d'édition sur cette note.",
+    "toolbarLabel": "Barre d'outils de formatage",
     "enterFocusMode": "Mode Focus",
     "exitFocusMode": "Quitter le mode Focus",
     "placeholder": "Écrivez quelque chose...",

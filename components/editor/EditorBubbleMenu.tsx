@@ -246,7 +246,7 @@ export default function EditorBubbleMenu({
     >
       <div
         data-testid="bubble-menu"
-        className="flex items-center gap-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+        className="flex items-center gap-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md z-20"
       >
         {onOpenChat && (
           <Button
