@@ -25,10 +25,10 @@ importers:
         version: 7.5.1(next@16.4.2(@babel/core@7.29.7(supports-color@8.1.1))(@types/node@25.9.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@convex-dev/presence':
         specifier: ^0.4.0
-        version: 0.4.0(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 0.4.0(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@convex-dev/prosemirror-sync':
         specifier: ^0.2.7
-        version: 0.2.7(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(decode-named-character-reference@1.3.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 0.2.7(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(decode-named-character-reference@1.3.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@dnd-kit/dom':
         specifier: ^0.4.0
         version: 0.4.0
@@ -120,8 +120,8 @@ importers:
         specifier: ^0.5.0
         version: 0.5.0
       convex:
-        specifier: ^1.47.0
-        version: 1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+        specifier: ^1.50.0
+        version: 1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       js-cookie:
         specifier: ^3.0.8
         version: 3.0.8
@@ -185,7 +185,7 @@ importers:
         version: 2.1.0(cypress@15.17.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@convex-dev/react-query':
         specifier: ^0.1.0
-        version: 0.1.0(@tanstack/react-query@5.101.0(react@19.2.7))(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))
+        version: 0.1.0(@tanstack/react-query@5.101.0(react@19.2.7))(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))
       '@edge-runtime/vm':
         specifier: ^5.0.0
         version: 5.0.0
@@ -227,7 +227,7 @@ importers:
         version: 10.0.3
       convex-test:
         specifier: ^0.0.54
-        version: 0.0.54(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))
+        version: 0.0.54(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))
       cypress:
         specifier: ^15.16.0
         version: 15.17.0
@@ -3484,9 +3484,9 @@ packages:
     peerDependencies:
       convex: ^1.32.0
 
-  convex@1.47.0:
-    resolution: {integrity: sha512-B1z/lOmex7i09NASq8+2WG9rZLzGXXOSkpwGOpaNIvOs4awyW4RMgpVBjt8r2wvvHwhEBEsOr2pGYpulnmAxYQ==}
-    engines: {node: '>=20.0.0', npm: '>=7.0.0'}
+  convex@1.50.0:
+    resolution: {integrity: sha512-WzzCad5hyzU4zzW0ChyUGB3Mil4LgRYMYii9cyQtC24WQnfaRgkZB0IKyhIIgRm1a2IXiGJoZnVYYSfttiap3Q==}
+    engines: {node: '>=22.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
       '@auth0/auth0-react': ^2.0.1
@@ -6687,31 +6687,31 @@ snapshots:
       - react
       - react-dom
 
-  '@convex-dev/batch-worker@0.2.2(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(react@19.2.7)':
+  '@convex-dev/batch-worker@0.2.2(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(react@19.2.7)':
     dependencies:
-      convex: 1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      convex: 1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       react: 19.2.7
 
-  '@convex-dev/presence@0.4.0(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@convex-dev/presence@0.4.0(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@convex-dev/batch-worker': 0.2.2(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(react@19.2.7)
-      convex: 1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      '@convex-dev/batch-worker': 0.2.2(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      convex: 1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
-  '@convex-dev/prosemirror-sync@0.2.7(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(decode-named-character-reference@1.3.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@convex-dev/prosemirror-sync@0.2.7(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(decode-named-character-reference@1.3.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@tiptap/core': 3.32.0(@tiptap/pm@3.32.0)
-      convex: 1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      convex: 1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       decode-named-character-reference: 1.3.0
       prosemirror-collab: 1.3.1
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
-  '@convex-dev/react-query@0.1.0(@tanstack/react-query@5.101.0(react@19.2.7))(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))':
+  '@convex-dev/react-query@0.1.0(@tanstack/react-query@5.101.0(react@19.2.7))(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))':
     dependencies:
       '@tanstack/react-query': 5.101.0(react@19.2.7)
-      convex: 1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      convex: 1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
@@ -9516,11 +9516,11 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  convex-test@0.0.54(convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)):
+  convex-test@0.0.54(convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)):
     dependencies:
-      convex: 1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      convex: 1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
 
-  convex@1.47.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
+  convex@1.50.0(@clerk/react@6.9.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.8.4
