@@ -36,8 +36,11 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/convex/_generated/api";
 import CreditsExhaustedDialog from "@/components/CreditsExhaustedDialog";
+import { cn } from "@/lib/utils";
 
 interface EditorToolbarProps {
+  /** Optional class name to customize toolbar container */
+  className?: string;
   /** Opens the AI chat panel (the free `basic` action, Phase 19). */
   onOpenChat?: (mode?: "chat" | "tree") => void;
   /** Opens the Related notes panel (the Premium `linking` action, Phase 22). */
@@ -45,6 +48,7 @@ interface EditorToolbarProps {
 }
 
 export default function EditorToolbar({
+  className,
   onOpenChat,
   onOpenLinks,
 }: EditorToolbarProps = {}) {
@@ -179,7 +183,14 @@ export default function EditorToolbar({
 
   return (
     <TooltipProvider delayDuration={1000}>
-      <div className="flex flex-wrap items-center gap-1">
+      <div
+        role="toolbar"
+        aria-label={t("toolbarLabel")}
+        className={cn(
+          "sticky top-0 z-10 w-full flex flex-wrap items-center gap-1 bg-background",
+          className,
+        )}
+      >
         <ToolbarGroup items={historyItems} />
 
         <HeadingDropdown />
