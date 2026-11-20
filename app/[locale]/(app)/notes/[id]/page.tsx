@@ -14,6 +14,26 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { VisuallyHidden } from "radix-ui";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTreeContext } from "@/providers/TreeProvider";
+import { useDefaultLayout, type LayoutStorage } from "react-resizable-panels";
+
+const panelStorage: LayoutStorage = {
+  getItem: name => {
+    if (typeof window === "undefined") return null;
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(name, value);
+    } catch {
+      // ignore
+    }
+  },
+};
 
 function MobileDrawer() {
   const { isDrawerOpen, setIsDrawerOpen, selectedNote } = useTreeContext();
@@ -34,6 +54,10 @@ function MobileDrawer() {
 
 function DesktopPanels() {
   const { isFocusMode } = useEditorContext();
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: "notes:desktop-layout",
+    storage: panelStorage,
+  });
 
   if (isFocusMode) {
     return (
@@ -46,12 +70,22 @@ function DesktopPanels() {
   }
 
   return (
-    <ResizablePanelGroup orientation="horizontal">
-      <ResizablePanel defaultSize="60%" minSize="250px">
+    <ResizablePanelGroup
+      id="notes:desktop-layout"
+      orientation="horizontal"
+      defaultLayout={defaultLayout}
+      onLayoutChanged={onLayoutChanged}
+    >
+      <ResizablePanel id="tree" defaultSize="60%" minSize="250px">
         <NoteTree />
       </ResizablePanel>
       <ResizableHandle withHandle />
-      <ResizablePanel defaultSize="40%" minSize="400px" className="p-4">
+      <ResizablePanel
+        id="content"
+        defaultSize="40%"
+        minSize="400px"
+        className="p-4"
+      >
         <NoteContent />
       </ResizablePanel>
     </ResizablePanelGroup>
