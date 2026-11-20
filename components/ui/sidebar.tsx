@@ -101,9 +101,24 @@ function SidebarProvider({
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+        event.key.toLowerCase() === SIDEBAR_KEYBOARD_SHORTCUT &&
+        !event.shiftKey &&
         (event.metaKey || event.ctrlKey)
       ) {
+        if (event.defaultPrevented) return;
+
+        const target = event.target as HTMLElement | null;
+        if (
+          target &&
+          (target.isContentEditable ||
+            target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            (typeof target.closest === "function" &&
+              Boolean(target.closest("[contenteditable='true']"))))
+        ) {
+          return;
+        }
+
         event.preventDefault();
         toggleSidebar();
       }
