@@ -1404,6 +1404,18 @@ export const removeShare = mutation({
       throw new Error("Unauthorized to remove this share");
     }
 
+    if (isSelfRevoke) {
+      const note = await ctx.db.get(share.noteId);
+      if (note?.isDefaultShared) {
+        const dismissed = user.dismissedDefaultTrees || [];
+        if (!dismissed.includes(share.noteId)) {
+          await ctx.db.patch(user._id, {
+            dismissedDefaultTrees: [...dismissed, share.noteId],
+          });
+        }
+      }
+    }
+
     await ctx.db.delete(share._id);
     return true;
   },

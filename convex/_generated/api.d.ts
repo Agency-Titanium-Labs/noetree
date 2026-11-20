@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
 import type * as aiChat from "../aiChat.js";
 import type * as aiCredits from "../aiCredits.js";
 import type * as aiRuns from "../aiRuns.js";
@@ -70,6 +71,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
   aiChat: typeof aiChat;
   aiCredits: typeof aiCredits;
   aiRuns: typeof aiRuns;

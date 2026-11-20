@@ -88,3 +88,8 @@ function handleButtonPress() {
 Use the Convex CLI to push your functions to a deployment. See everything
 the Convex CLI can do by running `npx convex -h` in your project root
 directory. To learn more, launch the docs with `npx convex docs`.
+
+## Admin CLI Functions
+
+Administrative and backfill functions are available in `convex/admin.ts`.
+See the root `README.md` for CLI command instructions (e.g. `admin:setDefaultSharedTree`).

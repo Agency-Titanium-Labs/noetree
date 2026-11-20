@@ -34,3 +34,33 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Commandes d'administration (CLI Convex)
+
+### Arbres partagés par défaut (ex. Feedbacks Beta)
+
+Permet de désigner un arbre racine (par exemple `🚀 Feedbacks Beta`) pour qu'il soit automatiquement partagé avec **tous les utilisateurs** (comptes existants et nouveaux arrivants) avec le rôle **`contributor`** (lecture, commentaires, création et modification de leurs propres sous-notes).
+
+L'ID de la note se trouve directement dans l'URL de votre navigateur lorsque vous visualisez la note :  
+`https://noetree.com/notes/<ID_DE_LA_NOTE>`
+
+```bash
+# Activer le partage par défaut pour un arbre (remplacer par l'ID de votre note racine) :
+npx convex run admin:setDefaultSharedTree '{"noteId": "<ID_DE_LA_NOTE>"}'
+
+# Spécifier un autre rôle si besoin (contributor par défaut, ou view, edit) :
+npx convex run admin:setDefaultSharedTree '{"noteId": "<ID_DE_LA_NOTE>", "role": "contributor"}'
+
+# Pour exécuter sur le déploiement de production, ajouter le flag --prod :
+npx convex run admin:setDefaultSharedTree '{"noteId": "<ID_DE_LA_NOTE>"}' --prod
+
+# Lister les arbres par défaut actifs :
+npx convex run admin:listDefaultSharedTrees
+# En production :
+npx convex run admin:listDefaultSharedTrees --prod
+
+# Désactiver le partage par défaut d'un arbre :
+npx convex run admin:setDefaultSharedTree '{"noteId": "<ID_DE_LA_NOTE>", "enabled": false}'
+# En production :
+npx convex run admin:setDefaultSharedTree '{"noteId": "<ID_DE_LA_NOTE>", "enabled": false}' --prod
+```
