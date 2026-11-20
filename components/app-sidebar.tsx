@@ -13,35 +13,13 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { FileText, Pin, Store, ShoppingBag, Wallet } from "lucide-react";
+import { FileText, Pin, Store } from "lucide-react";
+import { NavMain, type NavMainItem } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@/convex/_generated/api";
-
-const items = [
-  {
-    title: "notes",
-    url: "/notes",
-    icon: FileText,
-  },
-  {
-    title: "listings",
-    url: "/listings",
-    icon: Store,
-  },
-  {
-    title: "purchases",
-    url: "/purchases",
-    icon: ShoppingBag,
-  },
-  {
-    title: "sales",
-    url: "/sales",
-    icon: Wallet,
-  },
-];
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -76,24 +54,70 @@ export function AppSidebar() {
     }
   }, [pathname, isMobile, setOpen, setOpenMobile]);
 
+  const isNotesActive = pathname === "/notes" || pathname === "/notes/";
+
+  const isMarketplaceBrowseActive =
+    pathname === "/marketplace" || pathname.startsWith("/marketplace/");
+
+  const isListingsActive =
+    pathname === "/listings" || pathname.startsWith("/listings/");
+
+  const isPurchasesActive =
+    pathname === "/purchases" || pathname.startsWith("/purchases/");
+
+  const isSalesActive = pathname === "/sales" || pathname.startsWith("/sales/");
+
+  const isMarketplaceActive =
+    isMarketplaceBrowseActive ||
+    isListingsActive ||
+    isPurchasesActive ||
+    isSalesActive;
+
+  const navItems: NavMainItem[] = [
+    {
+      title: t("notes"),
+      url: "/notes",
+      icon: FileText,
+      isActive: isNotesActive,
+    },
+    {
+      title: t("marketplace"),
+      url: "/marketplace",
+      icon: Store,
+      isActive: isMarketplaceActive,
+      items: [
+        {
+          title: t("browse"),
+          url: "/marketplace",
+          isActive: isMarketplaceBrowseActive,
+        },
+        {
+          title: t("listings"),
+          url: "/listings",
+          isActive: isListingsActive,
+        },
+        {
+          title: t("purchases"),
+          url: "/purchases",
+          isActive: isPurchasesActive,
+        },
+        {
+          title: t("sales"),
+          url: "/sales",
+          isActive: isSalesActive,
+        },
+      ],
+    },
+  ];
+
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>{t("title")}</SidebarGroupLabel>
-          <SidebarMenu>
-            {items.map(item => (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild tooltip={t(item.title)}>
-                  <Link href={item.url} onClick={handleItemClick}>
-                    <item.icon />
-                    <span>{t(item.title)}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
+        <NavMain
+          label={t("title")}
+          items={navItems}
+          onItemClick={handleItemClick}
+        />
 
         {pinnedTrees.length > 0 && (
           <SidebarGroup>
@@ -101,7 +125,11 @@ export function AppSidebar() {
             <SidebarMenu>
               {pinnedTrees.map(tree => (
                 <SidebarMenuItem key={tree._id}>
-                  <SidebarMenuButton asChild tooltip={tree.title}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={tree.title}
+                    isActive={pathname === `/notes/${tree._id}`}
+                  >
                     <Link href={`/notes/${tree._id}`} onClick={handleItemClick}>
                       <Pin className="h-4 w-4 -rotate-45" />
                       <span className="truncate">{tree.title}</span>
