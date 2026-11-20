@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+
+current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+if [ "$current_branch" = "main" ]; then
+  echo ""
+  echo "🚫 [Husky] Push direct sur 'main' interdit !"
+  echo "👉 Veuillez créer une branche de fonctionnalité et passer par une Pull Request."
+  echo ""
+  exit 1
+fi
+
+while read -r local_ref local_oid remote_ref remote_oid; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo ""
+    echo "🚫 [Husky] Push vers la branche 'main' interdit !"
+    echo "👉 Veuillez pousser sur votre propre branche et ouvrir une Pull Request."
+    echo ""
+    exit 1
+  fi
+done
+
+exit 0
