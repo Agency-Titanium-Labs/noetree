@@ -412,10 +412,7 @@ export default function NoteContent() {
   const linksOpen = isLinksOpen && !!selectedNote;
   const dockOpen = chatOpen || linksOpen;
   return (
-    <ResizablePanelGroup
-      orientation="vertical"
-      className="h-[calc(100dvh-7rem)] min-h-120"
-    >
+    <ResizablePanelGroup orientation="vertical">
       <ResizablePanel
         id="note"
         defaultSize={dockOpen ? "60%" : "100%"}
