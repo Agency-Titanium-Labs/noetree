@@ -379,6 +379,7 @@ div:has(> .tiptap) {
 .tiptap,
 .ProseMirror {
   accent-color: var(--primary);
+  word-wrap: anywhere !important;
 
   @-moz-document url-prefix() {
     outline: none;
