@@ -117,11 +117,29 @@ function parseNoteContent(raw: unknown): Content {
   let content: Content = "";
   try {
     if (raw && typeof raw === "string") {
-      if (raw.trim() === "") {
+      const trimmed = raw.trim();
+      if (trimmed === "" || trimmed === "{}") {
         content = "";
       } else {
-        content = JSON.parse(raw) as Content;
+        const parsed = JSON.parse(trimmed) as Content;
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed) &&
+          !("type" in parsed)
+        ) {
+          content = "";
+        } else {
+          content = parsed;
+        }
       }
+    } else if (
+      raw &&
+      typeof raw === "object" &&
+      !Array.isArray(raw) &&
+      !("type" in raw)
+    ) {
+      content = "";
     } else if (raw) {
       content = raw as Content;
     }
@@ -208,7 +226,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
   const initialContent: Content = sync.initialContent
     ? (sync.initialContent as Content)
     : sync.isLoading
-      ? { type: "doc", content: [] }
+      ? { type: "doc", content: [{ type: "paragraph" }] }
       : parseNoteContent(selectedNote?.content);
 
   const { user } = useUser();
@@ -355,7 +373,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
       const doc =
         parsed && typeof parsed === "object" && "type" in parsed
           ? (parsed as JSONContent)
-          : { type: "doc", content: [] };
+          : { type: "doc", content: [{ type: "paragraph" }] };
       void sync.create(doc);
     }
   }, [
@@ -728,6 +746,7 @@ export function EditorProvider({ children }: Readonly<EditorProviderProps>) {
     if (sync.extension) return;
 
     const content = parseNoteContent(latestContentRef.current);
+    if (editor.isEmpty && (content === "" || !content)) return;
 
     const currentJSON = JSON.stringify(editor.getJSON());
     const incomingJSON =
